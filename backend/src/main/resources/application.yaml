@@ -1,3 +1,113 @@
 spring:
   application:
     name: rebyu
+
+  # ─── Database ───────────────────────────────────────────────
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: RebyuHikariPool
+      maximum-pool-size: 5      # Neon free tier has connection limits, keep this low
+      minimum-idle: 1
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-init-sql: SELECT 1
+
+  # ─── JPA / Hibernate ────────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: update          # use 'update' during early dev, 'validate' once schema is stable
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+
+  # ─── Security / OAuth2 Resource Server ──────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:9000}   # your auth server
+          jwk-set-uri: ${JWK_SET_URI:http://localhost:9000/oauth2/jwks}
+
+  # ─── WebSocket ──────────────────────────────────────────────
+  websocket:
+    message-broker:
+      application-destination-prefixes: /app
+      topic-prefix: /topic
+      queue-prefix: /queue
+
+  # ─── DevTools ───────────────────────────────────────────────
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+# ─── CORS ───────────────────────────────────────────────────────
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+
+# ─── Server ─────────────────────────────────────────────────────
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# ─── Resilience4j Circuit Breaker ───────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      mlSidecar:                        # for calls to your FastAPI/BKT sidecar
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+      ragService:                       # for LangChain4j RAG calls
+        register-health-indicator: true
+        sliding-window-size: 10
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 15s
+  retry:
+    instances:
+      mlSidecar:
+        max-attempts: 3
+        wait-duration: 500ms
+      ragService:
+        max-attempts: 2
+        wait-duration: 1s
+
+# ─── Logging ────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.capstone.rebyu: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG               # flip to INFO in prod
+    org.hibernate.orm.jdbc.bind: TRACE     # shows bound params — disable in prod
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ─── Actuator ───────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, circuitbreakers
+  endpoint:
+    health:
+      show-details: when-authorized

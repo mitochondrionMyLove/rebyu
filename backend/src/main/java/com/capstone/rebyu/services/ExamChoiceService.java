@@ -1,0 +1,46 @@
+package com.capstone.rebyu.services;
+
+import com.capstone.rebyu.dto.ExamChoiceDto;
+import com.capstone.rebyu.mappers.ExamChoiceMapper;
+import com.capstone.rebyu.models.ExamChoice;
+import com.capstone.rebyu.models.ExamChoiceId;
+import com.capstone.rebyu.repositories.ExamChoiceRepository;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class ExamChoiceService {
+    private final ExamChoiceRepository examChoiceRepository;
+    private final ExamChoiceMapper examChoiceMapper;
+
+    public List<ExamChoiceDto> getAll() {
+        return examChoiceRepository.findAll().stream().map(examChoiceMapper::toDto).toList();
+    }
+
+    public ExamChoiceDto getById(Long examQuestionId, Long choiceId) {
+        return examChoiceMapper.toDto(findEntity(examQuestionId, choiceId));
+    }
+
+    public ExamChoiceDto create(ExamChoiceDto dto) {
+        ExamChoice entity = examChoiceMapper.toEntity(dto);
+        return examChoiceMapper.toDto(examChoiceRepository.save(entity));
+    }
+
+    public void delete(Long examQuestionId, Long choiceId) {
+        examChoiceRepository.delete(findEntity(examQuestionId, choiceId));
+    }
+
+    private ExamChoice findEntity(Long examQuestionId, Long choiceId) {
+        ExamChoiceId id = new ExamChoiceId();
+        id.setExamQuestionId(examQuestionId);
+        id.setChoiceId(choiceId);
+        return examChoiceRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("ExamChoice not found: " + examQuestionId + "/" + choiceId));
+    }
+}

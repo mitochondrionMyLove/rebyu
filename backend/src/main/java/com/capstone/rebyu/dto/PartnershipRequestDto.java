@@ -1,0 +1,25 @@
+package com.capstone.rebyu.dto;
+
+import com.capstone.rebyu.models.PartnershipRequest;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PartnershipRequestDto {
+    private Long requestId;
+
+    @NotNull
+    private Long enterpriseId;
+
+    @NotNull
+    private LocalDateTime submittedDate;
+
+    @NotNull
+    private PartnershipRequest.Status status = PartnershipRequest.Status.PENDING;
+}
