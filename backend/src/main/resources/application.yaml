@@ -32,13 +32,13 @@ spring:
         order_inserts: true
         order_updates: true
 
-  # ─── Security / OAuth2 Resource Server ──────────────────────
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${JWT_ISSUER_URI:http://localhost:9000}   # your auth server
-          jwk-set-uri: ${JWK_SET_URI:http://localhost:9000/oauth2/jwks}
+#  # ─── Security / OAuth2 Resource Server ──────────────────────
+#  security:
+#    oauth2:
+#      resourceserver:
+#        jwt:
+#          issuer-uri: ${JWT_ISSUER_URI:http://localhost:9000}   # your auth server
+#          jwk-set-uri: ${JWK_SET_URI:http://localhost:9000/oauth2/jwks}
 
   # ─── WebSocket ──────────────────────────────────────────────
   websocket:

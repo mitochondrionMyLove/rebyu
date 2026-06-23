@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Set;
+
 @Entity
 @Table(name = "middle_categories")
 @Data
@@ -23,4 +25,7 @@ public class MiddleCategory {
 
     @Column(nullable = false, length = 150)
     private String title;
+
+    @OneToMany(mappedBy = "middleCategory", fetch = FetchType.LAZY)
+    private Set<Lesson> lessons;
 }

@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Set;
+
 @Entity
 @Table(name = "major_categories")
 @Data
@@ -23,4 +25,7 @@ public class MajorCategory {
 
     @Column(nullable = false, length = 150)
     private String title;
+
+    @OneToMany(mappedBy = "majorCategory", fetch = FetchType.LAZY)
+    private Set<MiddleCategory> middleCategory;
 }

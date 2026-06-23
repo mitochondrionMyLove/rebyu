@@ -5,7 +5,7 @@ import com.capstone.rebyu.models.MiddleCategory;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = LessonMapper.class)
 public interface MiddleCategoryMapper {
     @Mapping(source = "majorCategory.majorCategoryId", target = "majorCategoryId")
     MiddleCategoryDto toDto(MiddleCategory entity);

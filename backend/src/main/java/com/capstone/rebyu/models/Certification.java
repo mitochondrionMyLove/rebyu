@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "certifications")
@@ -34,4 +35,7 @@ public class Certification {
 
     @Column(nullable = false)
     private BigDecimal price = BigDecimal.ZERO;
+
+    @OneToMany(mappedBy = "certification", fetch = FetchType.LAZY)
+    private Set<MajorCategory> majorCategory;
 }

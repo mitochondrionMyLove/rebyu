@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -33,4 +34,7 @@ public class CertificationDto {
     @NotNull
     @DecimalMin(value = "0.0")
     private BigDecimal price = BigDecimal.ZERO;
+
+    private Set<MajorCategoryDto> majorCategory;
+
 }
