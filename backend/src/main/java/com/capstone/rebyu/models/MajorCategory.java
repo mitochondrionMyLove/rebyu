@@ -2,9 +2,10 @@ package com.capstone.rebyu.models;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.util.Set;
 
@@ -13,7 +14,6 @@ import java.util.Set;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class MajorCategory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,11 +21,13 @@ public class MajorCategory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "certification_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Certification certification;
 
     @Column(nullable = false, length = 150)
     private String title;
 
-    @OneToMany(mappedBy = "majorCategory", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "majorCategory", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Set<MiddleCategory> middleCategory;
 }

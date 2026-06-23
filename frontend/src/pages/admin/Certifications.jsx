@@ -1,57 +1,359 @@
 import React, { useEffect, useState } from "react"
-import { Plus, CircleChevronLeft } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  CircleAlert,
+  CircleChevronLeft,
+  Plus,
+  X,
+} from "lucide-react"
+
 import CertificationCard from "../../components/certification-card"
-import { getAllCertifications } from "../../services/certificationService"
+import {
+  addCertification,
+  getAllCertifications,
+} from "../../services/certificationService"
+
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 import { CertificationSkeletonCard } from "../../components/certification-skeleton-card"
+import CertificationDetails from "../../components/certification-details"
+import CertificationModules from "../../components/certification-modules"
+
+const TOTAL_STEPS = 2
+
+const emptyCertificationDetails = {
+  title: "",
+  price: "",
+  industry: "",
+  description: "",
+  imageFile: null,
+}
+
+const emptySubmissionDialog = {
+  open: false,
+  title: "",
+  description: "",
+}
+
+function validateCertificationDetails(details) {
+  const errors = {}
+
+  if (!details.title.trim()) {
+    errors.title = "Certification name is required."
+  }
+
+  if (
+    details.price === "" ||
+    Number.isNaN(Number(details.price)) ||
+    Number(details.price) < 0
+  ) {
+    errors.price = "Enter a valid price."
+  }
+
+  if (!details.industry.trim()) {
+    errors.industry = "Industry is required."
+  }
+
+  if (!details.description.trim()) {
+    errors.description = "Description is required."
+  }
+
+  if (!details.imageFile) {
+    errors.imageFile = "Certification cover image is required."
+  }
+
+  return errors
+}
+
+function isModuleStructureValid(categories) {
+  if (!Array.isArray(categories) || categories.length === 0) {
+    return false
+  }
+
+  return categories.every((majorCategory) => {
+    const hasMajorTitle = majorCategory.title.trim().length > 0
+    const hasMiddleCategories = majorCategory.middleCategories.length > 0
+
+    const hasValidMiddleCategories = majorCategory.middleCategories.every(
+      (middleCategory) => {
+        const hasMiddleTitle = middleCategory.title.trim().length > 0
+        const hasLessons = middleCategory.lessons.length > 0
+
+        const hasValidLessons = middleCategory.lessons.every(
+          (lesson) => lesson.name.trim().length > 0
+        )
+
+        return hasMiddleTitle && hasLessons && hasValidLessons
+      }
+    )
+
+    return hasMajorTitle && hasMiddleCategories && hasValidMiddleCategories
+  })
+}
+
+function removeModuleUiFields(categories) {
+  return categories.map((majorCategory) => ({
+    title: majorCategory.title.trim(),
+    middleCategory: majorCategory.middleCategories.map((middleCategory) => ({
+      title: middleCategory.title.trim(),
+      lessons: middleCategory.lessons.map((lesson) => ({
+        name: lesson.name.trim(),
+        lessonComponentStructure: "[]",
+      })),
+    })),
+  }))
+}
+
+function formatLocalDateTime(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0")
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+    date.getSeconds()
+  )}`
+}
+
+function buildImageKey(imageFile) {
+  if (!imageFile) {
+    return ""
+  }
+
+  const safeFileName = imageFile.name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9._-]/g, "")
+
+  return `certifications/${safeFileName}`
+}
 
 function Certifications() {
-  const navigate = useNavigate()
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false)
+  const [page, setPage] = useState(1)
+
+  const [certificationDetails, setCertificationDetails] = useState(
+    emptyCertificationDetails
+  )
+  const [moduleCategories, setModuleCategories] = useState([])
+
+  const [detailsErrors, setDetailsErrors] = useState({})
+  const [submissionError, setSubmissionError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [submissionDialog, setSubmissionDialog] = useState(
+    emptySubmissionDialog
+  )
+  const [isSubmmited, setIsSubmitted] = useState(false)
+
+
   useEffect(() => {
     async function getAllCertificates() {
-      setIsLoading(true)
-      const response = await getAllCertifications()
-      setItems(response)
-      setIsLoading(false)
+      try {
+        setIsLoading(true)
+        const response = await getAllCertifications()
+        setItems(response)
+      } catch (error) {
+        console.error("Failed to load certifications:", error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    getAllCertificates()
-  }, [])
 
-  if (isLoading)
-       return <CertificationSkeletonCard size = {items.length || 4}/>
+    getAllCertificates()
+  }, [isSubmmited])
+
+  const isFirstStep = page === 1
+  const isLastStep = page === TOTAL_STEPS
+
+  const resetCreateCertification = () => {
+    setPage(1)
+    setCertificationDetails(emptyCertificationDetails)
+    setModuleCategories([])
+    setDetailsErrors({})
+    setSubmissionError("")
+    setIsSubmitting(false)
+    setSubmissionDialog(emptySubmissionDialog)
+  }
+
+  const handleDrawerChange = (open) => {
+    setIsCreateDrawerOpen(open)
+
+    if (!open) {
+      resetCreateCertification()
+    }
+  }
+
+  const handleDetailsChange = (nextDetails) => {
+    setCertificationDetails(nextDetails)
+    setDetailsErrors({})
+    setSubmissionError("")
+  }
+
+  const handleModuleChange = (nextCategories) => {
+    setModuleCategories(nextCategories)
+    setSubmissionError("")
+  }
+
+  const handlePrevious = () => {
+    if (isFirstStep) {
+      return
+    }
+
+    setSubmissionError("")
+    setPage(1)
+  }
+
+  const handleNext = () => {
+    const errors = validateCertificationDetails(certificationDetails)
+
+    if (Object.keys(errors).length > 0) {
+      setDetailsErrors(errors)
+      return
+    }
+
+    setDetailsErrors({})
+    setSubmissionError("")
+    setPage(2)
+  }
+
+  const handleCreateMiddleExam = (examContext) => {
+    console.log("Create middle exam:", examContext)
+  }
+
+  const handleCreateCertification = async () => {
+    if (!isModuleStructureValid(moduleCategories)) {
+      setSubmissionError(
+        "Add at least one complete major category, middle category, and lesson."
+      )
+      return
+    }
+
+    const payload = {
+      title: certificationDetails.title.trim(),
+      description: certificationDetails.description.trim(),
+      imageKey: buildImageKey(certificationDetails.imageFile),
+      dateCreated: formatLocalDateTime(),
+      price: Number(certificationDetails.price),
+      majorCategory: removeModuleUiFields(moduleCategories),
+    }
+
+    console.group("Create Certification")
+    console.log("Certification object:", payload)
+    console.log("Certification JSON:", JSON.stringify(payload, null, 2))
+    console.log("Selected image file:", certificationDetails.imageFile)
+    console.groupEnd()
+
+    try {
+      setIsSubmitting(true)
+      setSubmissionError("")
+
+      const result = await addCertification(payload)
+
+      if (result === false || result?.success === false) {
+        throw new Error(
+          result?.message ||
+            "The server could not create the certification."
+        )
+      }
+      setSubmissionDialog({
+        open: true,
+        title: "Certification created successfully",
+        description:
+          "The certification details, categories, middle categories, and lessons were saved successfully.",
+      })
+    } catch (error) {
+      console.error("Failed to create certification:", error)
+      const responseData = error?.response?.data
+      const apiMessage =
+        (typeof responseData === "string" && responseData) ||
+        responseData?.message ||
+        responseData?.error ||
+        error?.message ||
+        "Unable to create the certification. Please try again."
+
+      setSubmissionError(apiMessage)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleMainAction = async () => {
+    if (isLastStep) {
+      await handleCreateCertification()
+      return
+    }
+
+    handleNext()
+  }
+
+  const handleExitAfterSubmission = () => {
+    setSubmissionDialog(emptySubmissionDialog)
+    handleDrawerChange(false)
+    setIsSubmitted((prev) => !prev)
+  }
+
+  if (isLoading) {
+    return <CertificationSkeletonCard size={items.length || 4} />
+  }
+
   return (
     <section className="flex h-full flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-950">
           Active Certifications
         </h1>
+
         <p className="mt-1 text-sm text-zinc-500">
           Manage the certification reviews available to learners.
         </p>
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        {items.map((item, index) => {
-          return <CertificationCard key={index} item={item} />
-        })}
-        <Drawer direction="right">
+        {items.map((item, index) => (
+          <CertificationCard
+            key={item.id ?? item.certificationId ?? index}
+            item={item}
+          />
+        ))}
+
+        <Drawer
+          direction="right"
+          open={isCreateDrawerOpen}
+          onOpenChange={handleDrawerChange}
+        >
           <DrawerTrigger asChild>
             <button
               type="button"
-              className="group flex h-[380px] w-full flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-zinc-800 bg-zinc-50 p-6 text-center transition-all duration-200 hover:border-zinc-950 hover:bg-zinc-100 focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 focus:outline-none"
+              className="group flex h-[380px] w-full flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-zinc-800 bg-zinc-50 p-6 text-center transition-all duration-200 hover:border-zinc-950 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2"
             >
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-zinc-300 bg-white transition-transform duration-200 group-hover:scale-110">
                 <Plus className="h-6 w-6 text-zinc-900" strokeWidth={1.8} />
@@ -66,34 +368,140 @@ function Certifications() {
               </span>
             </button>
           </DrawerTrigger>
-          <DrawerContent className="fixed top-0 right-0 bottom-auto left-auto flex h-dvh !w-[50vw] !max-w-none flex-col rounded-l-3xl rounded-r-none border-l bg-white p-0">
-            <DrawerHeader className="flex flex-row items-center justify-start gap-3 border-b px-6 py-5 text-left">
+
+          <DrawerContent className="fixed top-0 right-0 bottom-auto left-auto flex h-dvh !w-full !max-w-none flex-col rounded-l-3xl rounded-r-none border-l bg-white p-0 sm:!w-[680px] xl:!w-[50vw]">
+            <DrawerHeader className="flex flex-row items-center gap-3 border-b px-4 py-5 text-left sm:px-6">
               <DrawerClose asChild>
                 <button
                   type="button"
                   aria-label="Close drawer"
-                  className="shrink-0 rounded-full text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 focus:ring-2 focus:ring-zinc-900 focus:outline-none"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-900"
                 >
                   <CircleChevronLeft className="h-7 w-7" />
                 </button>
               </DrawerClose>
 
-              <div className="min-w-0 text-left">
-                <DrawerTitle className="text-left text-lg font-semibold">
+              <div className="min-w-0 flex-1">
+                <DrawerTitle className="text-lg font-semibold text-zinc-950">
                   Create Certification
                 </DrawerTitle>
+
+            
               </div>
             </DrawerHeader>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5">
-              {/* form goes here */}
-              fsdafdsa
+            <div className="flex-1 overflow-y-auto">
+              <div className="w-full px-4 py-5 sm:px-6">
+                {page === 1 ? (
+                  <CertificationDetails
+                    value={certificationDetails}
+                    onChange={handleDetailsChange}
+                    errors={detailsErrors}
+                  />
+                ) : (
+                  <CertificationModules
+                    value={moduleCategories}
+                    onChange={handleModuleChange}
+                    onCreateMiddleExam={handleCreateMiddleExam}
+                  />
+                )}
+              </div>
             </div>
 
-            <DrawerFooter className="border-t px-6 py-4">
-              <Button className="w-full">Create Certification</Button>
+            <DrawerFooter className="border-t bg-white px-4 py-4 sm:px-6">
+              <div className="w-full">
+                {submissionError && (
+                  <Alert
+                    variant="destructive"
+                    className="relative mb-3 border-red-200 bg-red-50 pr-12 text-red-700"
+                  >
+                    <CircleAlert className="h-4 w-4" />
+
+                    <AlertTitle>Cannot create certification</AlertTitle>
+
+                    <AlertDescription>
+                      {submissionError}
+                    </AlertDescription>
+
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionError("")}
+                      aria-label="Dismiss alert"
+                      className="absolute top-3 right-3 rounded-md p-1 text-red-500 transition hover:bg-red-100 hover:text-red-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </Alert>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handlePrevious}
+                    disabled={isFirstStep || isSubmitting}
+                    className="min-w-[118px] gap-2 rounded-xl border-zinc-300 text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={handleMainAction}
+                    disabled={isSubmitting}
+                    className="min-w-[150px] gap-2 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSubmitting ? (
+                      "Creating..."
+                    ) : isLastStep ? (
+                      "Create Certification"
+                    ) : (
+                      <>
+                        Next
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </DrawerFooter>
           </DrawerContent>
+
+          <AlertDialog
+            open={submissionDialog.open}
+            onOpenChange={(open) => {
+              setSubmissionDialog((previous) => ({
+                ...previous,
+                open,
+              }))
+            }}
+          >
+            <AlertDialogContent className="max-w-md rounded-2xl">
+              <AlertDialogHeader>
+                <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+
+                <AlertDialogTitle>
+                  {submissionDialog.title}
+                </AlertDialogTitle>
+
+                <AlertDialogDescription className="leading-6">
+                  {submissionDialog.description}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-3">
+                <AlertDialogAction
+                  onClick={handleExitAfterSubmission}
+                  className="rounded-xl bg-zinc-950 text-white hover:bg-zinc-800"
+                >
+                  Close & Exit
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </Drawer>
       </div>
     </section>
