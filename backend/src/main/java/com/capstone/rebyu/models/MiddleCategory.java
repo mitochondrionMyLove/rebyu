@@ -28,6 +28,6 @@ public class MiddleCategory {
     @Column(nullable = false, length = 150)
     private String title;
 
-    @OneToMany(mappedBy = "middleCategory", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "middleCategory", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private Set<Lesson> lessons;
 }

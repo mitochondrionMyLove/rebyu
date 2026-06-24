@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -34,8 +33,10 @@ public class Certification {
     @Column(nullable = false)
     private BigDecimal price = BigDecimal.ZERO;
 
-    @OneToMany(mappedBy = "certification", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "certification", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private Set<MajorCategory> majorCategory;
+
+    private String industry;
 
 
 }

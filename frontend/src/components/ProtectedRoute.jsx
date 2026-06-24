@@ -1,11 +1,17 @@
-import React from "react"
-import NotFound from "./NotFound"
+import { Navigate, Outlet } from "react-router-dom"
 
-function ProtectedRoute() {
-  const token = localStorage.getItem("admin")
-  if(!token)
-    return <NotFound/>
-  return <div>ProtectedRoute</div>
+function ProtectedRoute({ allowedRoles }) {
+  const role = localStorage.getItem("role")
+
+  if (!role) {
+    return <Navigate to="/" replace />
+  }
+
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/" replace />
+  }
+
+  return <Outlet />
 }
 
 export default ProtectedRoute

@@ -67,7 +67,7 @@ export function NavProjects({ projects }: NavProjectsProps) {
                     `}
                   >
                     <a
-                      href={item.url}
+                      href={`/admin/item.url`}
                       onClick={(event) => {
                         event.preventDefault()
                         handleNavigate(item.url)

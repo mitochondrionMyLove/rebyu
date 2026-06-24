@@ -29,17 +29,17 @@ const data = {
     items: [
       {
         name: "Certifications",
-        url: "/",
+        url: "",
         icon: AwardIcon,
       },
       {
         name: "Challenges",
-        url: "/challenges",
+        url: "challenges",
         icon: TrophyIcon,
       },
       {
         name: "Question Bank",
-        url: "/question-bank",
+        url: "question-bank",
         icon: ClipboardListIcon,
       },
     ],
@@ -50,12 +50,12 @@ const data = {
     items: [
       {
         name: "Organizations",
-        url: "/organizations",
+        url: "organizations",
         icon: Building2Icon,
       },
       {
         name: "Learners",
-        url: "/learners",
+        url: "learners",
         icon: UsersIcon,
       },
     ],
@@ -66,7 +66,7 @@ const data = {
     items: [
       {
         name: "Analytics",
-        url: "/analytics",
+        url: "analytics",
         icon: ChartNoAxesCombinedIcon,
       },
     ],

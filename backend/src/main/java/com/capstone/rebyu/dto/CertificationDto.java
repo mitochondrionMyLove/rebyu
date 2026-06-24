@@ -37,4 +37,5 @@ public class CertificationDto {
 
     private Set<MajorCategoryDto> majorCategory;
 
+    private String industry;
 }

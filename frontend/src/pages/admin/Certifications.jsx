@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,6 +8,11 @@ import {
   Plus,
   X,
 } from "lucide-react"
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 
 import CertificationCard from "../../components/certification-card"
 import {
@@ -107,11 +112,9 @@ function isModuleStructureValid(categories) {
         const hasValidLessons = middleCategory.lessons.every(
           (lesson) => lesson.name.trim().length > 0
         )
-
         return hasMiddleTitle && hasLessons && hasValidLessons
       }
     )
-
     return hasMajorTitle && hasMiddleCategories && hasValidMiddleCategories
   })
 }
@@ -143,7 +146,6 @@ function buildImageKey(imageFile) {
   if (!imageFile) {
     return ""
   }
-
   const safeFileName = imageFile.name
     .trim()
     .toLowerCase()
@@ -154,42 +156,44 @@ function buildImageKey(imageFile) {
 }
 
 function Certifications() {
-  const [items, setItems] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
-
+  const queryClient = useQueryClient()
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false)
   const [page, setPage] = useState(1)
-
   const [certificationDetails, setCertificationDetails] = useState(
     emptyCertificationDetails
   )
   const [moduleCategories, setModuleCategories] = useState([])
-
   const [detailsErrors, setDetailsErrors] = useState({})
   const [submissionError, setSubmissionError] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
   const [submissionDialog, setSubmissionDialog] = useState(
     emptySubmissionDialog
   )
-  const [isSubmmited, setIsSubmitted] = useState(false)
 
+  const {
+    data: items = [],
+    isPending: isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin-certifications"],
+    queryFn: getAllCertifications,
+    staleTime: 1000 * 60 * 5,
+  })
 
-  useEffect(() => {
-    async function getAllCertificates() {
-      try {
-        setIsLoading(true)
-        const response = await getAllCertifications()
-        setItems(response)
-      } catch (error) {
-        console.error("Failed to load certifications:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  const {
+    mutateAsync: createCertification,
+    isPending: isSubmitting,
+  } = useMutation({
+    mutationFn: addCertification,
 
-    getAllCertificates()
-  }, [isSubmmited])
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin-certifications"],
+      })
+    },
+  })
 
   const isFirstStep = page === 1
   const isLastStep = page === TOTAL_STEPS
@@ -200,7 +204,6 @@ function Certifications() {
     setModuleCategories([])
     setDetailsErrors({})
     setSubmissionError("")
-    setIsSubmitting(false)
     setSubmissionDialog(emptySubmissionDialog)
   }
 
@@ -264,6 +267,7 @@ function Certifications() {
       dateCreated: formatLocalDateTime(),
       price: Number(certificationDetails.price),
       majorCategory: removeModuleUiFields(moduleCategories),
+      industry: certificationDetails.industry.trim()
     }
 
     console.group("Create Certification")
@@ -273,17 +277,16 @@ function Certifications() {
     console.groupEnd()
 
     try {
-      setIsSubmitting(true)
       setSubmissionError("")
 
-      const result = await addCertification(payload)
+      const result = await createCertification(payload)
 
       if (result === false || result?.success === false) {
         throw new Error(
-          result?.message ||
-            "The server could not create the certification."
+          result?.message || "The server could not create the certification."
         )
       }
+
       setSubmissionDialog({
         open: true,
         title: "Certification created successfully",
@@ -292,7 +295,9 @@ function Certifications() {
       })
     } catch (error) {
       console.error("Failed to create certification:", error)
+
       const responseData = error?.response?.data
+
       const apiMessage =
         (typeof responseData === "string" && responseData) ||
         responseData?.message ||
@@ -301,14 +306,12 @@ function Certifications() {
         "Unable to create the certification. Please try again."
 
       setSubmissionError(apiMessage)
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
-  const handleMainAction = async () => {
+  const handleMainAction = () => {
     if (isLastStep) {
-      await handleCreateCertification()
+      handleCreateCertification()
       return
     }
 
@@ -318,23 +321,48 @@ function Certifications() {
   const handleExitAfterSubmission = () => {
     setSubmissionDialog(emptySubmissionDialog)
     handleDrawerChange(false)
-    setIsSubmitted((prev) => !prev)
   }
 
   if (isLoading) {
-    return <CertificationSkeletonCard size={items.length || 4} />
+    return <CertificationSkeletonCard size={4} />
+  }
+
+  if (isError) {
+    return (
+      <section className="flex h-full flex-col items-center justify-center gap-4">
+        <div className="max-w-md text-center">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Unable to load certifications
+          </h2>
+
+          <p className="mt-2 text-sm text-zinc-500">
+            {error?.message || "Something went wrong while loading the data."}
+          </p>
+        </div>
+
+        <Button onClick={() => refetch()}>Try Again</Button>
+      </section>
+    )
   }
 
   return (
     <section className="flex h-full flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-950">
-          Active Certifications
-        </h1>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-950">
+            Active Certifications
+          </h1>
 
-        <p className="mt-1 text-sm text-zinc-500">
-          Manage the certification reviews available to learners.
-        </p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Manage the certification reviews available to learners.
+          </p>
+        </div>
+
+        {isFetching && (
+          <span className="pt-2 text-xs text-zinc-400">
+            Updating...
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4">
@@ -342,6 +370,8 @@ function Certifications() {
           <CertificationCard
             key={item.id ?? item.certificationId ?? index}
             item={item}
+            index={index}
+            certification={item}
           />
         ))}
 
@@ -353,7 +383,7 @@ function Certifications() {
           <DrawerTrigger asChild>
             <button
               type="button"
-              className="group flex h-[380px] w-full flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-zinc-800 bg-zinc-50 p-6 text-center transition-all duration-200 hover:border-zinc-950 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2"
+              className="group flex h-[380px] w-full flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-zinc-800 bg-zinc-50 p-6 text-center transition-all duration-200 hover:border-zinc-950 hover:bg-zinc-100 focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 focus:outline-none"
             >
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-zinc-300 bg-white transition-transform duration-200 group-hover:scale-110">
                 <Plus className="h-6 w-6 text-zinc-900" strokeWidth={1.8} />
@@ -375,7 +405,7 @@ function Certifications() {
                 <button
                   type="button"
                   aria-label="Close drawer"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 focus:ring-2 focus:ring-zinc-900 focus:outline-none"
                 >
                   <CircleChevronLeft className="h-7 w-7" />
                 </button>
@@ -385,8 +415,6 @@ function Certifications() {
                 <DrawerTitle className="text-lg font-semibold text-zinc-950">
                   Create Certification
                 </DrawerTitle>
-
-            
               </div>
             </DrawerHeader>
 
@@ -419,9 +447,7 @@ function Certifications() {
 
                     <AlertTitle>Cannot create certification</AlertTitle>
 
-                    <AlertDescription>
-                      {submissionError}
-                    </AlertDescription>
+                    <AlertDescription>{submissionError}</AlertDescription>
 
                     <button
                       type="button"

@@ -7,3 +7,4 @@ export function getAllCertifications() {
 export function addCertification(data) {
   return base("certifications", { data: data, method: "POST" })
 }
+
