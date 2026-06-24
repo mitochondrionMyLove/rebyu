@@ -1,39 +1,111 @@
 import React, { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
-  ArrowLeft,
-  BetweenHorizontalEnd,
-  Plus,
-  Save,
-  Heading,
   AlignLeft,
-  MapPinned,
-  LayoutDashboard,
-  Image,
   FilePlay,
-  Grid2x2,
+  Heading as HeadingIcon,
+  Image as ImageIcon,
+  Layers3,
+  LayoutDashboard,
+  ListCollapse,
+  ArrowLeft,
+  Save,
+  Plus,
+  BetweenHorizontalEnd,
 } from "lucide-react"
+
 import Section from "../../components/Section"
-import Box from "@mui/material/Box"
 import SpeedDial from "@mui/material/SpeedDial"
 import SpeedDialAction from "@mui/material/SpeedDialAction"
+
+const actions = [
+  {
+    type: "heading",
+    name: "Heading",
+    icon: <HeadingIcon className="h-5 w-5" />,
+    createData: () => ({
+      text: "",
+    }),
+  },
+  {
+    type: "description",
+    name: "Description",
+    icon: <AlignLeft className="h-5 w-5" />,
+    createData: () => ({
+      text: "",
+    }),
+  },
+  {
+    type: "tabs",
+    name: "Tabs",
+    icon: <LayoutDashboard className="h-5 w-5" />,
+    createData: () => ({
+      items: [
+        {
+          id: crypto.randomUUID(),
+          label: "Overview",
+          title: "Overview",
+          description: "Write the overview content here.",
+        },
+      ],
+    }),
+  },
+  {
+    type: "accordion",
+    name: "Accordion",
+    icon: <ListCollapse className="h-5 w-5" />,
+    createData: () => ({
+      items: [
+        {
+          id: crypto.randomUUID(),
+          title: "What is this lesson about?",
+          content: "Write the answer or lesson explanation here.",
+        },
+      ],
+    }),
+  },
+  {
+    type: "flip-grid",
+    name: "Flip Cards",
+    icon: <Layers3 className="h-5 w-5" />,
+    createData: () => ({
+      cards: [
+        {
+          id: crypto.randomUUID(),
+          frontTitle: "Definition",
+          backTitle: "Answer",
+          description: "Write the explanation here.",
+        },
+      ],
+    }),
+  },
+  {
+    type: "image",
+    name: "Image",
+    icon: <ImageIcon className="h-5 w-5" />,
+    createData: () => ({
+      imageKey: "",
+    }),
+  },
+  {
+    type: "video",
+    name: "Video",
+    icon: <FilePlay className="h-5 w-5" />,
+    createData: () => ({
+      videoKey: "",
+    }),
+  },
+]
 
 function CreateLessons() {
   const navigate = useNavigate()
   const location = useLocation()
+
   const state = location.state ?? {}
   const lessonName = state.lessonName ?? "Untitled Lesson"
-  const [sections, setSections] = useState([])
 
-  const actions = [
-    { icon: <Heading className="h-5 w-5" />, name: "Heading" },
-    { icon: <AlignLeft className="h-5 w-5" />, name: "Description" },
-    { icon: <MapPinned className="h-5 w-5" />, name: "Image Hotspots" },
-    { icon: <LayoutDashboard className="h-5 w-5" />, name: "Tabs" },
-    { icon: <Image className="h-5 w-5" />, name: "Image" },
-    { icon: <FilePlay className="h-5 w-5" />, name: "Video" },
-    { icon: <Grid2x2 className="h-5 w-5" />, name: "Grid" },
-  ]
+  const [sections, setSections] = useState([])
+  const [sectionIndex, setSectionIndex] = useState(0)
 
   function handleCancel() {
     navigate(-1)
@@ -46,24 +118,79 @@ function CreateLessons() {
         id: crypto.randomUUID(),
         sectionName: "",
         title: "",
-        content: "",
+        content: [],
       },
     ])
   }
 
   function handleSectionChange(sectionId, field, value) {
     setSections((prev) =>
-      prev.map((s) => (s.id === sectionId ? { ...s, [field]: value } : s))
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              [field]: value,
+            }
+          : section
+      )
     )
   }
 
   function handleDeleteSection(sectionId) {
-    setSections((prev) => prev.filter((s) => s.id !== sectionId))
+    setSections((prev) =>
+      prev.filter((section) => section.id !== sectionId)
+    )
+  }
+
+  function handleAddTool(toolName) {
+    const itemTool = actions.find((item) => item.name === toolName)
+
+    if (!itemTool) {
+      return alert("Choose a tool")
+    }
+
+    setSections((prev) =>
+      prev.map((section, index) => {
+        if (index !== sectionIndex) {
+          return section
+        }
+
+        return {
+          ...section,
+          content: [
+            ...section.content,
+            {
+              id: crypto.randomUUID(),
+              type: itemTool.type,
+              data: itemTool.createData(),
+            },
+          ],
+        }
+      })
+    )
+  }
+
+  function handleRemoveTool(targetSectionIndex, targetToolIndex) {
+    setSections((prev) =>
+      prev.map((section, currentSectionIndex) => {
+        if (currentSectionIndex !== targetSectionIndex) {
+          return section
+        }
+
+        return {
+          ...section,
+          content: section.content.filter(
+            (_, currentToolIndex) => currentToolIndex !== targetToolIndex
+          ),
+        }
+      })
+    )
   }
 
   function handleSaveLesson() {
     console.log("Lesson name:", lessonName)
     console.log("Sections:", sections)
+
     alert("Lesson data was printed in the browser console.")
   }
 
@@ -78,8 +205,12 @@ function CreateLessons() {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
+
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500">Lesson editor</p>
+            <p className="text-xs font-medium text-zinc-500">
+              Lesson editor
+            </p>
+
             <h1 className="truncate text-base font-semibold text-zinc-950">
               {lessonName}
             </h1>
@@ -94,6 +225,7 @@ function CreateLessons() {
           >
             Cancel
           </button>
+
           <button
             type="button"
             onClick={handleSaveLesson}
@@ -116,7 +248,9 @@ function CreateLessons() {
               "& .MuiFab-primary": {
                 backgroundColor: "black",
                 color: "white",
-                "&:hover": { backgroundColor: "black" },
+                "&:hover": {
+                  backgroundColor: "black",
+                },
               },
               "& .MuiSpeedDialAction-fab": {
                 backgroundColor: "white",
@@ -128,7 +262,12 @@ function CreateLessons() {
               <SpeedDialAction
                 key={action.name}
                 icon={action.icon}
-                slotProps={{ tooltip: { title: action.name } }}
+                slotProps={{
+                  tooltip: {
+                    title: action.name,
+                  },
+                }}
+                onClick={() => handleAddTool(action.name)}
               />
             ))}
           </SpeedDial>
@@ -141,12 +280,15 @@ function CreateLessons() {
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700">
                   <BetweenHorizontalEnd className="h-6 w-6" />
                 </div>
+
                 <h2 className="mt-5 text-xl font-semibold text-zinc-900">
                   Start building your lesson
                 </h2>
+
                 <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">
                   Add your first section to start writing the lesson content.
                 </p>
+
                 <button
                   type="button"
                   onClick={handleAddSection}
@@ -158,14 +300,18 @@ function CreateLessons() {
               </div>
             ) : (
               <>
-                {sections.map((section) => (
+                {sections.map((section, index) => (
                   <Section
                     key={section.id}
                     section={section}
+                    sectionIndex={index}
                     onChange={handleSectionChange}
                     onDelete={handleDeleteSection}
+                    handleRemovalTool={handleRemoveTool}
+                    onClick={() => setSectionIndex(index)}
                   />
                 ))}
+
                 <button
                   type="button"
                   onClick={handleAddSection}

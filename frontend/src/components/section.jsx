@@ -1,9 +1,30 @@
 import React from "react"
 import { Trash2 } from "lucide-react"
+import {
+  AccordionTool,
+  DescriptionTool,
+  FlipGridTool,
+  HeadingTool,
+  ImageTool,
+  TabsTool,
+  VideoTool,
+} from "./tools"
 
-function Section({ section, onChange, onDelete, children }) {
+function Section({
+  section,
+  onChange,
+  onDelete,
+  children,
+  onClick,
+  sectionIndex,
+  handleRemovalTool,
+}) {
+  const tools = section.content
   return (
-    <div className="group relative mx-auto w-full min-w-0 max-w-5xl">
+    <div
+      className="group relative mx-auto w-full max-w-5xl min-w-0"
+      onClick={onClick}
+    >
       <div className="mb-3 flex min-w-0 items-center justify-between gap-3 px-1">
         <input
           id={`section-name-${section.id}`}
@@ -12,8 +33,8 @@ function Section({ section, onChange, onDelete, children }) {
           onChange={(event) =>
             onChange(section.id, "sectionName", event.target.value)
           }
-          placeholder="Name this section"
-          className="w-full min-w-0 max-w-sm bg-transparent text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 outline-none placeholder:text-zinc-400 focus:text-zinc-950"
+          placeholder="Untitled Section"
+          className="w-full max-w-sm min-w-0 bg-transparent text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase outline-none placeholder:text-zinc-400 focus:text-zinc-950"
         />
 
         <button
@@ -28,8 +49,58 @@ function Section({ section, onChange, onDelete, children }) {
       </div>
 
       <article className="min-h-[720px] w-full overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-[0_12px_35px_rgba(0,0,0,0.08)] transition duration-200 hover:shadow-[0_16px_45px_rgBA(0,0,0,0.12)]">
-        <div className="min-h-[720px] w-full">
-          {children}
+        <div className="flex min-h-[720px] w-full flex-col gap-3 p-10">
+          {tools.map((item, index) => {
+            if (item.type == "heading")
+              return (
+                <HeadingTool
+                  key={index}
+                  onClick={() => handleRemovalTool(sectionIndex, index)}
+                />
+              )
+            else if (item.type == "description")
+              return (
+                <DescriptionTool
+                  key={index}
+                  onClick={() => handleRemovalTool(sectionIndex, index)}
+                />
+              )
+            else if (item.type == "tabs")
+              return (
+                <TabsTool
+                  key={index}
+                  onClick={() => handleRemovalTool(sectionIndex, index)}
+                />
+              )
+            else if (item.type == "accordion")
+              return (
+                <AccordionTool
+                  key={index}
+                  onClick={() => handleRemovalTool(sectionIndex, index)}
+                />
+              )
+            else if (item.type == "flip-grid")
+              return (
+                <FlipGridTool
+                  key={index}
+                  onClick={() => handleRemovalTool(sectionIndex, index)}
+                />
+              )
+            else if (item.type == "image")
+              return (
+                <ImageTool
+                  key={index}
+                  onClick={() => handleRemovalTool(sectionIndex, index)}
+                />
+              )
+            else if (item.type == "video")
+              return (
+                <VideoTool
+                  key={index}
+                  onClick={() => handleRemovalTool(sectionIndex, index)}
+                />
+              )
+          })}
         </div>
       </article>
     </div>
