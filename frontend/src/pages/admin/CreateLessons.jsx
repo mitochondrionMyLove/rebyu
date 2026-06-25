@@ -35,6 +35,7 @@ import Section from "../../components/Section"
 import SpeedDial from "@mui/material/SpeedDial"
 import SpeedDialAction from "@mui/material/SpeedDialAction"
 import { setLessonComponent } from "../../services/lessonService.js"
+import { saveFile as MediaFileUpload} from "../../services/fileService.js"
 
 const actions = [
   {
@@ -496,15 +497,15 @@ function CreateLessons() {
       console.log("Sections:", sections)
       setIsSuccessDialogOpen(true)
 
-      const toolsWithFiles = [
           sections.map((section) =>{
             section.content.map((content) =>{
                 if(['image-left-text','image-right-text','image','video'].includes(content.type)){
-                  saveFile(content.toolType, content)
+                  saveFile(content.toolType, content, section.sectionName)
                 }
             })
           })
-      ]
+
+
       await setLessonComponent(lessonId, sections)
     } catch (error) {
       console.error("Could not save lesson:", error)
@@ -517,12 +518,13 @@ function CreateLessons() {
     }
   }
 
-  function  saveFile(toolType, content){
+  async function  saveFile(toolType, content, sectionName){
     switch (toolType) {
       case "image-left-text" || "image-right-text" || "image" :
-
+          await MediaFileUpload(lessonId, sectionName, content.id, 'photo',content.data.file)
         break
       case "video":
+          await MediaFileUpload(lessonId, sectionName, content.id, 'video',content.data.file)
         break
     }
   }
