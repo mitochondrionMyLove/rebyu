@@ -5,8 +5,6 @@ import {
   FilePlay,
   Heading as HeadingIcon,
   Image as ImageIcon,
-  Layers3,
-  LayoutDashboard,
   ListCollapse,
   List,
   ListOrdered,
@@ -15,6 +13,11 @@ import {
   Plus,
   BetweenHorizontalEnd,
   AlertCircleIcon,
+  Type,
+  PanelLeft,
+  PanelRight,
+  PanelsTopLeft,
+  FlipHorizontal,
 } from "lucide-react"
 
 import {
@@ -31,6 +34,7 @@ import {
 import Section from "../../components/Section"
 import SpeedDial from "@mui/material/SpeedDial"
 import SpeedDialAction from "@mui/material/SpeedDialAction"
+import { setLessonComponent } from "../../services/lessonService.js"
 
 const actions = [
   {
@@ -41,14 +45,16 @@ const actions = [
       text: "",
     }),
   },
+
   {
     type: "subheading",
     name: "Smaller Heading",
-    icon: <HeadingIcon className="h-4 w-4" />,
+    icon: <Type className="h-5 w-5" />,
     createData: () => ({
       text: "",
     }),
   },
+
   {
     type: "description",
     name: "Description",
@@ -57,6 +63,7 @@ const actions = [
       text: "",
     }),
   },
+
   {
     type: "unordered-list",
     name: "Bullet List",
@@ -70,6 +77,7 @@ const actions = [
       ],
     }),
   },
+
   {
     type: "ordered-list",
     name: "Numbered List",
@@ -83,10 +91,11 @@ const actions = [
       ],
     }),
   },
+
   {
     type: "image-left-text",
     name: "Image Left + Text",
-    icon: <ImageIcon className="h-5 w-5" />,
+    icon: <PanelLeft className="h-5 w-5" />,
     createData: () => ({
       file: null,
       imageKey: "",
@@ -94,10 +103,11 @@ const actions = [
       description: "",
     }),
   },
+
   {
     type: "image-right-text",
     name: "Text Left + Image",
-    icon: <ImageIcon className="h-5 w-5" />,
+    icon: <PanelRight className="h-5 w-5" />,
     createData: () => ({
       file: null,
       imageKey: "",
@@ -105,10 +115,11 @@ const actions = [
       description: "",
     }),
   },
+
   {
     type: "tabs",
     name: "Tabs",
-    icon: <LayoutDashboard className="h-5 w-5" />,
+    icon: <PanelsTopLeft className="h-5 w-5" />,
     createData: () => ({
       items: [
         {
@@ -120,6 +131,7 @@ const actions = [
       ],
     }),
   },
+
   {
     type: "accordion",
     name: "Accordion",
@@ -134,10 +146,11 @@ const actions = [
       ],
     }),
   },
+
   {
     type: "flip-grid",
     name: "Flip Cards",
-    icon: <Layers3 className="h-5 w-5" />,
+    icon: <FlipHorizontal className="h-5 w-5" />,
     createData: () => ({
       cards: [
         {
@@ -149,6 +162,7 @@ const actions = [
       ],
     }),
   },
+
   {
     type: "image",
     name: "Image",
@@ -158,6 +172,7 @@ const actions = [
       imageKey: "",
     }),
   },
+
   {
     type: "video",
     name: "Video",
@@ -175,7 +190,7 @@ function CreateLessons() {
 
   const state = location.state ?? {}
   const lessonName = state.lessonName ?? "Untitled Lesson"
-  const middleCategoryId = state.middleCategoryId ?? 0
+  const lessonId = state.lessonId ?? 0
 
   const [sections, setSections] = useState([])
   const [sectionIndex, setSectionIndex] = useState(0)
@@ -477,9 +492,20 @@ function CreateLessons() {
     try {
       setIsSaving(true)
       console.log("Lesson name:", lessonName)
-      console.log("Middle Category:", middleCategoryId)
+      console.log("LessonId:", lessonId)
       console.log("Sections:", sections)
       setIsSuccessDialogOpen(true)
+
+      const toolsWithFiles = [
+          sections.map((section) =>{
+            section.content.map((content) =>{
+                if(['image-left-text','image-right-text','image','video'].includes(content.type)){
+                  saveFile(content.toolType, content)
+                }
+            })
+          })
+      ]
+      await setLessonComponent(lessonId, sections)
     } catch (error) {
       console.error("Could not save lesson:", error)
 
@@ -491,232 +517,245 @@ function CreateLessons() {
     }
   }
 
+  function  saveFile(toolType, content){
+    switch (toolType) {
+      case "image-left-text" || "image-right-text" || "image" :
+
+        break
+      case "video":
+        break
+    }
+  }
+
   return (
-      <section className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-zinc-100">
-        <header className="flex h-16 min-w-0 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-                type="button"
-                onClick={handleCancel}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
+    <section className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-zinc-100">
+      <header className="flex h-16 min-w-0 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
 
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-zinc-500">
-                Lesson editor
-              </p>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-zinc-500">Lesson editor</p>
 
-              <h1 className="truncate text-base font-semibold text-zinc-950">
-                {lessonName}
-              </h1>
-            </div>
+            <h1 className="truncate text-base font-semibold text-zinc-950">
+              {lessonName}
+            </h1>
           </div>
+        </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-                type="button"
-                onClick={handleCancel}
-                className="hidden h-9 rounded-lg px-4 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 sm:block"
-            >
-              Cancel
-            </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="hidden h-9 rounded-lg px-4 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 sm:block"
+          >
+            Cancel
+          </button>
 
-            <button
-                type="button"
-                onClick={handleSaveLesson}
-                disabled={isSaving}
-                className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
-            >
-              <Save className="h-4 w-4" />
+          <button
+            type="button"
+            onClick={handleSaveLesson}
+            disabled={isSaving}
+            className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
+          >
+            <Save className="h-4 w-4" />
 
-              <span className="hidden sm:inline">
+            <span className="hidden sm:inline">
               {isSaving ? "Saving..." : "Save Lesson"}
             </span>
 
-              <span className="sm:hidden">
-              {isSaving ? "Saving..." : "Save"}
-            </span>
-            </button>
-          </div>
+            <span className="sm:hidden">{isSaving ? "Saving..." : "Save"}</span>
+          </button>
+        </div>
 
-          {/* Successful save dialog */}
-          <AlertDialog
-              open={isSuccessDialogOpen}
-              onOpenChange={setIsSuccessDialogOpen}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Created Successfully!</AlertDialogTitle>
+        {/* Successful save dialog */}
+        <AlertDialog
+          open={isSuccessDialogOpen}
+          onOpenChange={setIsSuccessDialogOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Created Successfully!</AlertDialogTitle>
 
-                <AlertDialogDescription>
-                  You have successfully created the lessons for {lessonName}.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
+              <AlertDialogDescription>
+                You have successfully created the lessons for {lessonName}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
 
-              <AlertDialogFooter>
-                <AlertDialogAction onClick={() => navigate(-1)}>
-                  Ok
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => navigate(-1)}>
+                Ok
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-          {/* Invalid lesson / failed save dialog */}
-          <AlertDialog
-              open={Boolean(validationError)}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setValidationError("")
-                }
-              }}
-          >
-            <AlertDialogContent size="sm">
-              <AlertDialogHeader>
-                <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20">
-                  <AlertCircleIcon />
-                </AlertDialogMedia>
+        <AlertDialog
+          open={Boolean(validationError)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setValidationError("")
+            }
+          }}
+        >
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20">
+                <AlertCircleIcon />
+              </AlertDialogMedia>
 
-                <AlertDialogTitle>Cannot Save Lesson</AlertDialogTitle>
+              <AlertDialogTitle>Cannot Save Lesson</AlertDialogTitle>
 
-                <AlertDialogDescription>
-                  {validationError}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
+              <AlertDialogDescription>{validationError}</AlertDialogDescription>
+            </AlertDialogHeader>
 
-              <AlertDialogFooter>
+            <div className="mt-6 w-full sm:justify-start">
+              <div className="w-full">
                 <AlertDialogAction
-                    variant="destructive"
-                    onClick={() => setValidationError("")}
+                  variant="destructive"
+                  onClick={() => setValidationError("")}
+                  className="!h-11 !w-full rounded-xl text-sm font-semibold sm:!w-full"
                 >
                   Ok
                 </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </header>
+              </div>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+      </header>
 
-        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <div className="fixed right-10 bottom-10 z-50">
-            <SpeedDial
-                ariaLabel="Add content block"
-                icon={<Plus />}
-                direction="up"
-                sx={{
-                  "& .MuiFab-primary": {
-                    backgroundColor: "black",
-                    color: "white",
-                    "&:hover": {
-                      backgroundColor: "black",
-                    },
-                  },
-                  "& .MuiSpeedDialAction-fab": {
-                    backgroundColor: "white",
-                    color: "black",
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="fixed right-10 bottom-10 z-50">
+          <SpeedDial
+            ariaLabel="Add content block"
+            icon={<Plus />}
+            direction="up"
+            sx={{
+              "& .MuiFab-primary": {
+                backgroundColor: "black",
+                color: "white",
+                "&:hover": {
+                  backgroundColor: "black",
+                },
+              },
+              "& .MuiSpeedDialAction-fab": {
+                backgroundColor: "white",
+                color: "black",
+              },
+            }}
+          >
+            {actions.map((action) => (
+              <SpeedDialAction
+                key={action.type}
+                icon={action.icon}
+                slotProps={{
+                  tooltip: {
+                    title: action.name,
                   },
                 }}
-            >
-              {actions.map((action) => (
-                  <SpeedDialAction
-                      key={action.type}
-                      icon={action.icon}
-                      slotProps={{
-                        tooltip: {
-                          title: action.name,
-                        },
-                      }}
-                      onClick={() => handleAddTool(action.type)}
-                  />
-              ))}
-            </SpeedDial>
+                onClick={() => handleAddTool(action.type)}
+              />
+            ))}
+          </SpeedDial>
 
-            {/* Add tool before section dialog */}
-            <AlertDialog
-                open={isErrorAddingToolWithoutSection}
-                onOpenChange={setIsErrorAddingToolWithoutSection}
+          <AlertDialog
+            open={isErrorAddingToolWithoutSection}
+            onOpenChange={setIsErrorAddingToolWithoutSection}
+          >
+            <AlertDialogContent
+              size="sm"
+              className="w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-destructive/15 p-0 shadow-2xl"
             >
-              <AlertDialogContent size="sm">
-                <AlertDialogHeader>
-                  <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20">
-                    <AlertCircleIcon />
+              <div className="px-6 pt-6 pb-5">
+                <AlertDialogHeader className="items-center text-center sm:text-center">
+                  <AlertDialogMedia className="mb-1 flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive dark:bg-destructive/20">
+                    <AlertCircleIcon className="h-7 w-7" />
                   </AlertDialogMedia>
 
-                  <AlertDialogTitle>Cannot Add Tool</AlertDialogTitle>
+                  <AlertDialogTitle className="mt-3 text-lg font-semibold tracking-tight">
+                    Cannot Add Tool
+                  </AlertDialogTitle>
 
-                  <AlertDialogDescription>
-                    Add a section first before adding lesson content.
+                  <AlertDialogDescription className="mt-2 max-w-[280px] text-sm leading-6 text-muted-foreground">
+                    Create a section first before adding lesson content.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <AlertDialogFooter>
-                  <AlertDialogAction
+                <div className="mt-6 w-full sm:justify-start">
+                  <div className="w-full">
+                    <AlertDialogAction
                       variant="destructive"
-                      onClick={() =>
-                          setIsErrorAddingToolWithoutSection(false)
-                      }
-                  >
-                    Ok
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-
-          <main className="h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-8 sm:px-8 lg:pr-24">
-            <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-10 pb-16">
-              {sections.length === 0 ? (
-                  <div className="mx-auto flex min-h-[600px] w-full max-w-5xl flex-col items-center justify-center px-6 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700">
-                      <BetweenHorizontalEnd className="h-6 w-6" />
-                    </div>
-
-                    <h2 className="mt-5 text-xl font-semibold text-zinc-900">
-                      Start building your lesson
-                    </h2>
-
-                    <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">
-                      Add your first section to start writing the lesson content.
-                    </p>
-
-                    <button
-                        type="button"
-                        onClick={handleAddSection}
-                        className="mt-6 flex h-10 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
+                      onClick={() => setIsErrorAddingToolWithoutSection(false)}
+                      className="!h-11 !w-full rounded-xl text-sm font-semibold sm:!w-full"
                     >
-                      <Plus className="h-4 w-4" />
-                      Add first section
-                    </button>
+                      Got it
+                    </AlertDialogAction>
                   </div>
-              ) : (
-                  <>
-                    {sections.map((section, index) => (
-                        <Section
-                            key={section.id}
-                            section={section}
-                            sectionIndex={index}
-                            onChange={handleSectionChange}
-                            onDelete={handleDeleteSection}
-                            handleRemovalTool={handleRemoveTool}
-                            handleToolDataChange={handleToolDataChange}
-                            onClick={() => setSectionIndex(index)}
-                        />
-                    ))}
-
-                    <button
-                        type="button"
-                        onClick={handleAddSection}
-                        className="mx-auto flex w-full max-w-5xl items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white/70 py-4 text-sm font-medium text-zinc-600 transition hover:border-zinc-500 hover:bg-white hover:text-zinc-950"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add another section
-                    </button>
-                  </>
-              )}
-            </div>
-          </main>
+                </div>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
-      </section>
+
+        <main className="h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-8 sm:px-8 lg:pr-24">
+          <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-10 pb-16">
+            {sections.length === 0 ? (
+              <div className="mx-auto flex min-h-[600px] w-full max-w-5xl flex-col items-center justify-center px-6 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700">
+                  <BetweenHorizontalEnd className="h-6 w-6" />
+                </div>
+
+                <h2 className="mt-5 text-xl font-semibold text-zinc-900">
+                  Start building your lesson
+                </h2>
+
+                <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">
+                  Add your first section to start writing the lesson content.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleAddSection}
+                  className="mt-6 flex h-10 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add first section
+                </button>
+              </div>
+            ) : (
+              <>
+                {sections.map((section, index) => (
+                  <Section
+                    key={section.id}
+                    section={section}
+                    sectionIndex={index}
+                    onChange={handleSectionChange}
+                    onDelete={handleDeleteSection}
+                    handleRemovalTool={handleRemoveTool}
+                    handleToolDataChange={handleToolDataChange}
+                    onClick={() => setSectionIndex(index)}
+                  />
+                ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddSection}
+                  className="mx-auto flex w-full max-w-5xl items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white/70 py-4 text-sm font-medium text-zinc-600 transition hover:border-zinc-500 hover:bg-white hover:text-zinc-950"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add another section
+                </button>
+              </>
+            )}
+          </div>
+        </main>
+      </div>
+    </section>
   )
 }
 

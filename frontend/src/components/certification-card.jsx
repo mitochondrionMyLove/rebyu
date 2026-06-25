@@ -19,6 +19,7 @@ function CertificationCard({ item, index, certification }) {
   const nav = useNavigate()
 
   function handleOpenCertification() {
+    console.log(certification)
     nav(`certification/${index + 1}`, {
       state: {
         certification: { certification },

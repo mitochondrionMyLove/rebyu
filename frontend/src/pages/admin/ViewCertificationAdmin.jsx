@@ -40,6 +40,8 @@ function ViewCertificationAdmin() {
   }, [location.key])
 
   const certification = getCertification(location)
+  console.log('inside viewCertificationAdmin')
+  console.log(certification)
 
   if (!certification) {
     return (
@@ -248,15 +250,13 @@ function MiddleCategoryCard({ middleCategory }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const lessons = middleCategory.lessons ?? []
-  const middleCategoryId = middleCategory.id ?? -1
   const navigate = useNavigate()
 
   function handleCreateLesson(event, lesson) {
     event.stopPropagation()
-
     navigate(`/admin/lessons/${lesson.name}/create`, {
       state: {
-        middleCategoryId: middleCategoryId,
+        lessonId: lesson.lessonId,
         lessonName: lesson.name,
       },
     })
