@@ -8,10 +8,19 @@ import {
   ChevronRight,
   ClipboardPlus,
   Layers3,
+  ChartNoAxesGantt,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
+
+const getCertification= (location) =>{
+  const certification =
+    location.state?.certification?.certification ??
+    location.state?.certification ??
+    null
+  return certification
+}
 function ViewCertificationAdmin() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -30,10 +39,7 @@ function ViewCertificationAdmin() {
     })
   }, [location.key])
 
-  const certification =
-    location.state?.certification?.certification ??
-    location.state?.certification ??
-    null
+  const certification = getCertification(location)
 
   if (!certification) {
     return (
@@ -242,16 +248,22 @@ function MiddleCategoryCard({ middleCategory }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const lessons = middleCategory.lessons ?? []
+  const middleCategoryId = middleCategory.id ?? -1
   const navigate = useNavigate()
 
-  function handleOpenLesson(event, lesson) {
+  function handleCreateLesson(event, lesson) {
     event.stopPropagation()
 
     navigate(`/admin/lessons/${lesson.name}/create`, {
       state: {
+        middleCategoryId: middleCategoryId,
         lessonName: lesson.name,
       },
     })
+  }
+
+  function handleViewLesson(){
+    alert('view lesson')
   }
 
   return (
@@ -308,15 +320,25 @@ function MiddleCategoryCard({ middleCategory }) {
                       </p>
                     </div>
                   </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={(event) => handleViewLesson()}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-950 transition hover:bg-white"
+                      title="View lesson"
+                    >
+                      <ChartNoAxesGantt className="h-4 w-4" />
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={(event) => handleOpenLesson(event, lesson)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-950 transition hover:bg-white"
-                    title="View lesson"
-                  >
-                    <ArrowUpRight className="h-4 w-4" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={(event) => handleCreateLesson(event, lesson)}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-950 transition hover:bg-white"
+                      title="Create Lessons"
+                    >
+                      <ArrowUpRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

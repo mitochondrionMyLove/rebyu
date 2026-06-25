@@ -278,7 +278,6 @@ function Certifications() {
 
     try {
       setSubmissionError("")
-
       const result = await createCertification(payload)
 
       if (result === false || result?.success === false) {
@@ -324,7 +323,7 @@ function Certifications() {
   }
 
   if (isLoading) {
-    return <CertificationSkeletonCard size={4} />
+    return <CertificationSkeletonCard size={8} />
   }
 
   if (isError) {
