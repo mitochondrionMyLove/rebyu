@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Save,
   Plus,
+  X,
   BetweenHorizontalEnd,
   AlertCircleIcon,
   Type,
@@ -31,11 +32,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+
 import Section from "../../components/Section"
-import SpeedDial from "@mui/material/SpeedDial"
-import SpeedDialAction from "@mui/material/SpeedDialAction"
 import { setLessonComponent } from "../../services/lessonService.js"
-import { saveFile as MediaFileUpload} from "../../services/fileService.js"
+import { saveFile as MediaFileUpload } from "../../services/fileService.js"
 
 const actions = [
   {
@@ -198,9 +203,10 @@ function CreateLessons() {
 
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isToolMenuOpen, setIsToolMenuOpen] = useState(false)
 
   const [isErrorAddingToolWithoutSection, setIsErrorAddingToolWithoutSection] =
-      useState(false)
+    useState(false)
 
   const [validationError, setValidationError] = useState("")
 
@@ -224,20 +230,20 @@ function CreateLessons() {
 
   function handleSectionChange(sectionId, field, value) {
     setSections((previousSections) =>
-        previousSections.map((section) =>
-            section.id === sectionId
-                ? {
-                  ...section,
-                  [field]: value,
-                }
-                : section
-        )
+      previousSections.map((section) =>
+        section.id === sectionId
+          ? {
+            ...section,
+            [field]: value,
+          }
+          : section
+      )
     )
   }
 
   function handleDeleteSection(sectionId) {
     setSections((previousSections) =>
-        previousSections.filter((section) => section.id !== sectionId)
+      previousSections.filter((section) => section.id !== sectionId)
     )
 
     setSectionIndex(0)
@@ -262,61 +268,66 @@ function CreateLessons() {
     }
 
     setSections((previousSections) =>
-        previousSections.map((section, currentSectionIndex) => {
-          if (currentSectionIndex !== sectionIndex) {
-            return section
-          }
+      previousSections.map((section, currentSectionIndex) => {
+        if (currentSectionIndex !== sectionIndex) {
+          return section
+        }
 
-          return {
-            ...section,
-            content: [...section.content, newTool],
-          }
-        })
+        return {
+          ...section,
+          content: [...section.content, newTool],
+        }
+      })
     )
+  }
+
+  // The tool menu intentionally stays open after adding a tool.
+  function handleSelectTool(toolType) {
+    handleAddTool(toolType)
   }
 
   function handleRemoveTool(targetSectionIndex, targetToolIndex) {
     setSections((previousSections) =>
-        previousSections.map((section, currentSectionIndex) => {
-          if (currentSectionIndex !== targetSectionIndex) {
-            return section
-          }
+      previousSections.map((section, currentSectionIndex) => {
+        if (currentSectionIndex !== targetSectionIndex) {
+          return section
+        }
 
-          return {
-            ...section,
-            content: section.content.filter(
-                (_, currentToolIndex) => currentToolIndex !== targetToolIndex
-            ),
-          }
-        })
+        return {
+          ...section,
+          content: section.content.filter(
+            (_, currentToolIndex) => currentToolIndex !== targetToolIndex
+          ),
+        }
+      })
     )
   }
 
   function handleToolDataChange(
-      targetSectionIndex,
-      targetToolIndex,
-      newData
+    targetSectionIndex,
+    targetToolIndex,
+    newData
   ) {
     setSections((previousSections) =>
-        previousSections.map((section, currentSectionIndex) => {
-          if (currentSectionIndex !== targetSectionIndex) {
-            return section
-          }
+      previousSections.map((section, currentSectionIndex) => {
+        if (currentSectionIndex !== targetSectionIndex) {
+          return section
+        }
 
-          return {
-            ...section,
-            content: section.content.map((tool, currentToolIndex) => {
-              if (currentToolIndex !== targetToolIndex) {
-                return tool
-              }
+        return {
+          ...section,
+          content: section.content.map((tool, currentToolIndex) => {
+            if (currentToolIndex !== targetToolIndex) {
+              return tool
+            }
 
-              return {
-                ...tool,
-                data: newData,
-              }
-            }),
-          }
-        })
+            return {
+              ...tool,
+              data: newData,
+            }
+          }),
+        }
+      })
     )
   }
 
@@ -341,8 +352,8 @@ function CreateLessons() {
     }
 
     if (
-        tool.type === "unordered-list" ||
-        tool.type === "ordered-list"
+      tool.type === "unordered-list" ||
+      tool.type === "ordered-list"
     ) {
       if (!data.items || data.items.length === 0) {
         return `${toolLabel}: add at least one list item.`
@@ -361,10 +372,10 @@ function CreateLessons() {
       }
 
       const hasInvalidTab = data.items.some(
-          (item) =>
-              isBlank(item.label) ||
-              isBlank(item.title) ||
-              isBlank(item.description)
+        (item) =>
+          isBlank(item.label) ||
+          isBlank(item.title) ||
+          isBlank(item.description)
       )
 
       if (hasInvalidTab) {
@@ -378,7 +389,7 @@ function CreateLessons() {
       }
 
       const hasInvalidItem = data.items.some(
-          (item) => isBlank(item.title) || isBlank(item.content)
+        (item) => isBlank(item.title) || isBlank(item.content)
       )
 
       if (hasInvalidItem) {
@@ -392,10 +403,10 @@ function CreateLessons() {
       }
 
       const hasInvalidCard = data.cards.some(
-          (card) =>
-              isBlank(card.frontTitle) ||
-              isBlank(card.backTitle) ||
-              isBlank(card.description)
+        (card) =>
+          isBlank(card.frontTitle) ||
+          isBlank(card.backTitle) ||
+          isBlank(card.description)
       )
 
       if (hasInvalidCard) {
@@ -416,8 +427,8 @@ function CreateLessons() {
     }
 
     if (
-        tool.type === "image-left-text" ||
-        tool.type === "image-right-text"
+      tool.type === "image-left-text" ||
+      tool.type === "image-right-text"
     ) {
       if (!data.file && isBlank(data.imageKey)) {
         return `${toolLabel}: upload an image first.`
@@ -445,9 +456,9 @@ function CreateLessons() {
     }
 
     for (
-        let currentSectionIndex = 0;
-        currentSectionIndex < sections.length;
-        currentSectionIndex++
+      let currentSectionIndex = 0;
+      currentSectionIndex < sections.length;
+      currentSectionIndex++
     ) {
       const section = sections[currentSectionIndex]
       const sectionNumber = currentSectionIndex + 1
@@ -461,16 +472,16 @@ function CreateLessons() {
       }
 
       for (
-          let currentToolIndex = 0;
-          currentToolIndex < section.content.length;
-          currentToolIndex++
+        let currentToolIndex = 0;
+        currentToolIndex < section.content.length;
+        currentToolIndex++
       ) {
         const tool = section.content[currentToolIndex]
 
         const toolError = validateTool(
-            tool,
-            sectionNumber,
-            currentToolIndex + 1
+          tool,
+          sectionNumber,
+          currentToolIndex + 1
         )
 
         if (toolError) {
@@ -480,6 +491,48 @@ function CreateLessons() {
     }
 
     return null
+  }
+
+  async function saveMediaFile(tool, sectionName) {
+    const file = tool.data?.file
+
+    if (!file) {
+      return
+    }
+
+    const imageTools = [
+      "image-left-text",
+      "image-right-text",
+      "image",
+    ]
+
+    if (imageTools.includes(tool.type)) {
+      await MediaFileUpload(
+        lessonId,
+        sectionName,
+        tool.id,
+        "photo",
+        file
+      )
+    }
+
+    if (tool.type === "video") {
+      await MediaFileUpload(
+        lessonId,
+        sectionName,
+        tool.id,
+        "video",
+        file
+      )
+    }
+  }
+
+  async function uploadLessonMedia() {
+    const mediaUploads = sections.flatMap((section) =>
+      section.content.map((tool) => saveMediaFile(tool, section.sectionName))
+    )
+
+    await Promise.all(mediaUploads)
   }
 
   async function handleSaveLesson() {
@@ -492,40 +545,19 @@ function CreateLessons() {
 
     try {
       setIsSaving(true)
-      console.log("Lesson name:", lessonName)
-      console.log("LessonId:", lessonId)
-      console.log("Sections:", sections)
-      setIsSuccessDialogOpen(true)
 
-          sections.map((section) =>{
-            section.content.map((content) =>{
-                if(['image-left-text','image-right-text','image','video'].includes(content.type)){
-                  saveFile(content.toolType, content, section.sectionName)
-                }
-            })
-          })
-
-
+      await uploadLessonMedia()
       await setLessonComponent(lessonId, sections)
+
+      setIsSuccessDialogOpen(true)
     } catch (error) {
       console.error("Could not save lesson:", error)
 
       setValidationError(
-          "Could not save the lesson. Please try again."
+        "Could not save the lesson. Please try again."
       )
     } finally {
       setIsSaving(false)
-    }
-  }
-
-  async function  saveFile(toolType, content, sectionName){
-    switch (toolType) {
-      case "image-left-text" || "image-right-text" || "image" :
-          await MediaFileUpload(lessonId, sectionName, content.id, 'photo',content.data.file)
-        break
-      case "video":
-          await MediaFileUpload(lessonId, sectionName, content.id, 'video',content.data.file)
-        break
     }
   }
 
@@ -542,7 +574,9 @@ function CreateLessons() {
           </button>
 
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500">Lesson editor</p>
+            <p className="text-xs font-medium text-zinc-500">
+              Lesson editor
+            </p>
 
             <h1 className="truncate text-base font-semibold text-zinc-950">
               {lessonName}
@@ -571,11 +605,12 @@ function CreateLessons() {
               {isSaving ? "Saving..." : "Save Lesson"}
             </span>
 
-            <span className="sm:hidden">{isSaving ? "Saving..." : "Save"}</span>
+            <span className="sm:hidden">
+              {isSaving ? "Saving..." : "Save"}
+            </span>
           </button>
         </div>
 
-        {/* Successful save dialog */}
         <AlertDialog
           open={isSuccessDialogOpen}
           onOpenChange={setIsSuccessDialogOpen}
@@ -585,7 +620,7 @@ function CreateLessons() {
               <AlertDialogTitle>Created Successfully!</AlertDialogTitle>
 
               <AlertDialogDescription>
-                You have successfully created the lessons for {lessonName}.
+                You have successfully created the lesson for {lessonName}.
               </AlertDialogDescription>
             </AlertDialogHeader>
 
@@ -613,57 +648,81 @@ function CreateLessons() {
 
               <AlertDialogTitle>Cannot Save Lesson</AlertDialogTitle>
 
-              <AlertDialogDescription>{validationError}</AlertDialogDescription>
+              <AlertDialogDescription>
+                {validationError}
+              </AlertDialogDescription>
             </AlertDialogHeader>
 
-            <div className="mt-6 w-full sm:justify-start">
-              <div className="w-full">
-                <AlertDialogAction
-                  variant="destructive"
-                  onClick={() => setValidationError("")}
-                  className="!h-11 !w-full rounded-xl text-sm font-semibold sm:!w-full"
-                >
-                  Ok
-                </AlertDialogAction>
-              </div>
+            <div className="mt-6 w-full">
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => setValidationError("")}
+                className="!h-11 !w-full rounded-xl text-sm font-semibold"
+              >
+                Ok
+              </AlertDialogAction>
             </div>
           </AlertDialogContent>
         </AlertDialog>
       </header>
 
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <div className="fixed right-10 bottom-10 z-50">
-          <SpeedDial
-            ariaLabel="Add content block"
-            icon={<Plus />}
-            direction="up"
-            sx={{
-              "& .MuiFab-primary": {
-                backgroundColor: "black",
-                color: "white",
-                "&:hover": {
-                  backgroundColor: "black",
-                },
-              },
-              "& .MuiSpeedDialAction-fab": {
-                backgroundColor: "white",
-                color: "black",
-              },
-            }}
+        <div className="fixed right-4 bottom-4 z-50 sm:right-8 sm:bottom-8">
+          <Collapsible
+            open={isToolMenuOpen}
+            onOpenChange={setIsToolMenuOpen}
           >
-            {actions.map((action) => (
-              <SpeedDialAction
-                key={action.type}
-                icon={action.icon}
-                slotProps={{
-                  tooltip: {
-                    title: action.name,
-                  },
-                }}
-                onClick={() => handleAddTool(action.type)}
-              />
-            ))}
-          </SpeedDial>
+            <div className="relative">
+              <CollapsibleContent className="absolute right-0 bottom-14 mb-3 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl">
+                <div className="mb-3 px-2 pt-1">
+                  <p className="text-sm font-semibold text-zinc-900">
+                    Add lesson content
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    Choose a content block to add to the selected section.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {actions.map((action) => (
+                    <button
+                      key={action.type}
+                      type="button"
+                      onClick={() => handleSelectTool(action.type)}
+                      className="flex min-h-20 flex-col items-start justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-left text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-950"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800">
+                        {action.icon}
+                      </span>
+
+                      <span className="text-xs font-medium leading-4">
+                        {action.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </CollapsibleContent>
+
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={
+                    isToolMenuOpen
+                      ? "Close content menu"
+                      : "Open content menu"
+                  }
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:bg-zinc-800 focus:outline-none focus:ring-4 focus:ring-zinc-300"
+                >
+                  {isToolMenuOpen ? (
+                    <X className="h-5 w-5" />
+                  ) : (
+                    <Plus className="h-5 w-5" />
+                  )}
+                </button>
+              </CollapsibleTrigger>
+            </div>
+          </Collapsible>
 
           <AlertDialog
             open={isErrorAddingToolWithoutSection}
@@ -688,16 +747,16 @@ function CreateLessons() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div className="mt-6 w-full sm:justify-start">
-                  <div className="w-full">
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={() => setIsErrorAddingToolWithoutSection(false)}
-                      className="!h-11 !w-full rounded-xl text-sm font-semibold sm:!w-full"
-                    >
-                      Got it
-                    </AlertDialogAction>
-                  </div>
+                <div className="mt-6 w-full">
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() =>
+                      setIsErrorAddingToolWithoutSection(false)
+                    }
+                    className="!h-11 !w-full rounded-xl text-sm font-semibold"
+                  >
+                    Got it
+                  </AlertDialogAction>
                 </div>
               </div>
             </AlertDialogContent>

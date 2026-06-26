@@ -1,10 +1,5 @@
 import React from "react"
-import {
-  MoreVertical,
-  PencilIcon,
-  ShareIcon,
-  TrashIcon,
-} from "lucide-react"
+import { MoreVertical, PencilIcon, ShareIcon, TrashIcon } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,16 +9,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useNavigate } from "react-router-dom"
+import { getFileViewUrl } from "../../src/services/fileService.js"
 
-function CertificationCard({ item, index, certification }) {
+const DEFAULT_IMAGE =
+  "https://www.eclosio.ong/wp-content/uploads/2018/08/default.png"
+
+function CertificationCard({ item, certification }) {
   const nav = useNavigate()
+  const imageKey = certification?.imageKey ?? item?.imageKey
+  const imageUrl = imageKey ? getFileViewUrl(imageKey) : DEFAULT_IMAGE
 
   function handleOpenCertification() {
-    console.log(certification)
-    nav(`certification/${index + 1}`, {
-      state: {
-        certification: { certification },
-      },
+    nav(`certification/${certification?.id ?? item?.id}`, {
+      state: { certification: {certification}, imageUrl: {imageUrl} },
     })
   }
 
@@ -32,11 +30,13 @@ function CertificationCard({ item, index, certification }) {
       className="card h-[380px] w-full cursor-pointer overflow-hidden rounded-[32px] bg-base-100 shadow-sm transition hover:shadow-md"
       onClick={handleOpenCertification}
     >
-      <figure className="h-56 shrink-0">
+      <figure className="h-56 shrink-0 bg-zinc-100">
         <img
-          src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
+          src={imageUrl}
           alt={item.title}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
+          onError={(e) => { e.currentTarget.src = DEFAULT_IMAGE }}
+          loading="eager"
         />
       </figure>
 
@@ -50,7 +50,7 @@ function CertificationCard({ item, index, certification }) {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                onClick={(event) => event.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 className="-mt-1 -mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition hover:bg-zinc-300"
                 aria-label="Certification options"
               >
@@ -60,13 +60,13 @@ function CertificationCard({ item, index, certification }) {
 
             <DropdownMenuContent
               align="end"
-              onClick={(event) => event.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               <DropdownMenuGroup>
                 <DropdownMenuItem
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    console.log("Edit certification:", item)
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    console.log("Edit:", item)
                   }}
                 >
                   <PencilIcon className="mr-2 h-4 w-4" />
@@ -74,9 +74,9 @@ function CertificationCard({ item, index, certification }) {
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    console.log("Share certification:", item)
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    console.log("Share:", item)
                   }}
                 >
                   <ShareIcon className="mr-2 h-4 w-4" />
@@ -89,9 +89,9 @@ function CertificationCard({ item, index, certification }) {
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   variant="destructive"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    console.log("Delete certification:", item)
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    console.log("Delete:", item)
                   }}
                 >
                   <TrashIcon className="mr-2 h-4 w-4" />

@@ -19,6 +19,9 @@ import {
   addCertification,
   getAllCertifications,
 } from "../../services/certificationService"
+import {
+  savePhotoCertification,
+} from "../../services/fileService"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -195,6 +198,13 @@ function Certifications() {
     },
   })
 
+  const { mutateAsync, isPending: isUploading } = useMutation({
+    mutationKey: ["save-certification-photo"],
+    mutationFn: savePhotoCertification
+  })
+
+  const isBusy = isSubmitting || isUploading
+
   const isFirstStep = page === 1
   const isLastStep = page === TOTAL_STEPS
 
@@ -208,6 +218,7 @@ function Certifications() {
   }
 
   const handleDrawerChange = (open) => {
+    if (!open && isBusy) return
     setIsCreateDrawerOpen(open)
 
     if (!open) {
@@ -263,7 +274,6 @@ function Certifications() {
     const payload = {
       title: certificationDetails.title.trim(),
       description: certificationDetails.description.trim(),
-      imageKey: buildImageKey(certificationDetails.imageFile),
       dateCreated: formatLocalDateTime(),
       price: Number(certificationDetails.price),
       majorCategory: removeModuleUiFields(moduleCategories),
@@ -278,6 +288,9 @@ function Certifications() {
 
     try {
       setSubmissionError("")
+      const imageKey =  await mutateAsync(certificationDetails.imageFile)
+      console.log(imageKey)
+      payload['imageKey'] = imageKey
       const result = await createCertification(payload)
 
       if (result === false || result?.success === false) {
@@ -404,7 +417,8 @@ function Certifications() {
                 <button
                   type="button"
                   aria-label="Close drawer"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 focus:ring-2 focus:ring-zinc-900 focus:outline-none"
+                  disabled={isBusy}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 focus:ring-2 focus:ring-zinc-900 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <CircleChevronLeft className="h-7 w-7" />
                 </button>
@@ -464,7 +478,7 @@ function Certifications() {
                     type="button"
                     variant="outline"
                     onClick={handlePrevious}
-                    disabled={isFirstStep || isSubmitting}
+                    disabled={isFirstStep || isBusy}
                     className="min-w-[118px] gap-2 rounded-xl border-zinc-300 text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -474,10 +488,10 @@ function Certifications() {
                   <Button
                     type="button"
                     onClick={handleMainAction}
-                    disabled={isSubmitting}
+                    disabled={isBusy}
                     className="min-w-[150px] gap-2 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isSubmitting ? (
+                    {isBusy ? (
                       "Creating..."
                     ) : isLastStep ? (
                       "Create Certification"
