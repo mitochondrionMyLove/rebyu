@@ -8,3 +8,9 @@ export function setLessonComponent(id, lessonComponent) {
     },
   })
 }
+
+export function getLessonComponent(id) {
+  return base(`lessons/lesson/${id}`, {
+    method: "GET",
+  })
+}

@@ -289,10 +289,7 @@ function CertificationModules({
 
     if (onCreateMiddleExam) {
       onCreateMiddleExam(examContext)
-      return
     }
-
-    console.log("Create middle exam:", examContext)
   }
 
   const totalMiddleCategories = categories.reduce(
