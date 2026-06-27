@@ -18,6 +18,7 @@ function Section({
   onClick,
   sectionIndex,
   handleRemovalTool,
+  onToolDataChange,
 }) {
   const tools = section.content
   return (
@@ -91,6 +92,7 @@ function Section({
                 <ImageTool
                   key={index}
                   onClick={() => handleRemovalTool(sectionIndex, index)}
+                  onChange={(file) => onToolDataChange?.(section.id, item.id, { file })}
                 />
               )
             else if (item.type == "video")
@@ -98,6 +100,7 @@ function Section({
                 <VideoTool
                   key={index}
                   onClick={() => handleRemovalTool(sectionIndex, index)}
+                  onChange={(file) => onToolDataChange?.(section.id, item.id, { file })}
                 />
               )
           })}

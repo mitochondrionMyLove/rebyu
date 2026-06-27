@@ -28,6 +28,12 @@ function createId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function useObjectUrl(file) {
   const [url, setUrl] = useState("")
 
@@ -291,12 +297,17 @@ export function ImageTool({ onChange, onClick }) {
       </div>
 
       {imagePreview && (
-        <div className="overflow-hidden rounded-2xl border border-zinc-200">
-          <img
-            src={imagePreview}
-            alt="Lesson upload preview"
-            className="max-h-[420px] w-full object-cover"
-          />
+        <div className="space-y-2">
+          <div className="overflow-hidden rounded-2xl border border-zinc-200">
+            <img
+              src={imagePreview}
+              alt="Lesson upload preview"
+              className="max-h-[420px] w-full object-cover"
+            />
+          </div>
+          <p className="text-xs text-zinc-500">
+            {imageFile?.name} &middot; {formatFileSize(imageFile?.size ?? 0)}
+          </p>
         </div>
       )}
     </section>
@@ -567,9 +578,78 @@ export function FlipGridTool({onClick}) {
   )
 }
 
-export function VideoTool({ onChange, onClick }) {
+export function ImageTextTool({ imagePosition = "left", data = {}, onDataChange, onClick }) {
+  const [imageFile, setImageFile] = useState(null)
+  const imagePreview = useObjectUrl(imageFile)
+  const imageSource = imagePreview || (data.imageKey ? getFileViewUrl(data.imageKey) : "")
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      "image/jpeg": [".jpeg", ".jpg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+    },
+    multiple: false,
+    onDrop: (acceptedFiles) => {
+      const selectedImage = acceptedFiles[0]
+
+      if (!selectedImage) return
+
+      setImageFile(selectedImage)
+      onDataChange?.({ file: selectedImage })
+    },
+  })
+
+  const imageBlock = (
+    <div className="space-y-3">
+      <div
+        {...getRootProps()}
+        className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition ${
+          isDragActive
+            ? "border-zinc-950 bg-zinc-100"
+            : "border-zinc-200 hover:border-zinc-500"
+        }`}
+      >
+        <input {...getInputProps()} />
+        <p className="font-medium text-zinc-800">
+          {isDragActive ? "Drop the image here" : "Upload an image"}
+        </p>
+      </div>
+      {imageSource ? (
+        <img
+          src={imageSource}
+          alt="Lesson upload preview"
+          className="max-h-[320px] w-full rounded-2xl border border-zinc-200 object-cover"
+        />
+      ) : null}
+    </div>
+  )
+
+  const textBlock = (
+    <textarea
+      value={data.text ?? ""}
+      onChange={(event) => onDataChange?.({ text: event.target.value })}
+      placeholder="Write supporting text..."
+      rows={8}
+      className="w-full resize-none rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700 transition outline-none focus:border-zinc-950"
+    />
+  )
+
+  return (
+    <section className="relative rounded-2xl border border-zinc-200 bg-white p-5">
+      <FloatingDeleteButton onClick={onClick} />
+      <div className="grid gap-5 md:grid-cols-2">
+        {imagePosition === "left" ? imageBlock : textBlock}
+        {imagePosition === "left" ? textBlock : imageBlock}
+      </div>
+    </section>
+  )
+}
+
+export function VideoTool({ data = {}, onChange, onClick }) {
   const [videoFile, setVideoFile] = useState(null)
   const videoPreview = useObjectUrl(videoFile)
+  const videoSource = videoPreview || (data.videoKey ? getFileViewUrl(data.videoKey) : "")
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -618,12 +698,19 @@ export function VideoTool({ onChange, onClick }) {
         </p>
       </div>
 
-      {videoPreview && (
-        <video
-          src={videoPreview}
-          controls
-          className="w-full rounded-2xl border border-zinc-200 bg-black"
-        />
+      {videoSource && (
+        <div className="space-y-2">
+          <video
+            src={videoSource}
+            controls
+            className="w-full rounded-2xl border border-zinc-200 bg-black"
+          />
+          {videoFile ? (
+            <p className="text-xs text-zinc-500">
+              {videoFile.name} &middot; {formatFileSize(videoFile.size)}
+            </p>
+          ) : null}
+        </div>
       )}
     </section>
   )

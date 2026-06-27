@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { useMutation } from "@tanstack/react-query"
 import {
   AlignLeft,
   FilePlay,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react"
 
 import Section from "../../components/Section"
+import { base } from "../../services/base"
 import SpeedDial from "@mui/material/SpeedDial"
 import SpeedDialAction from "@mui/material/SpeedDialAction"
 
@@ -23,17 +25,13 @@ const actions = [
     type: "heading",
     name: "Heading",
     icon: <HeadingIcon className="h-5 w-5" />,
-    createData: () => ({
-      text: "",
-    }),
+    createData: () => ({ text: "" }),
   },
   {
     type: "description",
     name: "Description",
     icon: <AlignLeft className="h-5 w-5" />,
-    createData: () => ({
-      text: "",
-    }),
+    createData: () => ({ text: "" }),
   },
   {
     type: "tabs",
@@ -83,17 +81,13 @@ const actions = [
     type: "image",
     name: "Image",
     icon: <ImageIcon className="h-5 w-5" />,
-    createData: () => ({
-      imageKey: "",
-    }),
+    createData: () => ({ imageKey: "" }),
   },
   {
     type: "video",
     name: "Video",
     icon: <FilePlay className="h-5 w-5" />,
-    createData: () => ({
-      videoKey: "",
-    }),
+    createData: () => ({ videoKey: "" }),
   },
 ]
 
@@ -103,6 +97,7 @@ function CreateLessons() {
 
   const state = location.state ?? {}
   const lessonName = state.lessonName ?? "Untitled Lesson"
+  const lessonId = state.lessonId
 
   const [sections, setSections] = useState([])
   const [sectionIndex, setSectionIndex] = useState(0)
@@ -126,20 +121,13 @@ function CreateLessons() {
   function handleSectionChange(sectionId, field, value) {
     setSections((prev) =>
       prev.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              [field]: value,
-            }
-          : section
+        section.id === sectionId ? { ...section, [field]: value } : section
       )
     )
   }
 
   function handleDeleteSection(sectionId) {
-    setSections((prev) =>
-      prev.filter((section) => section.id !== sectionId)
-    )
+    setSections((prev) => prev.filter((section) => section.id !== sectionId))
   }
 
   function handleAddTool(toolName) {
@@ -151,10 +139,7 @@ function CreateLessons() {
 
     setSections((prev) =>
       prev.map((section, index) => {
-        if (index !== sectionIndex) {
-          return section
-        }
-
+        if (index !== sectionIndex) return section
         return {
           ...section,
           content: [
@@ -173,10 +158,7 @@ function CreateLessons() {
   function handleRemoveTool(targetSectionIndex, targetToolIndex) {
     setSections((prev) =>
       prev.map((section, currentSectionIndex) => {
-        if (currentSectionIndex !== targetSectionIndex) {
-          return section
-        }
-
+        if (currentSectionIndex !== targetSectionIndex) return section
         return {
           ...section,
           content: section.content.filter(
@@ -187,12 +169,80 @@ function CreateLessons() {
     )
   }
 
-  function handleSaveLesson() {
-    console.log("Lesson name:", lessonName)
-    console.log("Sections:", sections)
-
-    alert("Lesson data was printed in the browser console.")
+  function handleToolDataChange(sectionId, toolId, data) {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              content: section.content.map((tool) =>
+                tool.id === toolId
+                  ? { ...tool, data: { ...tool.data, ...data } }
+                  : tool
+              ),
+            }
+          : section
+      )
+    )
   }
+
+  const { mutate: saveLesson, isPending } = useMutation({
+    mutationFn: async () => {
+      const updatedSections = await Promise.all(
+        sections.map(async (section) => {
+          const updatedContent = await Promise.all(
+            section.content.map(async (tool) => {
+              if (tool.type === "image" && tool.data.file) {
+                const formData = new FormData()
+                formData.append("lessonId", lessonId)
+                formData.append("sectionName", section.sectionName || "Untitled")
+                formData.append("toolId", tool.id)
+                formData.append("folderName", "photo")
+                formData.append("file", tool.data.file)
+                const key = await base("files/upload", { method: "POST", data: formData })
+                if (!key) throw new Error("File upload failed because the server did not return a file name.")
+                const { file: _f, ...rest } = tool.data
+                return { ...tool, data: { ...rest, imageKey: key } }
+              }
+              if (tool.type === "video" && tool.data.file) {
+                const formData = new FormData()
+                formData.append("lessonId", lessonId)
+                formData.append("sectionName", section.sectionName || "Untitled")
+                formData.append("toolId", tool.id)
+                formData.append("folderName", "video")
+                formData.append("file", tool.data.file)
+                const key = await base("files/upload", { method: "POST", data: formData })
+                if (!key) throw new Error("File upload failed because the server did not return a file name.")
+                const { file: _f, ...rest } = tool.data
+                return { ...tool, data: { ...rest, videoKey: key } }
+              }
+              return tool
+            })
+          )
+          return { ...section, content: updatedContent }
+        })
+      )
+
+      const lessonComponent = updatedSections.map((section) => ({
+        sectionId: section.id,
+        sectionName: section.sectionName,
+        content: section.content.map(({ id, type, data }) => {
+          const { file: _f, ...cleanData } = data
+          return { id, type, data: cleanData }
+        }),
+      }))
+
+      await base(`lessons/lesson/${lessonId}`, {
+        method: "PUT",
+        data: { lessonComponentStructure: JSON.stringify(lessonComponent) },
+      })
+    },
+    onSuccess: () => navigate(-1),
+    onError: (error) => {
+      console.error("Could not save lesson:", error)
+      alert(error.message || "Failed to save lesson.")
+    },
+  })
 
   return (
     <section className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-zinc-100">
@@ -207,10 +257,7 @@ function CreateLessons() {
           </button>
 
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500">
-              Lesson editor
-            </p>
-
+            <p className="text-xs font-medium text-zinc-500">Lesson editor</p>
             <h1 className="truncate text-base font-semibold text-zinc-950">
               {lessonName}
             </h1>
@@ -228,12 +275,15 @@ function CreateLessons() {
 
           <button
             type="button"
-            onClick={handleSaveLesson}
-            className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 sm:px-4"
+            onClick={() => saveLesson()}
+            disabled={isPending}
+            className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60 sm:px-4"
           >
             <Save className="h-4 w-4" />
-            <span className="hidden sm:inline">Save Lesson</span>
-            <span className="sm:hidden">Save</span>
+            <span className="hidden sm:inline">
+              {isPending ? "Saving…" : "Save Lesson"}
+            </span>
+            <span className="sm:hidden">{isPending ? "…" : "Save"}</span>
           </button>
         </div>
       </header>
@@ -248,9 +298,7 @@ function CreateLessons() {
               "& .MuiFab-primary": {
                 backgroundColor: "black",
                 color: "white",
-                "&:hover": {
-                  backgroundColor: "black",
-                },
+                "&:hover": { backgroundColor: "black" },
               },
               "& .MuiSpeedDialAction-fab": {
                 backgroundColor: "white",
@@ -262,11 +310,7 @@ function CreateLessons() {
               <SpeedDialAction
                 key={action.name}
                 icon={action.icon}
-                slotProps={{
-                  tooltip: {
-                    title: action.name,
-                  },
-                }}
+                slotProps={{ tooltip: { title: action.name } }}
                 onClick={() => handleAddTool(action.name)}
               />
             ))}
@@ -308,6 +352,7 @@ function CreateLessons() {
                     onChange={handleSectionChange}
                     onDelete={handleDeleteSection}
                     handleRemovalTool={handleRemoveTool}
+                    onToolDataChange={handleToolDataChange}
                     onClick={() => setSectionIndex(index)}
                   />
                 ))}

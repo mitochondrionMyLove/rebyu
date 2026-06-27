@@ -249,6 +249,7 @@ function MiddleCategoryCard({ middleCategory }) {
 
     navigate(`/admin/lessons/${lesson.name}/create`, {
       state: {
+        lessonId: lesson.lessonId,
         lessonName: lesson.name,
       },
     })
