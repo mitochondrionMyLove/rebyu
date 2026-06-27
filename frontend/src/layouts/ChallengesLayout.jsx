@@ -1,4 +1,3 @@
-import { Outlet } from "react-router-dom"
 import {
     ArrowLeft,
     ChevronLeft,
@@ -6,15 +5,17 @@ import {
     Clock3,
 } from "lucide-react"
 
+import MainArea from "../components/challenges/main.jsx"
+
 export default function ChallengesLayout() {
     return (
-        <section className="flex h-dvh min-h-0 flex-col bg-white">
+        <section className="flex h-dvh min-h-0 flex-col overflow-hidden bg-white">
             {/* Header */}
             <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 px-4 sm:px-6">
                 <div className="flex min-w-0 items-center gap-3">
                     <button
                         type="button"
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950"
                         aria-label="Back"
                     >
                         <ArrowLeft className="h-5 w-5" />
@@ -27,7 +28,6 @@ export default function ChallengesLayout() {
                     </div>
                 </div>
 
-                {/* Temporary timer */}
                 <div className="flex shrink-0 items-center gap-2 text-zinc-700">
                     <Clock3 className="h-4 w-4" />
 
@@ -36,21 +36,21 @@ export default function ChallengesLayout() {
                             Time Left
                         </p>
 
-                        <p className="text-sm font-semibold tabular-nums">01:56:12</p>
+                        <p className="text-sm font-semibold tabular-nums">
+                            01:56:12
+                        </p>
                     </div>
                 </div>
             </header>
 
-            {/* Page content */}
-            <main className="min-h-0 flex-1 overflow-y-auto">
-                <Outlet />
+            <main className="min-h-0 flex-1 overflow-hidden">
+                <MainArea />
             </main>
 
-            {/* Footer navigation */}
             <footer className="flex h-16 shrink-0 items-center justify-between border-t border-zinc-200 px-4 sm:px-6">
                 <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
                 >
                     <ChevronLeft className="h-4 w-4" />
                     Previous
@@ -60,7 +60,7 @@ export default function ChallengesLayout() {
 
                 <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
                 >
                     Next
                     <ChevronRight className="h-4 w-4" />
