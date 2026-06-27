@@ -42,6 +42,7 @@ function ViewCertificationAdmin() {
       behavior: "auto",
     })
   }, [location.key])
+
   const certification = getCertification(location)
 
   if (!certification) {
@@ -53,8 +54,7 @@ function ViewCertificationAdmin() {
             </h1>
 
             <p className="mt-2 text-sm text-zinc-500">
-              Go back to the certifications page and select a certification
-              again.
+              Go back to the certifications page and select a certification again.
             </p>
 
             <Button
@@ -197,6 +197,7 @@ function ViewCertificationAdmin() {
                   {majorCategories.map((majorCategory, majorIndex) => (
                       <MajorCategorySection
                           key={majorCategory.majorCategoryId ?? majorIndex}
+                          certification={certification}
                           majorCategory={majorCategory}
                           majorIndex={majorIndex}
                       />
@@ -209,7 +210,11 @@ function ViewCertificationAdmin() {
   )
 }
 
-function MajorCategorySection({ majorCategory, majorIndex }) {
+function MajorCategorySection({
+                                certification,
+                                majorCategory,
+                                majorIndex,
+                              }) {
   const middleCategories = majorCategory.middleCategory ?? []
 
   return (
@@ -238,6 +243,8 @@ function MajorCategorySection({ majorCategory, majorIndex }) {
               middleCategories.map((middleCategory, middleIndex) => (
                   <MiddleCategoryCard
                       key={middleCategory.middleCategoryId ?? middleIndex}
+                      certification={certification}
+                      majorCategory={majorCategory}
                       middleCategory={middleCategory}
                   />
               ))
@@ -247,14 +254,15 @@ function MajorCategorySection({ majorCategory, majorIndex }) {
   )
 }
 
-function MiddleCategoryCard({ middleCategory }) {
+function MiddleCategoryCard({
+                              certification,
+                              majorCategory,
+                              middleCategory,
+                            }) {
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
 
-
   const lessons = middleCategory.lessons ?? []
-
-
 
   function handleCreateLesson(event, lesson) {
     event.stopPropagation()
@@ -265,6 +273,26 @@ function MiddleCategoryCard({ middleCategory }) {
       state: {
         lessonId: lesson.lessonId,
         lessonName,
+      },
+    })
+  }
+
+  function handleCreateQuiz() {
+    navigate("/admin/quizzes/create", {
+      state: {
+        quizType: "MIDDLE_CATEGORY_QUIZ",
+
+        certificationId:
+            certification.certificationId ?? certification.id ?? null,
+        certificationTitle: certification.title ?? "",
+
+        majorCategoryId: majorCategory.majorCategoryId ?? null,
+        majorCategoryTitle: majorCategory.title ?? "",
+
+        middleCategoryId: middleCategory.middleCategoryId ?? null,
+        middleCategoryTitle: middleCategory.title ?? "",
+
+        lessons,
       },
     })
   }
@@ -324,22 +352,31 @@ function MiddleCategoryCard({ middleCategory }) {
                             </div>
                           </div>
 
-                          <div className="flex gap-1">
-                            <button
-                                type="button"
-                                onClick={(event) => handleCreateLesson(event, lesson)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-950 transition hover:bg-white"
-                                title="Create Lessons"
-                            >
-                              <ArrowUpRight className="h-4 w-4" />
-                            </button>
-                          </div>
+                          <button
+                              type="button"
+                              onClick={(event) => handleCreateLesson(event, lesson)}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-950 transition hover:bg-white"
+                              title="Create Lesson Content"
+                          >
+                            <ArrowUpRight className="h-4 w-4" />
+                          </button>
                         </div>
                     ))}
                   </div>
               )}
             </div>
         )}
+
+        <div className="flex justify-end border-t border-zinc-100 bg-zinc-50 px-5 py-3">
+          <Button
+              type="button"
+              onClick={handleCreateQuiz}
+              className="h-9 rounded-lg bg-indigo-950 px-4 text-xs font-medium text-white hover:bg-indigo-900"
+          >
+            <ClipboardPlus className="mr-2 h-4 w-4" />
+            Create Quiz
+          </Button>
+        </div>
       </article>
   )
 }

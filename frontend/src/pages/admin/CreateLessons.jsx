@@ -39,7 +39,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 
-import Section from "../../components/Section"
+import Section from "../../components/certifications/section"
 import {
   getLessonComponent,
   setLessonComponent,

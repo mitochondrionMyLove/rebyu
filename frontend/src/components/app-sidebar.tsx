@@ -99,6 +99,7 @@ export function AppSidebar({
 
       <SidebarContent>
         <NavProjects projects={data} />
+
       </SidebarContent>
 
       <SidebarFooter />

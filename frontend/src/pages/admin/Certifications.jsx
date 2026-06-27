@@ -15,7 +15,7 @@ import {
 } from "@tanstack/react-query"
 import { toast } from "sonner"
 
-import CertificationCard from "../../components/certification-card"
+import CertificationCard from "../../components/certifications/certification-card"
 import {
   addCertification,
   getAllCertifications,
@@ -57,9 +57,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-import { CertificationSkeletonCard } from "../../components/certification-skeleton-card"
-import CertificationDetails from "../../components/certification-details"
-import CertificationModules from "../../components/certification-modules"
+import { CertificationSkeletonCard } from "../../components/certifications/certification-skeleton-card"
+import CertificationDetails from "../../components/certifications/certification-details"
+import CertificationModules from "../../components/certifications/certification-modules"
 import { industries } from "@/constants/industries.js"
 import {useEffect} from "react"
 

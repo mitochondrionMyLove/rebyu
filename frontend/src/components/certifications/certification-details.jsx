@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import FileUploadComponent from "./file-upload"
+import FileUploadComponent from "./file-upload.jsx"
 import {
   Select,
   SelectContent,

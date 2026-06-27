@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom"
 import ProtectedRoute from "./components/ProtectedRoute"
 import DashboardLayout from "./layouts/DashboardLayout"
+import ChallengesLayout from "./layouts/ChallengesLayout"
+
 
 import Certifications from "./pages/admin/Certifications"
 import Challenges from "./pages/admin/Challenges"
@@ -44,6 +46,8 @@ export function App() {
       <Route element={<ProtectedRoute allowedRoles={["enterprise"]} />}>
         <Route path="/enterprise" element={<Enterprise />} />
       </Route>
+
+        <Route path='/challenges' element={<ChallengesLayout />} />
     </Routes>
   )
 }

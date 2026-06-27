@@ -13,7 +13,7 @@ import {
   OrderedListTool,
   ImageLeftTextTool,
   ImageRightTextTool,
-} from "./tools"
+} from "./tools.jsx"
 
 const TOOL_COMPONENTS = {
   heading: HeadingTool,
