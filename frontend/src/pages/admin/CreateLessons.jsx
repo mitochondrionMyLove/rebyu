@@ -1,5 +1,6 @@
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import {
   AlignLeft,
   FilePlay,
@@ -39,7 +40,10 @@ import {
 } from "@/components/ui/collapsible"
 
 import Section from "../../components/Section"
-import { setLessonComponent } from "../../services/lessonService.js"
+import {
+  getLessonComponent,
+  setLessonComponent,
+} from "../../services/lessonService.js"
 import { saveFile as MediaFileUpload } from "../../services/fileService.js"
 
 const actions = [
@@ -190,11 +194,34 @@ const actions = [
   },
 ]
 
+const MEDIA_TOOL_CONFIG = {
+  image: {
+    folderName: "photo",
+    keyField: "imageKey",
+  },
+
+  "image-left-text": {
+    folderName: "photo",
+    keyField: "imageKey",
+  },
+
+  "image-right-text": {
+    folderName: "photo",
+    keyField: "imageKey",
+  },
+
+  video: {
+    folderName: "video",
+    keyField: "videoKey",
+  },
+}
+
 function CreateLessons() {
   const navigate = useNavigate()
   const location = useLocation()
 
   const state = location.state ?? {}
+
   const lessonName = state.lessonName ?? "Untitled Lesson"
   const lessonId = state.lessonId ?? 0
 
@@ -203,12 +230,139 @@ function CreateLessons() {
 
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingLesson, setIsLoadingLesson] = useState(true)
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false)
 
   const [isErrorAddingToolWithoutSection, setIsErrorAddingToolWithoutSection] =
     useState(false)
 
   const [validationError, setValidationError] = useState("")
+
+  function normalizeSections(savedSections, imageKeys = {}, videoKeys = {}) {
+    if (!Array.isArray(savedSections)) {
+      return []
+    }
+
+    return savedSections.map((section) => ({
+      id: section.id || crypto.randomUUID(),
+
+      sectionName: section.sectionName ?? "",
+
+      content: Array.isArray(section.content)
+        ? section.content.map((tool) => {
+            const toolId = tool.id || crypto.randomUUID()
+
+            const normalizedData = {
+              ...(tool.data ?? {}),
+            }
+
+            const mediaConfig = MEDIA_TOOL_CONFIG[tool.type]
+
+            if (mediaConfig?.keyField === "imageKey") {
+              normalizedData.file = null
+
+              normalizedData.imageKey =
+                imageKeys[toolId] ?? normalizedData.imageKey ?? ""
+            }
+
+            if (mediaConfig?.keyField === "videoKey") {
+              normalizedData.file = null
+
+              normalizedData.videoKey =
+                videoKeys[toolId] ?? normalizedData.videoKey ?? ""
+            }
+
+            return {
+              id: toolId,
+              type: tool.type ?? "",
+              data: normalizedData,
+            }
+          })
+        : [],
+    }))
+  }
+
+  function parseLessonComponent(response) {
+    const responseData = response?.data ?? response ?? {}
+
+    const structure = responseData.lessonComponentStructure ?? "[]"
+
+    const imageKeys = responseData.imageKeys ?? {}
+    const videoKeys = responseData.videoKeys ?? {}
+
+    if (Array.isArray(structure)) {
+      return normalizeSections(structure, imageKeys, videoKeys)
+    }
+
+    if (typeof structure !== "string" || structure.trim().length === 0) {
+      return []
+    }
+
+    try {
+      const parsedStructure = JSON.parse(structure)
+
+      return normalizeSections(parsedStructure, imageKeys, videoKeys)
+    } catch (error) {
+      toast.error("Could not read saved lesson", {
+        description:
+          error?.message || "The saved lesson component JSON is invalid.",
+      })
+
+      return []
+    }
+  }
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadSavedLesson() {
+      if (!lessonId) {
+        if (isMounted) {
+          setSections([])
+          setIsLoadingLesson(false)
+        }
+
+        return
+      }
+
+      try {
+        setIsLoadingLesson(true)
+
+        const response = await getLessonComponent(lessonId)
+
+        const savedSections = parseLessonComponent(response)
+
+        if (!isMounted) {
+          return
+        }
+
+        setSections(savedSections)
+        setSectionIndex(0)
+      } catch (error) {
+        if (isMounted) {
+          setSections([])
+
+          const errorMessage = "Could not load the saved lesson content."
+
+          setValidationError(errorMessage)
+
+          toast.error("Could not load lesson", {
+            description: error?.message || errorMessage,
+          })
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingLesson(false)
+        }
+      }
+    }
+
+    loadSavedLesson()
+
+    return () => {
+      isMounted = false
+    }
+  }, [lessonId])
 
   function handleCancel() {
     navigate(-1)
@@ -233,20 +387,28 @@ function CreateLessons() {
       previousSections.map((section) =>
         section.id === sectionId
           ? {
-            ...section,
-            [field]: value,
-          }
+              ...section,
+              [field]: value,
+            }
           : section
       )
     )
   }
 
   function handleDeleteSection(sectionId) {
-    setSections((previousSections) =>
-      previousSections.filter((section) => section.id !== sectionId)
-    )
+    setSections((previousSections) => {
+      const updatedSections = previousSections.filter(
+        (section) => section.id !== sectionId
+      )
 
-    setSectionIndex(0)
+      setSectionIndex(
+        updatedSections.length === 0
+          ? 0
+          : Math.min(sectionIndex, updatedSections.length - 1)
+      )
+
+      return updatedSections
+    })
   }
 
   function handleAddTool(toolType) {
@@ -281,7 +443,6 @@ function CreateLessons() {
     )
   }
 
-  // The tool menu intentionally stays open after adding a tool.
   function handleSelectTool(toolType) {
     handleAddTool(toolType)
   }
@@ -303,11 +464,7 @@ function CreateLessons() {
     )
   }
 
-  function handleToolDataChange(
-    targetSectionIndex,
-    targetToolIndex,
-    newData
-  ) {
+  function handleToolDataChange(targetSectionIndex, targetToolIndex, newData) {
     setSections((previousSections) =>
       previousSections.map((section, currentSectionIndex) => {
         if (currentSectionIndex !== targetSectionIndex) {
@@ -337,6 +494,7 @@ function CreateLessons() {
 
   function validateTool(tool, sectionNumber, toolNumber) {
     const data = tool.data ?? {}
+
     const toolLabel = `Section ${sectionNumber}, tool ${toolNumber}`
 
     if (tool.type === "heading" || tool.type === "subheading") {
@@ -351,10 +509,7 @@ function CreateLessons() {
       }
     }
 
-    if (
-      tool.type === "unordered-list" ||
-      tool.type === "ordered-list"
-    ) {
+    if (tool.type === "unordered-list" || tool.type === "ordered-list") {
       if (!data.items || data.items.length === 0) {
         return `${toolLabel}: add at least one list item.`
       }
@@ -426,10 +581,7 @@ function CreateLessons() {
       }
     }
 
-    if (
-      tool.type === "image-left-text" ||
-      tool.type === "image-right-text"
-    ) {
+    if (tool.type === "image-left-text" || tool.type === "image-right-text") {
       if (!data.file && isBlank(data.imageKey)) {
         return `${toolLabel}: upload an image first.`
       }
@@ -461,6 +613,7 @@ function CreateLessons() {
       currentSectionIndex++
     ) {
       const section = sections[currentSectionIndex]
+
       const sectionNumber = currentSectionIndex + 1
 
       if (isBlank(section.sectionName)) {
@@ -493,49 +646,101 @@ function CreateLessons() {
     return null
   }
 
-  async function saveMediaFile(tool, sectionName) {
-    const file = tool.data?.file
+  function isBrowserFile(value) {
+    return typeof File !== "undefined" && value instanceof File
+  }
 
-    if (!file) {
-      return
+  function getUploadedFileKey(uploadResponse) {
+    const responseData = uploadResponse?.data ?? uploadResponse
+
+    if (typeof responseData === "string") {
+      return responseData.trim().replace(/^"/, "").replace(/"$/, "")
     }
 
-    const imageTools = [
-      "image-left-text",
-      "image-right-text",
-      "image",
-    ]
+    return (
+      responseData?.fileKey ??
+      responseData?.key ??
+      responseData?.imageKey ??
+      responseData?.videoKey ??
+      ""
+    )
+  }
 
-    if (imageTools.includes(tool.type)) {
-      await MediaFileUpload(
-        lessonId,
-        sectionName,
-        tool.id,
-        "photo",
-        file
-      )
+  async function uploadToolMedia(tool, sectionName) {
+    const mediaConfig = MEDIA_TOOL_CONFIG[tool.type]
+
+    const currentData = {
+      ...(tool.data ?? {}),
     }
 
-    if (tool.type === "video") {
-      await MediaFileUpload(
-        lessonId,
-        sectionName,
-        tool.id,
-        "video",
-        file
-      )
+    if (!mediaConfig) {
+      return {
+        ...tool,
+        data: currentData,
+      }
+    }
+
+    const selectedFile = currentData.file
+
+    // Existing saved image/video:
+    // Keep imageKey/videoKey and do not upload again.
+    if (!isBrowserFile(selectedFile)) {
+      return {
+        ...tool,
+        data: {
+          ...currentData,
+          file: null,
+          [mediaConfig.keyField]: currentData[mediaConfig.keyField] ?? "",
+        },
+      }
+    }
+
+    const uploadResponse = await MediaFileUpload(
+      lessonId,
+      sectionName,
+      tool.id,
+      mediaConfig.folderName,
+      selectedFile
+    )
+
+    const uploadedFileKey = getUploadedFileKey(uploadResponse)
+
+    if (!uploadedFileKey) {
+      throw new Error(`No file key was returned while uploading ${tool.type}.`)
+    }
+
+    return {
+      ...tool,
+      data: {
+        ...currentData,
+        file: null,
+        [mediaConfig.keyField]: uploadedFileKey,
+      },
     }
   }
 
-  async function uploadLessonMedia() {
-    const mediaUploads = sections.flatMap((section) =>
-      section.content.map((tool) => saveMediaFile(tool, section.sectionName))
-    )
+  async function buildSavedLessonStructure() {
+    return Promise.all(
+      sections.map(async (section) => {
+        const savedTools = await Promise.all(
+          section.content.map((tool) =>
+            uploadToolMedia(tool, section.sectionName)
+          )
+        )
 
-    await Promise.all(mediaUploads)
+        return {
+          ...section,
+          content: savedTools,
+        }
+      })
+    )
   }
 
   async function handleSaveLesson() {
+    if (isLoadingLesson) {
+      return
+    }
+
     const error = validateLesson()
 
     if (error) {
@@ -546,16 +751,23 @@ function CreateLessons() {
     try {
       setIsSaving(true)
 
-      await uploadLessonMedia()
-      await setLessonComponent(lessonId, sections)
+      const savedLessonStructure = await buildSavedLessonStructure()
+      await setLessonComponent(lessonId, savedLessonStructure)
+      setSections(savedLessonStructure)
 
       setIsSuccessDialogOpen(true)
-    } catch (error) {
-      console.error("Could not save lesson:", error)
 
-      setValidationError(
-        "Could not save the lesson. Please try again."
-      )
+      toast.success("Lesson saved", {
+        description: `${lessonName} was saved successfully.`,
+      })
+    } catch (error) {
+      const errorMessage = "Could not save the lesson. Please try again."
+
+      setValidationError(errorMessage)
+
+      toast.error("Could not save lesson", {
+        description: error?.message || errorMessage,
+      })
     } finally {
       setIsSaving(false)
     }
@@ -574,9 +786,7 @@ function CreateLessons() {
           </button>
 
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500">
-              Lesson editor
-            </p>
+            <p className="text-xs font-medium text-zinc-500">Lesson editor</p>
 
             <h1 className="truncate text-base font-semibold text-zinc-950">
               {lessonName}
@@ -596,17 +806,21 @@ function CreateLessons() {
           <button
             type="button"
             onClick={handleSaveLesson}
-            disabled={isSaving}
+            disabled={isSaving || isLoadingLesson}
             className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
           >
             <Save className="h-4 w-4" />
 
             <span className="hidden sm:inline">
-              {isSaving ? "Saving..." : "Save Lesson"}
+              {isLoadingLesson
+                ? "Loading..."
+                : isSaving
+                  ? "Saving..."
+                  : "Save Lesson"}
             </span>
 
             <span className="sm:hidden">
-              {isSaving ? "Saving..." : "Save"}
+              {isLoadingLesson ? "Loading..." : isSaving ? "Saving..." : "Save"}
             </span>
           </button>
         </div>
@@ -617,10 +831,10 @@ function CreateLessons() {
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Created Successfully!</AlertDialogTitle>
+              <AlertDialogTitle>Saved Successfully!</AlertDialogTitle>
 
               <AlertDialogDescription>
-                You have successfully created the lesson for {lessonName}.
+                You have successfully saved the lesson for {lessonName}.
               </AlertDialogDescription>
             </AlertDialogHeader>
 
@@ -648,9 +862,7 @@ function CreateLessons() {
 
               <AlertDialogTitle>Cannot Save Lesson</AlertDialogTitle>
 
-              <AlertDialogDescription>
-                {validationError}
-              </AlertDialogDescription>
+              <AlertDialogDescription>{validationError}</AlertDialogDescription>
             </AlertDialogHeader>
 
             <div className="mt-6 w-full">
@@ -668,10 +880,7 @@ function CreateLessons() {
 
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className="fixed right-4 bottom-4 z-50 sm:right-8 sm:bottom-8">
-          <Collapsible
-            open={isToolMenuOpen}
-            onOpenChange={setIsToolMenuOpen}
-          >
+          <Collapsible open={isToolMenuOpen} onOpenChange={setIsToolMenuOpen}>
             <div className="relative">
               <CollapsibleContent className="absolute right-0 bottom-14 mb-3 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl">
                 <div className="mb-3 px-2 pt-1">
@@ -696,7 +905,7 @@ function CreateLessons() {
                         {action.icon}
                       </span>
 
-                      <span className="text-xs font-medium leading-4">
+                      <span className="text-xs leading-4 font-medium">
                         {action.name}
                       </span>
                     </button>
@@ -708,11 +917,9 @@ function CreateLessons() {
                 <button
                   type="button"
                   aria-label={
-                    isToolMenuOpen
-                      ? "Close content menu"
-                      : "Open content menu"
+                    isToolMenuOpen ? "Close content menu" : "Open content menu"
                   }
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:bg-zinc-800 focus:outline-none focus:ring-4 focus:ring-zinc-300"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:bg-zinc-800 focus:ring-4 focus:ring-zinc-300 focus:outline-none"
                 >
                   {isToolMenuOpen ? (
                     <X className="h-5 w-5" />
@@ -750,9 +957,7 @@ function CreateLessons() {
                 <div className="mt-6 w-full">
                   <AlertDialogAction
                     variant="destructive"
-                    onClick={() =>
-                      setIsErrorAddingToolWithoutSection(false)
-                    }
+                    onClick={() => setIsErrorAddingToolWithoutSection(false)}
                     className="!h-11 !w-full rounded-xl text-sm font-semibold"
                   >
                     Got it
@@ -765,7 +970,19 @@ function CreateLessons() {
 
         <main className="h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-8 sm:px-8 lg:pr-24">
           <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-10 pb-16">
-            {sections.length === 0 ? (
+            {isLoadingLesson ? (
+              <div className="mx-auto flex min-h-[600px] w-full max-w-5xl flex-col items-center justify-center px-6 text-center">
+                <div className="flex h-12 w-12 animate-spin items-center justify-center rounded-full border-4 border-zinc-200 border-t-zinc-900" />
+
+                <h2 className="mt-5 text-lg font-semibold text-zinc-900">
+                  Loading lesson content...
+                </h2>
+
+                <p className="mt-2 text-sm text-zinc-500">
+                  Loading the saved sections, tools, images, and videos.
+                </p>
+              </div>
+            ) : sections.length === 0 ? (
               <div className="mx-auto flex min-h-[600px] w-full max-w-5xl flex-col items-center justify-center px-6 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700">
                   <BetweenHorizontalEnd className="h-6 w-6" />

@@ -268,11 +268,6 @@ function MiddleCategoryCard({ middleCategory }) {
     })
   }
 
-  function handleViewLesson(event, lesson) {
-    event.stopPropagation()
-    alert(`View lesson: ${lesson.name ?? lesson.title ?? "Untitled lesson"}`)
-  }
-
   return (
       <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <button
@@ -329,15 +324,6 @@ function MiddleCategoryCard({ middleCategory }) {
                           </div>
 
                           <div className="flex gap-1">
-                            <button
-                                type="button"
-                                onClick={(event) => handleViewLesson(event, lesson)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-950 transition hover:bg-white"
-                                title="View lesson"
-                            >
-                              <ChartNoAxesGantt className="h-4 w-4" />
-                            </button>
-
                             <button
                                 type="button"
                                 onClick={(event) =>

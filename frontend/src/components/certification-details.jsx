@@ -18,20 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-
-const industries = [
-  "Information Technology",
-  "Business and Management",
-  "Education",
-  "Healthcare",
-  "Engineering",
-  "Finance and Accounting",
-  "Law and Legal Studies",
-  "Hospitality and Tourism",
-  "Criminology and Public Safety",
-  "Government and Public Service",
-  "Other",
-]
+import {industries} from "@/constants/industries.js";
 
 function CertificationDetails({ value, onChange, errors = {} }) {
   const updateField = (fieldName, fieldValue) => {

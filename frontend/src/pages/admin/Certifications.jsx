@@ -13,6 +13,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import CertificationCard from "../../components/certification-card"
 import {
@@ -47,10 +48,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import { CertificationSkeletonCard } from "../../components/certification-skeleton-card"
 import CertificationDetails from "../../components/certification-details"
 import CertificationModules from "../../components/certification-modules"
+import { industries } from "@/constants/industries.js"
+
 
 const TOTAL_STEPS = 2
 
@@ -76,9 +87,9 @@ function validateCertificationDetails(details) {
   }
 
   if (
-    details.price === "" ||
-    Number.isNaN(Number(details.price)) ||
-    Number(details.price) < 0
+      details.price === "" ||
+      Number.isNaN(Number(details.price)) ||
+      Number(details.price) < 0
   ) {
     errors.price = "Enter a valid price."
   }
@@ -108,16 +119,18 @@ function isModuleStructureValid(categories) {
     const hasMiddleCategories = majorCategory.middleCategories.length > 0
 
     const hasValidMiddleCategories = majorCategory.middleCategories.every(
-      (middleCategory) => {
-        const hasMiddleTitle = middleCategory.title.trim().length > 0
-        const hasLessons = middleCategory.lessons.length > 0
+        (middleCategory) => {
+          const hasMiddleTitle = middleCategory.title.trim().length > 0
+          const hasLessons = middleCategory.lessons.length > 0
 
-        const hasValidLessons = middleCategory.lessons.every(
-          (lesson) => lesson.name.trim().length > 0
-        )
-        return hasMiddleTitle && hasLessons && hasValidLessons
-      }
+          const hasValidLessons = middleCategory.lessons.every(
+              (lesson) => lesson.name.trim().length > 0
+          )
+
+          return hasMiddleTitle && hasLessons && hasValidLessons
+        }
     )
+
     return hasMajorTitle && hasMiddleCategories && hasValidMiddleCategories
   })
 }
@@ -125,8 +138,10 @@ function isModuleStructureValid(categories) {
 function removeModuleUiFields(categories) {
   return categories.map((majorCategory) => ({
     title: majorCategory.title.trim(),
+
     middleCategory: majorCategory.middleCategories.map((middleCategory) => ({
       title: middleCategory.title.trim(),
+
       lessons: middleCategory.lessons.map((lesson) => ({
         name: lesson.name.trim(),
         lessonComponentStructure: "[]",
@@ -139,9 +154,9 @@ function formatLocalDateTime(date = new Date()) {
   const pad = (value) => String(value).padStart(2, "0")
 
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate()
+      date.getDate()
   )}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
-    date.getSeconds()
+      date.getSeconds()
   )}`
 }
 
@@ -149,27 +164,32 @@ function buildImageKey(imageFile) {
   if (!imageFile) {
     return ""
   }
+
   const safeFileName = imageFile.name
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9._-]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9._-]/g, "")
 
   return `certifications/${safeFileName}`
 }
 
 function Certifications() {
   const queryClient = useQueryClient()
+
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false)
   const [page, setPage] = useState(1)
+
   const [certificationDetails, setCertificationDetails] = useState(
-    emptyCertificationDetails
+      emptyCertificationDetails
   )
+
   const [moduleCategories, setModuleCategories] = useState([])
   const [detailsErrors, setDetailsErrors] = useState({})
   const [submissionError, setSubmissionError] = useState("")
+
   const [submissionDialog, setSubmissionDialog] = useState(
-    emptySubmissionDialog
+      emptySubmissionDialog
   )
 
   const {
@@ -198,13 +218,15 @@ function Certifications() {
     },
   })
 
-  const { mutateAsync, isPending: isUploading } = useMutation({
+  const {
+    mutateAsync,
+    isPending: isUploading,
+  } = useMutation({
     mutationKey: ["save-certification-photo"],
-    mutationFn: savePhotoCertification
+    mutationFn: savePhotoCertification,
   })
 
   const isBusy = isSubmitting || isUploading
-
   const isFirstStep = page === 1
   const isLastStep = page === TOTAL_STEPS
 
@@ -218,7 +240,10 @@ function Certifications() {
   }
 
   const handleDrawerChange = (open) => {
-    if (!open && isBusy) return
+    if (!open && isBusy) {
+      return
+    }
+
     setIsCreateDrawerOpen(open)
 
     if (!open) {
@@ -259,14 +284,12 @@ function Certifications() {
     setPage(2)
   }
 
-  const handleCreateMiddleExam = (examContext) => {
-    console.log("Create middle exam:", examContext)
-  }
+  const handleCreateMiddleExam = () => {}
 
   const handleCreateCertification = async () => {
     if (!isModuleStructureValid(moduleCategories)) {
       setSubmissionError(
-        "Add at least one complete major category, middle category, and lesson."
+          "Add at least one complete major category, middle category, and lesson."
       )
       return
     }
@@ -277,25 +300,21 @@ function Certifications() {
       dateCreated: formatLocalDateTime(),
       price: Number(certificationDetails.price),
       majorCategory: removeModuleUiFields(moduleCategories),
-      industry: certificationDetails.industry.trim()
+      industry: certificationDetails.industry.trim(),
     }
-
-    console.group("Create Certification")
-    console.log("Certification object:", payload)
-    console.log("Certification JSON:", JSON.stringify(payload, null, 2))
-    console.log("Selected image file:", certificationDetails.imageFile)
-    console.groupEnd()
 
     try {
       setSubmissionError("")
-      const imageKey =  await mutateAsync(certificationDetails.imageFile)
-      console.log(imageKey)
-      payload['imageKey'] = imageKey
+
+      const imageKey = await mutateAsync(certificationDetails.imageFile)
+
+      payload.imageKey = imageKey
+
       const result = await createCertification(payload)
 
       if (result === false || result?.success === false) {
         throw new Error(
-          result?.message || "The server could not create the certification."
+            result?.message || "The server could not create the certification."
         )
       }
 
@@ -303,21 +322,23 @@ function Certifications() {
         open: true,
         title: "Certification created successfully",
         description:
-          "The certification details, categories, middle categories, and lessons were saved successfully.",
+            "The certification details, categories, middle categories, and lessons were saved successfully.",
       })
     } catch (error) {
-      console.error("Failed to create certification:", error)
-
       const responseData = error?.response?.data
 
       const apiMessage =
-        (typeof responseData === "string" && responseData) ||
-        responseData?.message ||
-        responseData?.error ||
-        error?.message ||
-        "Unable to create the certification. Please try again."
+          (typeof responseData === "string" && responseData) ||
+          responseData?.message ||
+          responseData?.error ||
+          error?.message ||
+          "Unable to create the certification. Please try again."
 
       setSubmissionError(apiMessage)
+
+      toast.error("Could not create certification", {
+        description: apiMessage,
+      })
     }
   }
 
@@ -341,19 +362,19 @@ function Certifications() {
 
   if (isError) {
     return (
-      <section className="flex h-full flex-col items-center justify-center gap-4">
-        <div className="max-w-md text-center">
-          <h2 className="text-lg font-semibold text-zinc-950">
-            Unable to load certifications
-          </h2>
+        <section className="flex h-full flex-col items-center justify-center gap-4">
+          <div className="max-w-md text-center">
+            <h2 className="text-lg font-semibold text-zinc-950">
+              Unable to load certifications
+            </h2>
 
-          <p className="mt-2 text-sm text-zinc-500">
-            {error?.message || "Something went wrong while loading the data."}
-          </p>
-        </div>
+            <p className="mt-2 text-sm text-zinc-500">
+              {error?.message || "Something went wrong while loading the data."}
+            </p>
+          </div>
 
-        <Button onClick={() => refetch()}>Try Again</Button>
-      </section>
+          <Button onClick={() => refetch()}>Try Again</Button>
+        </section>
     )
   }
 
@@ -371,10 +392,24 @@ function Certifications() {
         </div>
 
         {isFetching && (
-          <span className="pt-2 text-xs text-zinc-400">
-            Updating...
-          </span>
+          <span className="pt-2 text-xs text-zinc-400">Updating...</span>
         )}
+        <Select>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Theme" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {
+                industries.map((item,index) =>{
+                  return <SelectItem value={item}>{item}</SelectItem>
+                })
+              }
+
+
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4">
@@ -492,7 +527,7 @@ function Certifications() {
                     className="min-w-[150px] gap-2 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isBusy ? (
-                      "Creating..."
+                      "Creating"
                     ) : isLastStep ? (
                       "Create Certification"
                     ) : (
@@ -522,9 +557,7 @@ function Certifications() {
                   <CheckCircle2 className="h-6 w-6" />
                 </div>
 
-                <AlertDialogTitle>
-                  {submissionDialog.title}
-                </AlertDialogTitle>
+                <AlertDialogTitle>{submissionDialog.title}</AlertDialogTitle>
 
                 <AlertDialogDescription className="leading-6">
                   {submissionDialog.description}
