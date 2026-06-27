@@ -8,7 +8,6 @@ import {
   ChevronRight,
   ClipboardPlus,
   Layers3,
-  ChartNoAxesGantt,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -43,7 +42,6 @@ function ViewCertificationAdmin() {
       behavior: "auto",
     })
   }, [location.key])
-
   const certification = getCertification(location)
 
   if (!certification) {
@@ -253,7 +251,10 @@ function MiddleCategoryCard({ middleCategory }) {
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
 
+
   const lessons = middleCategory.lessons ?? []
+
+
 
   function handleCreateLesson(event, lesson) {
     event.stopPropagation()
@@ -326,9 +327,7 @@ function MiddleCategoryCard({ middleCategory }) {
                           <div className="flex gap-1">
                             <button
                                 type="button"
-                                onClick={(event) =>
-                                    handleCreateLesson(event, lesson)
-                                }
+                                onClick={(event) => handleCreateLesson(event, lesson)}
                                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-950 transition hover:bg-white"
                                 title="Create Lessons"
                             >

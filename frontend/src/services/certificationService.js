@@ -14,3 +14,12 @@ export function deleteCertification(id) {
   })
 }
 
+export async function updateCertification(certificationId, payload) {
+  return await base(
+      `certifications/${certificationId}`,{
+        data: payload,
+        method: "PUT"
+      }
+  )
+}
+

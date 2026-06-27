@@ -28,6 +28,6 @@ public class MajorCategory {
     @Column(nullable = false, length = 150)
     private String title;
 
-    @OneToMany(mappedBy = "majorCategory", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "majorCategory", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<MiddleCategory> middleCategory;
 }

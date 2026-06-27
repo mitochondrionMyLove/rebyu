@@ -33,7 +33,7 @@ public class Certification {
     @Column(nullable = false)
     private BigDecimal price = BigDecimal.ZERO;
 
-    @OneToMany(mappedBy = "certification", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "certification", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<MajorCategory> majorCategory;
 
     private String industry;

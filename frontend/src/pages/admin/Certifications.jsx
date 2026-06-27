@@ -61,6 +61,7 @@ import { CertificationSkeletonCard } from "../../components/certification-skelet
 import CertificationDetails from "../../components/certification-details"
 import CertificationModules from "../../components/certification-modules"
 import { industries } from "@/constants/industries.js"
+import {useEffect} from "react"
 
 
 const TOTAL_STEPS = 2
@@ -191,6 +192,13 @@ function Certifications() {
   const [submissionDialog, setSubmissionDialog] = useState(
       emptySubmissionDialog
   )
+  const [chosenIndustry, setChosenIndustry] = useState("all")
+  const [filteredCertifications, setFilteredCertifications] = useState([])
+
+  useEffect(() => {
+    const filter = items.filter((item) => item.industry == chosenIndustry)
+    setFilteredCertifications(filter)
+  }, [chosenIndustry]);
 
   const {
     data: items = [],
@@ -324,6 +332,7 @@ function Certifications() {
         description:
             "The certification details, categories, middle categories, and lessons were saved successfully.",
       })
+      setChosenIndustry(payload.industry)
     } catch (error) {
       const responseData = error?.response?.data
 
@@ -394,26 +403,45 @@ function Certifications() {
         {isFetching && (
           <span className="pt-2 text-xs text-zinc-400">Updating...</span>
         )}
-        <Select>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Theme" />
+        <Select
+            value={chosenIndustry}
+            onValueChange={(value) => {
+              setChosenIndustry(value)
+            }}
+        >
+          <SelectTrigger className="h-10 w-[220px] rounded-xl border-zinc-300 bg-white px-4 text-sm">
+            <SelectValue placeholder="Filter by industry" />
           </SelectTrigger>
-          <SelectContent>
+
+          <SelectContent className="max-h-[280px] overflow-y-auto rounded-xl">
             <SelectGroup>
-              {
-                industries.map((item,index) =>{
-                  return <SelectItem value={item}>{item}</SelectItem>
-                })
-              }
+              <SelectItem value="all">All Industries</SelectItem>
 
-
+              {industries.map((item) => (
+                  <SelectItem
+                      key={item}
+                      value={item}
+                      className="cursor-pointer py-2"
+                  >
+                    {item}
+                  </SelectItem>
+              ))}
             </SelectGroup>
           </SelectContent>
         </Select>
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        {items.map((item, index) => (
+        {
+          chosenIndustry == 'all' ?
+              (items.map((item, index) => (
+                  <CertificationCard
+                      key={item.id ?? item.certificationId ?? index}
+                      item={item}
+                      index={index}
+                      certification={item}
+                  />))):
+          filteredCertifications.map((item, index) => (
           <CertificationCard
             key={item.id ?? item.certificationId ?? index}
             item={item}

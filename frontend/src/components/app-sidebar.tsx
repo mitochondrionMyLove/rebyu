@@ -31,17 +31,17 @@ const data = {
         name: "Certifications",
         url: "",
         icon: AwardIcon,
+      },{
+        name: "Question Bank",
+        url: "question-bank",
+        icon: ClipboardListIcon,
       },
       {
         name: "Challenges",
         url: "challenges",
         icon: TrophyIcon,
       },
-      {
-        name: "Question Bank",
-        url: "question-bank",
-        icon: ClipboardListIcon,
-      },
+
     ],
   },
 
