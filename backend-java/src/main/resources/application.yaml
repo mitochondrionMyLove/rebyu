@@ -17,6 +17,11 @@ spring:
       max-lifetime: 1800000
       connection-init-sql: SELECT 1
 
+  # ─── Flyway ─────────────────────────────────────────────────
+  flyway:
+    baseline-on-migrate: true   # treat existing schema as version 1 baseline on first run
+    baseline-version: 1
+
   # ─── JPA / Hibernate ────────────────────────────────────────
   jpa:
     hibernate:

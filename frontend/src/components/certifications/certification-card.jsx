@@ -58,6 +58,14 @@ function CertificationCard({ item, certification }) {
   const certificationTitle =
       currentCertification?.title ?? item?.title ?? "Untitled Certification"
 
+  const certificationDescription =
+      currentCertification?.description ??
+      item?.description ??
+      "No description available."
+
+  const certificationIndustry =
+      currentCertification?.industry ?? item?.industry ?? "Certification"
+
   const imageKey = currentCertification?.imageKey ?? item?.imageKey
 
   const imageUrl = imageKey ? getFileViewUrl(imageKey) : DEFAULT_IMAGE
@@ -135,36 +143,55 @@ function CertificationCard({ item, certification }) {
   return (
       <>
         <div
-            className="card h-[380px] w-full cursor-pointer overflow-hidden rounded-[32px] bg-base-100 shadow-sm transition hover:shadow-md"
+            role="button"
+            tabIndex={0}
             onClick={handleOpenCertification}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                handleOpenCertification()
+              }
+            }}
+            className="group flex h-[380px] w-full cursor-pointer flex-col overflow-hidden rounded-[32px] border border-border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         >
-          <figure className="h-56 shrink-0 bg-zinc-100">
+          {/* Certification cover */}
+          <figure className="relative h-52 shrink-0 overflow-hidden border-b border-border bg-muted/40">
             <img
                 src={imageUrl}
                 alt={certificationTitle}
-                className="h-full w-full object-contain"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 onError={(event) => {
+                  event.currentTarget.onerror = null
                   event.currentTarget.src = DEFAULT_IMAGE
                 }}
                 loading="eager"
             />
+
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
           </figure>
 
-          <div className="card-body flex flex-1 bg-zinc-200 p-5">
+          {/* Card details */}
+          <div className="flex min-h-0 flex-1 flex-col p-5 pb-6">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="card-title line-clamp-2 flex-1 text-xl font-semibold text-zinc-950">
-                {certificationTitle}
-              </h2>
+              <div className="min-w-0 flex-1">
+              <span className="inline-flex max-w-full truncate rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                {certificationIndustry}
+              </span>
+
+                <h2 className="font-heading mt-2 line-clamp-2 text-lg font-semibold leading-6 text-foreground">
+                  {certificationTitle}
+                </h2>
+              </div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                       type="button"
                       onClick={(event) => event.stopPropagation()}
-                      className="-mt-1 -mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition hover:bg-zinc-300"
+                      className="-mt-1 -mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       aria-label="Certification options"
                   >
-                    <MoreVertical className="h-5 w-5 text-zinc-950" />
+                    <MoreVertical className="h-5 w-5" />
                   </button>
                 </DropdownMenuTrigger>
 
@@ -186,10 +213,10 @@ function CertificationCard({ item, certification }) {
               </DropdownMenu>
             </div>
 
-            <p className="line-clamp-3 text-sm leading-6 text-zinc-500">
-              {currentCertification?.description ||
-                  item?.description ||
-                  "No description available."}
+            <div className="mt-3 h-1 w-10 shrink-0 rounded-full bg-primary" />
+
+            <p className="mt-3 line-clamp-3 flex-1 text-sm leading-5 text-muted-foreground">
+              {certificationDescription}
             </p>
           </div>
         </div>

@@ -1,7 +1,8 @@
 "use client"
 
-import * as React from "react"
 import type { LucideIcon } from "lucide-react"
+import { NavLink, useLocation } from "react-router-dom"
+
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -9,12 +10,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { useNavigate } from "react-router-dom"
 
 type NavItem = {
   name: string
   url: string
   icon: LucideIcon
+  exact?: boolean
+  activeUrls?: string[]
 }
 
 type NavGroup = {
@@ -26,63 +28,79 @@ type NavProjectsProps = {
   projects: Record<string, NavGroup>
 }
 
-export function NavProjects({ projects }: NavProjectsProps) {
-  const navigate = useNavigate()
-  const [activeUrl, setActiveUrl] = React.useState("")
+function normalizePath(path: string) {
+  const normalized = path.replace(/\/+$/, "")
 
-  const handleNavigate = (url: string) => {
-    setActiveUrl(url)
-    navigate(url)
+  return normalized || "/"
+}
+
+function isRouteActive(
+    currentPath: string,
+    routePath: string,
+    exact = false
+) {
+  const current = normalizePath(currentPath)
+  const route = normalizePath(routePath)
+
+  if (exact) {
+    return current === route
   }
 
+  return current === route || current.startsWith(`${route}/`)
+}
+
+export function NavProjects({ projects }: NavProjectsProps) {
+  const location = useLocation()
+
   return (
-    <>
-      {Object.values(projects).map((group) => (
-        <SidebarGroup
-          key={group.name}
-          className="group-data-[collapsible=icon]:hidden"
-        >
-          <SidebarGroupLabel>{group.name}</SidebarGroupLabel>
+      <>
+        {Object.values(projects).map((group) => (
+            <SidebarGroup
+                key={group.name}
+                className="group-data-[collapsible=icon]:hidden"
+            >
+              <SidebarGroupLabel>{group.name}</SidebarGroupLabel>
 
-          <SidebarMenu>
-            {group.items.map((item) => {
-              const Icon = item.icon
-              const isActive = activeUrl === item.url
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const Icon = item.icon
 
-              return (
-                <SidebarMenuItem key={item.name}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.name}
-                    isActive={isActive}
-                    className={`
-                      rounded-none
-                      border-l-4
-                      border-l-transparent
-                      ${
-                        isActive
-                          ? "border-l-black bg-sidebar-accent text-sidebar-accent-foreground"
-                          : ""
-                      }
-                    `}
-                  >
-                    <a
-                      href={`/admin/item.url`}
-                      onClick={(event) => {
-                        event.preventDefault()
-                        handleNavigate(item.url)
-                      }}
-                    >
-                      <Icon className="size-4" />
-                      <span>{item.name}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
-      ))}
-    </>
+                  const isMainRouteActive = isRouteActive(
+                      location.pathname,
+                      item.url,
+                      item.exact
+                  )
+
+                  const isExtraRouteActive = (item.activeUrls ?? []).some(
+                      (route) => isRouteActive(location.pathname, route)
+                  )
+
+                  const isActive = isMainRouteActive || isExtraRouteActive
+
+                  return (
+                      <SidebarMenuItem key={item.name}>
+                        <SidebarMenuButton
+                            asChild
+                            tooltip={item.name}
+                            isActive={isActive}
+                            className={[
+                              "rounded-none border-l-4 transition-colors",
+                              isActive
+                                  ? "border-l-sidebar-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                                  : "border-l-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            ].join(" ")}
+                        >
+                          <NavLink to={item.url}>
+                            <Icon className="size-4" />
+                            <span>{item.name}</span>
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+        ))}
+      </>
   )
 }

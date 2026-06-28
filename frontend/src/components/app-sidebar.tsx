@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { NavLink } from "react-router-dom"
 
 import { NavProjects } from "@/components/nav-projects"
 import {
@@ -29,19 +30,25 @@ const data = {
     items: [
       {
         name: "Certifications",
-        url: "",
+        url: "/admin",
+        exact: true,
+        activeUrls: [
+          "/admin/certifications",
+          "/admin/certification",
+          "/admin/lessons",
+        ],
         icon: AwardIcon,
-      },{
+      },
+      {
         name: "Question Bank",
-        url: "question-bank",
+        url: "/admin/question-bank",
         icon: ClipboardListIcon,
       },
       {
         name: "Challenges",
-        url: "challenges",
+        url: "/admin/challenges",
         icon: TrophyIcon,
       },
-
     ],
   },
 
@@ -50,12 +57,12 @@ const data = {
     items: [
       {
         name: "Organizations",
-        url: "organizations",
+        url: "/admin/organizations",
         icon: Building2Icon,
       },
       {
         name: "Learners",
-        url: "learners",
+        url: "/admin/learners",
         icon: UsersIcon,
       },
     ],
@@ -66,7 +73,7 @@ const data = {
     items: [
       {
         name: "Analytics",
-        url: "analytics",
+        url: "/admin/analytics",
         icon: ChartNoAxesCombinedIcon,
       },
     ],
@@ -74,35 +81,34 @@ const data = {
 }
 
 export function AppSidebar({
-  ...props
-}: React.ComponentProps<typeof Sidebar>) {
+                             ...props
+                           }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar variant="inset" {...props}>
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <a href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <TerminalIcon className="size-4" />
-                </div>
+      <Sidebar variant="inset" {...props}>
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" asChild>
+                <NavLink to="/admin">
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                    <TerminalIcon className="size-4" />
+                  </div>
 
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Rebyu</span>
-                  <span className="truncate text-xs">Admin Portal</span>
-                </div>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">Rebyu</span>
+                    <span className="truncate text-xs">Admin Portal</span>
+                  </div>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
 
-      <SidebarContent>
-        <NavProjects projects={data} />
+        <SidebarContent>
+          <NavProjects projects={data} />
+        </SidebarContent>
 
-      </SidebarContent>
-
-      <SidebarFooter />
-    </Sidebar>
+        <SidebarFooter />
+      </Sidebar>
   )
 }

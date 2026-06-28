@@ -75,7 +75,7 @@ export default function DashboardLayout() {
             </DropdownMenu>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-4 px-5 py-3">
           <Outlet />
         </div>
       </SidebarInset>

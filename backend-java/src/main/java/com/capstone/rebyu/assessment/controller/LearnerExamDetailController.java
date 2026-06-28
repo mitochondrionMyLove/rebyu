@@ -1,7 +1,5 @@
 package com.capstone.rebyu.assessment.controller;
 
-
-import com.capstone.rebyu.assessment.entity.Exam;
 import com.capstone.rebyu.assessment.dto.LearnerExamDetailDto;
 import com.capstone.rebyu.assessment.service.LearnerExamDetailService;
 import jakarta.validation.Valid;
@@ -22,10 +20,16 @@ public class LearnerExamDetailController {
         return learnerExamDetailService.getAll();
     }
 
-    @GetMapping("/{learnerId}/{examId}/{attemptNo}/{questionId}")
-    public LearnerExamDetailDto getById(@PathVariable Long learnerId, @PathVariable Long examId,
-                                         @PathVariable Integer attemptNo, @PathVariable Long questionId) {
-        return learnerExamDetailService.getById(learnerId, examId, attemptNo, questionId);
+    @GetMapping("/{id}")
+    public LearnerExamDetailDto getById(@PathVariable Long id) {
+        return learnerExamDetailService.getById(id);
+    }
+
+    @GetMapping("/by-attempt/{learnerId}/{examId}/{attemptNo}")
+    public List<LearnerExamDetailDto> getByAttempt(@PathVariable Long learnerId,
+                                                    @PathVariable Long examId,
+                                                    @PathVariable Integer attemptNo) {
+        return learnerExamDetailService.getByAttempt(learnerId, examId, attemptNo);
     }
 
     @PostMapping
@@ -34,17 +38,14 @@ public class LearnerExamDetailController {
         return learnerExamDetailService.create(dto);
     }
 
-    @PutMapping("/{learnerId}/{examId}/{attemptNo}/{questionId}")
-    public LearnerExamDetailDto update(@PathVariable Long learnerId, @PathVariable Long examId,
-                                        @PathVariable Integer attemptNo, @PathVariable Long questionId,
-                                        @Valid @RequestBody LearnerExamDetailDto dto) {
-        return learnerExamDetailService.update(learnerId, examId, attemptNo, questionId, dto);
+    @PutMapping("/{id}")
+    public LearnerExamDetailDto update(@PathVariable Long id, @Valid @RequestBody LearnerExamDetailDto dto) {
+        return learnerExamDetailService.update(id, dto);
     }
 
-    @DeleteMapping("/{learnerId}/{examId}/{attemptNo}/{questionId}")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long learnerId, @PathVariable Long examId,
-                        @PathVariable Integer attemptNo, @PathVariable Long questionId) {
-        learnerExamDetailService.delete(learnerId, examId, attemptNo, questionId);
+    public void delete(@PathVariable Long id) {
+        learnerExamDetailService.delete(id);
     }
 }

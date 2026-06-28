@@ -2,11 +2,13 @@ package com.capstone.rebyu.assessment.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -14,6 +16,8 @@ import java.util.List;
 @AllArgsConstructor
 public class QuestionDto {
     private Long questionId;
+
+    private Long parentQuestionId;
 
     @NotBlank
     @Size(max = 30)
@@ -31,6 +35,9 @@ public class QuestionDto {
 
     @NotNull
     private Long lessonId;
+
+    @Positive
+    private BigDecimal totalPoints;
 
     private List<ChoiceDto> choices;
 }

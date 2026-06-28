@@ -8,12 +8,15 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class LearnerExamDetailDto {
+    private Long learnerExamDetailId;
+
     @NotNull
     private Long learnerId;
 
@@ -23,6 +26,9 @@ public class LearnerExamDetailDto {
     @NotNull
     @Min(1)
     private Integer attemptNo;
+
+    @NotNull
+    private Long examQuestionId;
 
     @NotNull
     private Long questionId;
@@ -37,6 +43,7 @@ public class LearnerExamDetailDto {
     @NotNull
     private Boolean result;
 
-    @NotNull
     private LocalDateTime answeredAt;
+
+    private BigDecimal earnedScore;
 }

@@ -33,6 +33,4 @@ public class Choice {
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
-    @Column(name = "display_order", nullable = false)
-    private Integer displayOrder;
 }

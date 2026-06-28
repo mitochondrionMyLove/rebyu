@@ -3,23 +3,22 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
   AlignLeft,
+  ArrowLeft,
+  BetweenHorizontalEnd,
+  CircleAlert,
   FilePlay,
+  FlipHorizontal,
   Heading as HeadingIcon,
   Image as ImageIcon,
-  ListCollapse,
   List,
+  ListCollapse,
   ListOrdered,
-  ArrowLeft,
-  Save,
-  Plus,
-  X,
-  BetweenHorizontalEnd,
-  AlertCircleIcon,
-  Type,
   PanelLeft,
   PanelRight,
   PanelsTopLeft,
-  FlipHorizontal,
+  Plus,
+  Save,
+  Type,
 } from "lucide-react"
 
 import {
@@ -32,12 +31,17 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-
+import { Button } from "@/components/ui/button"
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+  Card,
+  CardContent,
+} from "@/components/ui/card"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 import Section from "../../components/certifications/section"
 import {
@@ -50,34 +54,35 @@ const actions = [
   {
     type: "heading",
     name: "Heading",
-    icon: <HeadingIcon className="h-5 w-5" />,
+    description: "Add a main lesson heading",
+    icon: HeadingIcon,
     createData: () => ({
       text: "",
     }),
   },
-
   {
     type: "subheading",
     name: "Smaller Heading",
-    icon: <Type className="h-5 w-5" />,
+    description: "Add a supporting heading",
+    icon: Type,
     createData: () => ({
       text: "",
     }),
   },
-
   {
     type: "description",
     name: "Description",
-    icon: <AlignLeft className="h-5 w-5" />,
+    description: "Add lesson text or explanation",
+    icon: AlignLeft,
     createData: () => ({
       text: "",
     }),
   },
-
   {
     type: "unordered-list",
     name: "Bullet List",
-    icon: <List className="h-5 w-5" />,
+    description: "Add unordered list items",
+    icon: List,
     createData: () => ({
       items: [
         {
@@ -87,11 +92,11 @@ const actions = [
       ],
     }),
   },
-
   {
     type: "ordered-list",
     name: "Numbered List",
-    icon: <ListOrdered className="h-5 w-5" />,
+    description: "Add ordered list items",
+    icon: ListOrdered,
     createData: () => ({
       items: [
         {
@@ -101,11 +106,11 @@ const actions = [
       ],
     }),
   },
-
   {
     type: "image-left-text",
     name: "Image Left + Text",
-    icon: <PanelLeft className="h-5 w-5" />,
+    description: "Place image beside written content",
+    icon: PanelLeft,
     createData: () => ({
       file: null,
       imageKey: "",
@@ -113,11 +118,11 @@ const actions = [
       description: "",
     }),
   },
-
   {
     type: "image-right-text",
     name: "Text Left + Image",
-    icon: <PanelRight className="h-5 w-5" />,
+    description: "Place written content beside image",
+    icon: PanelRight,
     createData: () => ({
       file: null,
       imageKey: "",
@@ -125,11 +130,11 @@ const actions = [
       description: "",
     }),
   },
-
   {
     type: "tabs",
     name: "Tabs",
-    icon: <PanelsTopLeft className="h-5 w-5" />,
+    description: "Organize content into tabs",
+    icon: PanelsTopLeft,
     createData: () => ({
       items: [
         {
@@ -141,11 +146,11 @@ const actions = [
       ],
     }),
   },
-
   {
     type: "accordion",
     name: "Accordion",
-    icon: <ListCollapse className="h-5 w-5" />,
+    description: "Create expandable content items",
+    icon: ListCollapse,
     createData: () => ({
       items: [
         {
@@ -156,11 +161,11 @@ const actions = [
       ],
     }),
   },
-
   {
     type: "flip-grid",
     name: "Flip Cards",
-    icon: <FlipHorizontal className="h-5 w-5" />,
+    description: "Create interactive review cards",
+    icon: FlipHorizontal,
     createData: () => ({
       cards: [
         {
@@ -172,21 +177,21 @@ const actions = [
       ],
     }),
   },
-
   {
     type: "image",
     name: "Image",
-    icon: <ImageIcon className="h-5 w-5" />,
+    description: "Upload an image",
+    icon: ImageIcon,
     createData: () => ({
       file: null,
       imageKey: "",
     }),
   },
-
   {
     type: "video",
     name: "Video",
-    icon: <FilePlay className="h-5 w-5" />,
+    description: "Upload a lesson video",
+    icon: FilePlay,
     createData: () => ({
       file: null,
       videoKey: "",
@@ -199,21 +204,57 @@ const MEDIA_TOOL_CONFIG = {
     folderName: "photo",
     keyField: "imageKey",
   },
-
   "image-left-text": {
     folderName: "photo",
     keyField: "imageKey",
   },
-
   "image-right-text": {
     folderName: "photo",
     keyField: "imageKey",
   },
-
   video: {
     folderName: "video",
     keyField: "videoKey",
   },
+}
+
+function LessonToolButton({ action, onClick, disabled }) {
+  const Icon = action.icon
+
+  return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+              type="button"
+              disabled={disabled}
+              onClick={onClick}
+              aria-label={action.name}
+              className="grid h-9 w-9 place-items-center bg-transparent text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Icon className="h-[18px] w-[18px]" />
+          </button>
+        </TooltipTrigger>
+
+        <TooltipContent side="left" align="center" sideOffset={10}>
+          {action.name}
+        </TooltipContent>
+      </Tooltip>
+  )
+}
+
+function SectionToolsRail({ isLoadingLesson, onAddTool }) {
+  return (
+      <div className="flex w-9 flex-col items-center">
+        {actions.map((action) => (
+            <LessonToolButton
+                key={action.type}
+                action={action}
+                disabled={isLoadingLesson}
+                onClick={() => onAddTool(action.type)}
+            />
+        ))}
+      </div>
+  )
 }
 
 function CreateLessons() {
@@ -231,10 +272,9 @@ function CreateLessons() {
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingLesson, setIsLoadingLesson] = useState(true)
-  const [isToolMenuOpen, setIsToolMenuOpen] = useState(false)
 
   const [isErrorAddingToolWithoutSection, setIsErrorAddingToolWithoutSection] =
-    useState(false)
+      useState(false)
 
   const [validationError, setValidationError] = useState("")
 
@@ -245,11 +285,10 @@ function CreateLessons() {
 
     return savedSections.map((section) => ({
       id: section.id || crypto.randomUUID(),
-
       sectionName: section.sectionName ?? "",
 
       content: Array.isArray(section.content)
-        ? section.content.map((tool) => {
+          ? section.content.map((tool) => {
             const toolId = tool.id || crypto.randomUUID()
 
             const normalizedData = {
@@ -262,14 +301,14 @@ function CreateLessons() {
               normalizedData.file = null
 
               normalizedData.imageKey =
-                imageKeys[toolId] ?? normalizedData.imageKey ?? ""
+                  imageKeys[toolId] ?? normalizedData.imageKey ?? ""
             }
 
             if (mediaConfig?.keyField === "videoKey") {
               normalizedData.file = null
 
               normalizedData.videoKey =
-                videoKeys[toolId] ?? normalizedData.videoKey ?? ""
+                  videoKeys[toolId] ?? normalizedData.videoKey ?? ""
             }
 
             return {
@@ -278,7 +317,7 @@ function CreateLessons() {
               data: normalizedData,
             }
           })
-        : [],
+          : [],
     }))
   }
 
@@ -286,7 +325,6 @@ function CreateLessons() {
     const responseData = response?.data ?? response ?? {}
 
     const structure = responseData.lessonComponentStructure ?? "[]"
-
     const imageKeys = responseData.imageKeys ?? {}
     const videoKeys = responseData.videoKeys ?? {}
 
@@ -305,7 +343,7 @@ function CreateLessons() {
     } catch (error) {
       toast.error("Could not read saved lesson", {
         description:
-          error?.message || "The saved lesson component JSON is invalid.",
+            error?.message || "The saved lesson component JSON is invalid.",
       })
 
       return []
@@ -329,7 +367,6 @@ function CreateLessons() {
         setIsLoadingLesson(true)
 
         const response = await getLessonComponent(lessonId)
-
         const savedSections = parseLessonComponent(response)
 
         if (!isMounted) {
@@ -384,27 +421,27 @@ function CreateLessons() {
 
   function handleSectionChange(sectionId, field, value) {
     setSections((previousSections) =>
-      previousSections.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              [field]: value,
-            }
-          : section
-      )
+        previousSections.map((section) =>
+            section.id === sectionId
+                ? {
+                  ...section,
+                  [field]: value,
+                }
+                : section
+        )
     )
   }
 
   function handleDeleteSection(sectionId) {
     setSections((previousSections) => {
       const updatedSections = previousSections.filter(
-        (section) => section.id !== sectionId
+          (section) => section.id !== sectionId
       )
 
       setSectionIndex(
-        updatedSections.length === 0
-          ? 0
-          : Math.min(sectionIndex, updatedSections.length - 1)
+          updatedSections.length === 0
+              ? 0
+              : Math.min(sectionIndex, updatedSections.length - 1)
       )
 
       return updatedSections
@@ -430,61 +467,57 @@ function CreateLessons() {
     }
 
     setSections((previousSections) =>
-      previousSections.map((section, currentSectionIndex) => {
-        if (currentSectionIndex !== sectionIndex) {
-          return section
-        }
+        previousSections.map((section, currentSectionIndex) => {
+          if (currentSectionIndex !== sectionIndex) {
+            return section
+          }
 
-        return {
-          ...section,
-          content: [...section.content, newTool],
-        }
-      })
+          return {
+            ...section,
+            content: [...section.content, newTool],
+          }
+        })
     )
-  }
-
-  function handleSelectTool(toolType) {
-    handleAddTool(toolType)
   }
 
   function handleRemoveTool(targetSectionIndex, targetToolIndex) {
     setSections((previousSections) =>
-      previousSections.map((section, currentSectionIndex) => {
-        if (currentSectionIndex !== targetSectionIndex) {
-          return section
-        }
+        previousSections.map((section, currentSectionIndex) => {
+          if (currentSectionIndex !== targetSectionIndex) {
+            return section
+          }
 
-        return {
-          ...section,
-          content: section.content.filter(
-            (_, currentToolIndex) => currentToolIndex !== targetToolIndex
-          ),
-        }
-      })
+          return {
+            ...section,
+            content: section.content.filter(
+                (_, currentToolIndex) => currentToolIndex !== targetToolIndex
+            ),
+          }
+        })
     )
   }
 
   function handleToolDataChange(targetSectionIndex, targetToolIndex, newData) {
     setSections((previousSections) =>
-      previousSections.map((section, currentSectionIndex) => {
-        if (currentSectionIndex !== targetSectionIndex) {
-          return section
-        }
+        previousSections.map((section, currentSectionIndex) => {
+          if (currentSectionIndex !== targetSectionIndex) {
+            return section
+          }
 
-        return {
-          ...section,
-          content: section.content.map((tool, currentToolIndex) => {
-            if (currentToolIndex !== targetToolIndex) {
-              return tool
-            }
+          return {
+            ...section,
+            content: section.content.map((tool, currentToolIndex) => {
+              if (currentToolIndex !== targetToolIndex) {
+                return tool
+              }
 
-            return {
-              ...tool,
-              data: newData,
-            }
-          }),
-        }
-      })
+              return {
+                ...tool,
+                data: newData,
+              }
+            }),
+          }
+        })
     )
   }
 
@@ -494,7 +527,6 @@ function CreateLessons() {
 
   function validateTool(tool, sectionNumber, toolNumber) {
     const data = tool.data ?? {}
-
     const toolLabel = `Section ${sectionNumber}, tool ${toolNumber}`
 
     if (tool.type === "heading" || tool.type === "subheading") {
@@ -527,10 +559,10 @@ function CreateLessons() {
       }
 
       const hasInvalidTab = data.items.some(
-        (item) =>
-          isBlank(item.label) ||
-          isBlank(item.title) ||
-          isBlank(item.description)
+          (item) =>
+              isBlank(item.label) ||
+              isBlank(item.title) ||
+              isBlank(item.description)
       )
 
       if (hasInvalidTab) {
@@ -544,7 +576,7 @@ function CreateLessons() {
       }
 
       const hasInvalidItem = data.items.some(
-        (item) => isBlank(item.title) || isBlank(item.content)
+          (item) => isBlank(item.title) || isBlank(item.content)
       )
 
       if (hasInvalidItem) {
@@ -558,10 +590,10 @@ function CreateLessons() {
       }
 
       const hasInvalidCard = data.cards.some(
-        (card) =>
-          isBlank(card.frontTitle) ||
-          isBlank(card.backTitle) ||
-          isBlank(card.description)
+          (card) =>
+              isBlank(card.frontTitle) ||
+              isBlank(card.backTitle) ||
+              isBlank(card.description)
       )
 
       if (hasInvalidCard) {
@@ -608,12 +640,11 @@ function CreateLessons() {
     }
 
     for (
-      let currentSectionIndex = 0;
-      currentSectionIndex < sections.length;
-      currentSectionIndex++
+        let currentSectionIndex = 0;
+        currentSectionIndex < sections.length;
+        currentSectionIndex++
     ) {
       const section = sections[currentSectionIndex]
-
       const sectionNumber = currentSectionIndex + 1
 
       if (isBlank(section.sectionName)) {
@@ -625,16 +656,16 @@ function CreateLessons() {
       }
 
       for (
-        let currentToolIndex = 0;
-        currentToolIndex < section.content.length;
-        currentToolIndex++
+          let currentToolIndex = 0;
+          currentToolIndex < section.content.length;
+          currentToolIndex++
       ) {
         const tool = section.content[currentToolIndex]
 
         const toolError = validateTool(
-          tool,
-          sectionNumber,
-          currentToolIndex + 1
+            tool,
+            sectionNumber,
+            currentToolIndex + 1
         )
 
         if (toolError) {
@@ -658,11 +689,11 @@ function CreateLessons() {
     }
 
     return (
-      responseData?.fileKey ??
-      responseData?.key ??
-      responseData?.imageKey ??
-      responseData?.videoKey ??
-      ""
+        responseData?.fileKey ??
+        responseData?.key ??
+        responseData?.imageKey ??
+        responseData?.videoKey ??
+        ""
     )
   }
 
@@ -682,8 +713,6 @@ function CreateLessons() {
 
     const selectedFile = currentData.file
 
-    // Existing saved image/video:
-    // Keep imageKey/videoKey and do not upload again.
     if (!isBrowserFile(selectedFile)) {
       return {
         ...tool,
@@ -696,11 +725,11 @@ function CreateLessons() {
     }
 
     const uploadResponse = await MediaFileUpload(
-      lessonId,
-      sectionName,
-      tool.id,
-      mediaConfig.folderName,
-      selectedFile
+        lessonId,
+        sectionName,
+        tool.id,
+        mediaConfig.folderName,
+        selectedFile
     )
 
     const uploadedFileKey = getUploadedFileKey(uploadResponse)
@@ -721,18 +750,18 @@ function CreateLessons() {
 
   async function buildSavedLessonStructure() {
     return Promise.all(
-      sections.map(async (section) => {
-        const savedTools = await Promise.all(
-          section.content.map((tool) =>
-            uploadToolMedia(tool, section.sectionName)
+        sections.map(async (section) => {
+          const savedTools = await Promise.all(
+              section.content.map((tool) =>
+                  uploadToolMedia(tool, section.sectionName)
+              )
           )
-        )
 
-        return {
-          ...section,
-          content: savedTools,
-        }
-      })
+          return {
+            ...section,
+            content: savedTools,
+          }
+        })
     )
   }
 
@@ -752,9 +781,10 @@ function CreateLessons() {
       setIsSaving(true)
 
       const savedLessonStructure = await buildSavedLessonStructure()
-      await setLessonComponent(lessonId, savedLessonStructure)
-      setSections(savedLessonStructure)
 
+      await setLessonComponent(lessonId, savedLessonStructure)
+
+      setSections(savedLessonStructure)
       setIsSuccessDialogOpen(true)
 
       toast.success("Lesson saved", {
@@ -774,266 +804,256 @@ function CreateLessons() {
   }
 
   return (
-    <section className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-zinc-100">
-      <header className="flex h-16 min-w-0 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500">Lesson editor</p>
-
-            <h1 className="truncate text-base font-semibold text-zinc-950">
-              {lessonName}
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="hidden h-9 rounded-lg px-4 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 sm:block"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSaveLesson}
-            disabled={isSaving || isLoadingLesson}
-            className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
-          >
-            <Save className="h-4 w-4" />
-
-            <span className="hidden sm:inline">
-              {isLoadingLesson
-                ? "Loading..."
-                : isSaving
-                  ? "Saving..."
-                  : "Save Lesson"}
-            </span>
-
-            <span className="sm:hidden">
-              {isLoadingLesson ? "Loading..." : isSaving ? "Saving..." : "Save"}
-            </span>
-          </button>
-        </div>
-
-        <AlertDialog
-          open={isSuccessDialogOpen}
-          onOpenChange={setIsSuccessDialogOpen}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Saved Successfully!</AlertDialogTitle>
-
-              <AlertDialogDescription>
-                You have successfully saved the lesson for {lessonName}.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-
-            <AlertDialogFooter>
-              <AlertDialogAction onClick={() => navigate(-1)}>
-                Ok
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog
-          open={Boolean(validationError)}
-          onOpenChange={(open) => {
-            if (!open) {
-              setValidationError("")
-            }
-          }}
-        >
-          <AlertDialogContent size="sm">
-            <AlertDialogHeader>
-              <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20">
-                <AlertCircleIcon />
-              </AlertDialogMedia>
-
-              <AlertDialogTitle>Cannot Save Lesson</AlertDialogTitle>
-
-              <AlertDialogDescription>{validationError}</AlertDialogDescription>
-            </AlertDialogHeader>
-
-            <div className="mt-6 w-full">
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => setValidationError("")}
-                className="!h-11 !w-full rounded-xl text-sm font-semibold"
-              >
-                Ok
-              </AlertDialogAction>
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
-      </header>
-
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <div className="fixed right-4 bottom-4 z-50 sm:right-8 sm:bottom-8">
-          <Collapsible open={isToolMenuOpen} onOpenChange={setIsToolMenuOpen}>
-            <div className="relative">
-              <CollapsibleContent className="absolute right-0 bottom-14 mb-3 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl">
-                <div className="mb-3 px-2 pt-1">
-                  <p className="text-sm font-semibold text-zinc-900">
-                    Add lesson content
-                  </p>
-
-                  <p className="mt-1 text-xs leading-5 text-zinc-500">
-                    Choose a content block to add to the selected section.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {actions.map((action) => (
-                    <button
-                      key={action.type}
-                      type="button"
-                      onClick={() => handleSelectTool(action.type)}
-                      className="flex min-h-20 flex-col items-start justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-left text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-950"
-                    >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800">
-                        {action.icon}
-                      </span>
-
-                      <span className="text-xs leading-4 font-medium">
-                        {action.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </CollapsibleContent>
-
-              <CollapsibleTrigger asChild>
-                <button
+      <TooltipProvider delayDuration={150}>
+        <section className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+          <header className="flex shrink-0 items-center justify-between border-b bg-background px-4 py-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <Button
                   type="button"
-                  aria-label={
-                    isToolMenuOpen ? "Close content menu" : "Open content menu"
-                  }
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:bg-zinc-800 focus:ring-4 focus:ring-zinc-300 focus:outline-none"
-                >
-                  {isToolMenuOpen ? (
-                    <X className="h-5 w-5" />
-                  ) : (
-                    <Plus className="h-5 w-5" />
-                  )}
-                </button>
-              </CollapsibleTrigger>
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCancel}
+                  aria-label="Back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+
+              <div className="min-w-0">
+                <p className="text-sm text-muted-foreground">
+                  Lesson editor
+                </p>
+
+                <h1 className="truncate text-lg font-semibold tracking-tight">
+                  {lessonName}
+                </h1>
+              </div>
             </div>
-          </Collapsible>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancel}
+                  className="hidden sm:inline-flex"
+              >
+                Cancel
+              </Button>
+
+              <Button
+                  type="button"
+                  onClick={handleSaveLesson}
+                  disabled={isSaving || isLoadingLesson}
+                  className="gap-2"
+              >
+                <Save className="h-4 w-4" />
+
+                <span className="hidden sm:inline">
+                {isLoadingLesson
+                    ? "Loading..."
+                    : isSaving
+                        ? "Saving..."
+                        : "Save Lesson"}
+              </span>
+
+                <span className="sm:hidden">
+                {isLoadingLesson
+                    ? "Loading..."
+                    : isSaving
+                        ? "Saving..."
+                        : "Save"}
+              </span>
+              </Button>
+            </div>
+          </header>
 
           <AlertDialog
-            open={isErrorAddingToolWithoutSection}
-            onOpenChange={setIsErrorAddingToolWithoutSection}
+              open={isSuccessDialogOpen}
+              onOpenChange={setIsSuccessDialogOpen}
           >
-            <AlertDialogContent
-              size="sm"
-              className="w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-destructive/15 p-0 shadow-2xl"
-            >
-              <div className="px-6 pt-6 pb-5">
-                <AlertDialogHeader className="items-center text-center sm:text-center">
-                  <AlertDialogMedia className="mb-1 flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive dark:bg-destructive/20">
-                    <AlertCircleIcon className="h-7 w-7" />
-                  </AlertDialogMedia>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Lesson saved</AlertDialogTitle>
 
-                  <AlertDialogTitle className="mt-3 text-lg font-semibold tracking-tight">
-                    Cannot Add Tool
-                  </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {lessonName} was saved successfully.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
 
-                  <AlertDialogDescription className="mt-2 max-w-[280px] text-sm leading-6 text-muted-foreground">
-                    Create a section first before adding lesson content.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div className="mt-6 w-full">
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={() => setIsErrorAddingToolWithoutSection(false)}
-                    className="!h-11 !w-full rounded-xl text-sm font-semibold"
-                  >
-                    Got it
-                  </AlertDialogAction>
-                </div>
-              </div>
+              <AlertDialogFooter>
+                <AlertDialogAction onClick={() => navigate(-1)}>
+                  Done
+                </AlertDialogAction>
+              </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </div>
 
-        <main className="h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-8 sm:px-8 lg:pr-24">
-          <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-10 pb-16">
-            {isLoadingLesson ? (
-              <div className="mx-auto flex min-h-[600px] w-full max-w-5xl flex-col items-center justify-center px-6 text-center">
-                <div className="flex h-12 w-12 animate-spin items-center justify-center rounded-full border-4 border-zinc-200 border-t-zinc-900" />
+          <AlertDialog
+              open={Boolean(validationError)}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setValidationError("")
+                }
+              }}
+          >
+            <AlertDialogContent size="sm">
+              <AlertDialogHeader>
+                <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                  <CircleAlert />
+                </AlertDialogMedia>
 
-                <h2 className="mt-5 text-lg font-semibold text-zinc-900">
-                  Loading lesson content...
-                </h2>
+                <AlertDialogTitle>Cannot save lesson</AlertDialogTitle>
 
-                <p className="mt-2 text-sm text-zinc-500">
-                  Loading the saved sections, tools, images, and videos.
-                </p>
-              </div>
-            ) : sections.length === 0 ? (
-              <div className="mx-auto flex min-h-[600px] w-full max-w-5xl flex-col items-center justify-center px-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700">
-                  <BetweenHorizontalEnd className="h-6 w-6" />
+                <AlertDialogDescription>
+                  {validationError}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setValidationError("")}>
+                  Okay
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog
+              open={isErrorAddingToolWithoutSection}
+              onOpenChange={setIsErrorAddingToolWithoutSection}
+          >
+            <AlertDialogContent size="sm">
+              <AlertDialogHeader>
+                <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                  <CircleAlert />
+                </AlertDialogMedia>
+
+                <AlertDialogTitle>Create a section first</AlertDialogTitle>
+
+                <AlertDialogDescription>
+                  Add a section before adding lesson content.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter>
+                <AlertDialogAction
+                    onClick={() => setIsErrorAddingToolWithoutSection(false)}
+                >
+                  Okay
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-4 sm:p-6">
+            <div className="mx-auto h-full min-h-0 w-full max-w-[1600px] overflow-hidden rounded-lg border bg-background">
+              <main className="min-h-0 min-w-0 overflow-y-auto">
+                <div className="mx-auto w-full max-w-[1280px] p-5 sm:p-6">
+                  {isLoadingLesson ? (
+                      <Card className="mt-6 shadow-none">
+                        <CardContent className="flex min-h-[460px] flex-col items-center justify-center px-6 text-center">
+                          <div className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
+
+                          <h3 className="mt-5 text-base font-semibold">
+                            Loading lesson content
+                          </h3>
+
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            Loading sections, blocks, images, and videos.
+                          </p>
+                        </CardContent>
+                      </Card>
+                  ) : sections.length === 0 ? (
+                      <Card className="mt-6 shadow-none">
+                        <CardContent className="flex min-h-[460px] flex-col items-center justify-center px-6 text-center">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                            <BetweenHorizontalEnd className="h-5 w-5 text-muted-foreground" />
+                          </div>
+
+                          <h3 className="mt-4 text-base font-semibold">
+                            Start building your lesson
+                          </h3>
+
+                          <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+                            Add your first section, then use the tools beside the
+                            selected section to add text, images, videos, and
+                            interactive content.
+                          </p>
+
+                          <Button
+                              type="button"
+                              onClick={handleAddSection}
+                              className="mt-5 gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add first section
+                          </Button>
+                        </CardContent>
+                      </Card>
+                  ) : (
+                      <div className="mt-6 space-y-6 pb-8">
+                        {sections.map((section, index) => {
+                          const isSelected = sectionIndex === index
+
+                          return (
+                              <div
+                                  key={section.id}
+                                  className="grid items-center gap-3 xl:grid-cols-[minmax(0,1fr)_48px] xl:gap-3"
+                                  onMouseDown={() => setSectionIndex(index)}
+                                  onFocusCapture={() => setSectionIndex(index)}
+                              >
+                                <div className="min-w-0">
+                                  <Section
+                                      section={section}
+                                      sectionIndex={index}
+                                      onChange={handleSectionChange}
+                                      onDelete={handleDeleteSection}
+                                      handleRemovalTool={handleRemoveTool}
+                                      handleToolDataChange={handleToolDataChange}
+                                      onClick={() => setSectionIndex(index)}
+                                  />
+                                </div>
+
+                                {isSelected && (
+                                    <div className="hidden self-center xl:flex xl:justify-center">
+                                      <SectionToolsRail
+                                          isLoadingLesson={isLoadingLesson}
+                                          onAddTool={handleAddTool}
+                                      />
+                                    </div>
+                                )}
+
+                                {isSelected && (
+                                    <div className="flex justify-start xl:hidden">
+                                      <SectionToolsRail
+                                          isLoadingLesson={isLoadingLesson}
+                                          onAddTool={handleAddTool}
+                                      />
+                                    </div>
+                                )}
+                              </div>
+                          )
+                        })}
+
+                        <div className=" flex pl-10">
+                          <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleAddSection}
+                              className="h-12 w-[92%] border-dashed text-muted-foreground hover:text-foreground"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add another section
+                          </Button>
+
+                          <div className="hidden xl:block" aria-hidden="true" />
+                        </div>
+                      </div>
+                  )}
                 </div>
-
-                <h2 className="mt-5 text-xl font-semibold text-zinc-900">
-                  Start building your lesson
-                </h2>
-
-                <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">
-                  Add your first section to start writing the lesson content.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={handleAddSection}
-                  className="mt-6 flex h-10 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add first section
-                </button>
-              </div>
-            ) : (
-              <>
-                {sections.map((section, index) => (
-                  <Section
-                    key={section.id}
-                    section={section}
-                    sectionIndex={index}
-                    onChange={handleSectionChange}
-                    onDelete={handleDeleteSection}
-                    handleRemovalTool={handleRemoveTool}
-                    handleToolDataChange={handleToolDataChange}
-                    onClick={() => setSectionIndex(index)}
-                  />
-                ))}
-
-                <button
-                  type="button"
-                  onClick={handleAddSection}
-                  className="mx-auto flex w-full max-w-5xl items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white/70 py-4 text-sm font-medium text-zinc-600 transition hover:border-zinc-500 hover:bg-white hover:text-zinc-950"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add another section
-                </button>
-              </>
-            )}
+              </main>
+            </div>
           </div>
-        </main>
-      </div>
-    </section>
+        </section>
+      </TooltipProvider>
   )
 }
 
