@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Entity
 @Table(name = "no_choice_questions")
 @Data
@@ -26,6 +28,15 @@ public class NoChoiceQuestion {
     @Column(name = "image_key", length = 255)
     private String imageKey;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String explanation;
+
+    @Column(name = "difficulty_level", nullable = false, length = 10)
+    private String difficultyLevel;
+
+    @Column(name = "question_type", nullable = false, length = 30)
+    private String questionType;
+
+    @OneToMany(mappedBy = "noChoiceQuestion", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SubQuestion> subQuestions;
 }

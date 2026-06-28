@@ -14,3 +14,9 @@ export function getLessonComponent(id) {
     method: "GET",
   })
 }
+
+export async function getAllLessons(){
+  return await base(`lessons`,{
+    method: "GET",
+  })
+}

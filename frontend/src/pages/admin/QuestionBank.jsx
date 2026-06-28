@@ -22,7 +22,6 @@ function QuestionBank() {
     alert("Generate AI Questions clicked")
   }
 
-
   return (
       <section className="flex h-full flex-col gap-5">
         <div className="flex items-start justify-between gap-4">

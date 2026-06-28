@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,5 +23,16 @@ public class NoChoiceQuestionDto {
     @Size(max = 255)
     private String imageKey;
 
+    @NotBlank
     private String explanation;
+
+    @NotBlank
+    @Size(max = 10)
+    private String difficultyLevel;
+
+    @NotBlank
+    @Size(max = 30)
+    private String questionType;
+
+    private List<SubQuestionDto> subQuestions;
 }

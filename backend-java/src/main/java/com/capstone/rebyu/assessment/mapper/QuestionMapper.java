@@ -1,24 +1,42 @@
 package com.capstone.rebyu.assessment.mapper;
 
-
-
-import com.capstone.rebyu.assessment.entity.DifficultyLevel;
-import com.capstone.rebyu.assessment.entity.QuestionType;
-import com.capstone.rebyu.certification.entity.Lesson;
+import com.capstone.rebyu.assessment.dto.ChoiceDto;
 import com.capstone.rebyu.assessment.dto.QuestionDto;
+import com.capstone.rebyu.assessment.entity.Choice;
 import com.capstone.rebyu.assessment.entity.Question;
+import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@Mapper(componentModel = "spring")
-public interface QuestionMapper {
-    @Mapping(source = "questionType.questionTypeId", target = "questionTypeId")
-    @Mapping(source = "difficultyLevel.difficultyLevelId", target = "difficultyLevelId")
+import java.util.ArrayList;
+import java.util.List;
+
+@Mapper(componentModel = "spring", uses = {ChoiceMapper.class})
+public abstract class QuestionMapper {
+
+    @Autowired
+    protected ChoiceMapper choiceMapper;
+
     @Mapping(source = "lesson.lessonId", target = "lessonId")
-    QuestionDto toDto(Question entity);
+    public abstract QuestionDto toDto(Question entity);
 
-    @Mapping(source = "questionTypeId", target = "questionType.questionTypeId")
-    @Mapping(source = "difficultyLevelId", target = "difficultyLevel.difficultyLevelId")
     @Mapping(source = "lessonId", target = "lesson.lessonId")
-    Question toEntity(QuestionDto dto);
+    @Mapping(target = "choices", ignore = true)
+    public abstract Question toEntity(QuestionDto dto);
+
+    @AfterMapping
+    protected void afterToEntity(QuestionDto dto, @MappingTarget Question entity) {
+        List<Choice> choices = new ArrayList<>();
+        if (dto.getChoices() != null) {
+            for (ChoiceDto choiceDto : dto.getChoices()) {
+                Choice choice = choiceMapper.toEntity(choiceDto);
+                choice.setChoiceId(null);
+                choice.setQuestion(entity);
+                choices.add(choice);
+            }
+        }
+        entity.setChoices(choices);
+    }
 }

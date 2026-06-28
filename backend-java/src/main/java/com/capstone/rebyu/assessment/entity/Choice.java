@@ -28,7 +28,7 @@ public class Choice {
     private String imageKey;
 
     @Column(name = "is_correct", nullable = false)
-    private boolean isCorrect = false;
+    private boolean correct;
 
     @Column(columnDefinition = "TEXT")
     private String explanation;

@@ -8,6 +8,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "questions")
 @Data
@@ -19,13 +22,11 @@ public class Question {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long questionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "question_type_id", nullable = false)
-    private QuestionType questionType;
+    @Column(name = "question_type", nullable = false, length = 30)
+    private String questionType;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "difficulty_level_id", nullable = false)
-    private DifficultyLevel difficultyLevel;
+    @Column(name = "difficulty_level", nullable = false, length = 10)
+    private String difficultyLevel;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String questionText;
@@ -33,10 +34,10 @@ public class Question {
     @Column(name = "image_key", length = 255)
     private String imageKey;
 
-    @Column(name = "has_no_choices", nullable = false)
-    private boolean hasNoChoices = false;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
+
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Choice> choices = new ArrayList<>();
 }

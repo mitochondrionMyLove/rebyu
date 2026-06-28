@@ -7,17 +7,21 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class QuestionDto {
     private Long questionId;
 
-    @NotNull
-    private Long questionTypeId;
+    @NotBlank
+    @Size(max = 30)
+    private String questionType;
 
-    @NotNull
-    private Long difficultyLevelId;
+    @NotBlank
+    @Size(max = 10)
+    private String difficultyLevel;
 
     @NotBlank
     private String questionText;
@@ -25,8 +29,8 @@ public class QuestionDto {
     @Size(max = 255)
     private String imageKey;
 
-    private boolean hasNoChoices = false;
-
     @NotNull
     private Long lessonId;
+
+    private List<ChoiceDto> choices;
 }

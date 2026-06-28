@@ -23,7 +23,7 @@ public class ChoiceDto {
     @Size(max = 255)
     private String imageKey;
 
-    private boolean isCorrect = false;
+    private boolean correct;
 
     private String explanation;
 
