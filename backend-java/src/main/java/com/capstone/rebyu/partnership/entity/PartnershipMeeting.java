@@ -1,7 +1,6 @@
 package com.capstone.rebyu.partnership.entity;
 
 
-import com.capstone.rebyu.organization.entity.Enterprise;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,8 +17,12 @@ import java.time.LocalDateTime;
 @Builder
 public class PartnershipMeeting {
 
+    public enum Status {
+        scheduled, completed, cancelled, no_show
+    }
+
     public enum Outcome {
-        APPROVED, CANCELLED
+        approved, rejected, cancelled
     }
 
     @Id
@@ -27,18 +30,18 @@ public class PartnershipMeeting {
     private Long meetingId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "enterprise_id", nullable = false)
-    private Enterprise enterprise;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "request_id", nullable = false)
     private PartnershipRequest partnershipRequest;
 
-    @Column(name = "scheduled_date", nullable = false)
-    private LocalDateTime scheduledDate;
+    @Column(name = "scheduled_at", nullable = false)
+    private LocalDateTime scheduledAt;
 
     @Column(name = "meeting_link", length = 500)
     private String meetingLink;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Status status = Status.scheduled;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)

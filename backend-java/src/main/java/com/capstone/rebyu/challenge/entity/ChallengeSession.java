@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,26 +18,33 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class ChallengeSession {
+
+    public enum Status {
+        in_progress, passed, failed, abandoned
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long challengeSessionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "challenge_mode_id")
+    @JoinColumn(name = "challenge_mode_id", nullable = false)
     private ChallengeMode challengeMode;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "learner_id")
+    @JoinColumn(name = "learner_id", nullable = false)
     private Learner learner;
 
-    @Column(name = "started_time", nullable = false)
-    private LocalDateTime startedTime;
+    @Column(name = "started_at", nullable = false)
+    private LocalDateTime startedAt;
 
-    @Column(name = "ended_time")
-    private LocalDateTime endedTime;
+    @Column(name = "ended_at")
+    private LocalDateTime endedAt;
 
-    private Integer score;
+    @Column(precision = 5, scale = 2)
+    private BigDecimal score;
 
-    @Column(length = 20)
-    private String status; // PASSED or FAILED
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Status status = Status.in_progress;
 }

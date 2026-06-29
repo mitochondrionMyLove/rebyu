@@ -25,4 +25,7 @@ public class ExamChoice {
     @JoinColumn(name = "choice_id")
     @MapsId("choiceId")
     private Choice choice;
+
+    @Column(name = "display_order", nullable = false)
+    private Integer displayOrder;
 }

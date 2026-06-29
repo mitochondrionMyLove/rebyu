@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 public class ChallengeModeIndustry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long challengeModeIndustriesId;
+    private Long challengeModeIndustryId;
 
     @Column(nullable = false, length = 100)
     private String industry;

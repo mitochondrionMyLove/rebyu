@@ -1,5 +1,6 @@
 package com.capstone.rebyu.enrollment.dto;
 
+import com.capstone.rebyu.enrollment.entity.LearnerCertification;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,6 +12,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LearnerCertificationDto {
+    private Long learnerCertificationId;
+
     @NotNull
     private Long learnerId;
 
@@ -18,5 +21,10 @@ public class LearnerCertificationDto {
     private Long certificationId;
 
     @NotNull
-    private LocalDateTime datePurchased;
+    private Long orderDetailId;
+
+    @NotNull
+    private LocalDateTime enrolledAt;
+
+    private LearnerCertification.Status status = LearnerCertification.Status.active;
 }

@@ -1,7 +1,6 @@
 package com.capstone.rebyu.enrollment.entity;
 
 
-
 import com.capstone.rebyu.certification.entity.Certification;
 import com.capstone.rebyu.user.entity.Learner;
 import jakarta.persistence.*;
@@ -19,19 +18,31 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class LearnerCertification {
-    @EmbeddedId
-    private LearnerCertificationId id;
+
+    public enum Status {
+        active, expired, revoked
+    }
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long learnerCertificationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "learner_id")
-    @MapsId("learnerId")
+    @JoinColumn(name = "learner_id", nullable = false)
     private Learner learner;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "certification_id")
-    @MapsId("certificationId")
+    @JoinColumn(name = "certification_id", nullable = false)
     private Certification certification;
 
-    @Column(name = "date_purchased", nullable = false)
-    private LocalDateTime datePurchased;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_detail_id", nullable = false, unique = true)
+    private LearnerOrderDetail orderDetail;
+
+    @Column(name = "enrolled_at", nullable = false)
+    private LocalDateTime enrolledAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Status status = Status.active;
 }

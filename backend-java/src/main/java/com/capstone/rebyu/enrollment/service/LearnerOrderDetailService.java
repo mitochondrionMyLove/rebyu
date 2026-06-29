@@ -39,9 +39,9 @@ public class LearnerOrderDetailService {
     public LearnerOrderDetailDto create(LearnerOrderDetailDto dto) {
         log.info("Creating new learner order detail");
         LearnerOrderDetail entity = learnerOrderDetailMapper.toEntity(dto);
-        entity.setOrderDetailsId(null);
+        entity.setOrderDetailId(null);
         LearnerOrderDetailDto result = learnerOrderDetailMapper.toDto(learnerOrderDetailRepository.save(entity));
-        log.info("LearnerOrderDetail created with id: {}", result.getOrderDetailsId());
+        log.info("LearnerOrderDetail created with id: {}", result.getOrderDetailId());
         return result;
     }
 
@@ -49,7 +49,7 @@ public class LearnerOrderDetailService {
         log.info("Updating learner order detail id: {}", id);
         findEntity(id);
         LearnerOrderDetail entity = learnerOrderDetailMapper.toEntity(dto);
-        entity.setOrderDetailsId(id);
+        entity.setOrderDetailId(id);
         LearnerOrderDetailDto result = learnerOrderDetailMapper.toDto(learnerOrderDetailRepository.save(entity));
         log.info("LearnerOrderDetail id: {} updated", id);
         return result;

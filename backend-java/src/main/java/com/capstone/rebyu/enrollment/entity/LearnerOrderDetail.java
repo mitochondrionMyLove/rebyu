@@ -18,7 +18,7 @@ import java.math.BigDecimal;
 public class LearnerOrderDetail {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long orderDetailsId;
+    private Long orderDetailId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)

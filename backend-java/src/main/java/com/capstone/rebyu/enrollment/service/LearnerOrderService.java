@@ -41,8 +41,8 @@ public class LearnerOrderService {
         log.info("Creating new learner order");
         LearnerOrder entity = learnerOrderMapper.toEntity(dto);
         entity.setOrderId(null);
-        if (entity.getOrderedOn() == null) {
-            entity.setOrderedOn(LocalDateTime.now());
+        if (entity.getOrderedAt() == null) {
+            entity.setOrderedAt(LocalDateTime.now());
         }
         LearnerOrderDto result = learnerOrderMapper.toDto(learnerOrderRepository.save(entity));
         log.info("LearnerOrder created with id: {}", result.getOrderId());

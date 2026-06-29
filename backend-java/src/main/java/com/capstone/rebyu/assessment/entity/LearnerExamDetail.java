@@ -45,15 +45,12 @@ public class LearnerExamDetail {
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
 
-    @Column(name = "user_answer", nullable = false, length = 500)
-    private String userAnswer;
-
-    @Column(nullable = false)
-    private Boolean result;
+    @Column(name = "is_correct", nullable = false)
+    private Boolean isCorrect;
 
     @Column(name = "answered_at", nullable = false)
     private LocalDateTime answeredAt;
 
-    @Column(name = "earned_score", precision = 5, scale = 2)
-    private BigDecimal earnedScore;
+    @Column(name = "earned_score", nullable = false, precision = 5, scale = 2)
+    private BigDecimal earnedScore = BigDecimal.ZERO;
 }

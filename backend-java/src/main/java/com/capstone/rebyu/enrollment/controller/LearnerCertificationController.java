@@ -20,9 +20,9 @@ public class LearnerCertificationController {
         return learnerCertificationService.getAll();
     }
 
-    @GetMapping("/{learnerId}/{certificationId}")
-    public LearnerCertificationDto getById(@PathVariable Long learnerId, @PathVariable Long certificationId) {
-        return learnerCertificationService.getById(learnerId, certificationId);
+    @GetMapping("/{id}")
+    public LearnerCertificationDto getById(@PathVariable Long id) {
+        return learnerCertificationService.getById(id);
     }
 
     @PostMapping
@@ -31,15 +31,14 @@ public class LearnerCertificationController {
         return learnerCertificationService.create(dto);
     }
 
-    @PutMapping("/{learnerId}/{certificationId}")
-    public LearnerCertificationDto update(@PathVariable Long learnerId, @PathVariable Long certificationId,
-                                           @Valid @RequestBody LearnerCertificationDto dto) {
-        return learnerCertificationService.update(learnerId, certificationId, dto);
+    @PutMapping("/{id}")
+    public LearnerCertificationDto update(@PathVariable Long id, @Valid @RequestBody LearnerCertificationDto dto) {
+        return learnerCertificationService.update(id, dto);
     }
 
-    @DeleteMapping("/{learnerId}/{certificationId}")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long learnerId, @PathVariable Long certificationId) {
-        learnerCertificationService.delete(learnerId, certificationId);
+    public void delete(@PathVariable Long id) {
+        learnerCertificationService.delete(id);
     }
 }

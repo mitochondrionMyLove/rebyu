@@ -29,9 +29,9 @@ public class ActivityLog {
     @JoinColumn(name = "activity_type_id")
     private ActivityType activityType;
 
-    @Column(name = "date_time", nullable = false)
-    private LocalDateTime dateTime;
+    @Column(name = "occurred_at", nullable = false)
+    private LocalDateTime occurredAt;
 
-    @Column(nullable = true)
-    private Integer duration; // seconds
+    @Column(name = "duration_seconds")
+    private Integer durationSeconds;
 }

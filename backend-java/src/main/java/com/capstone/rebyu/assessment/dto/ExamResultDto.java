@@ -26,7 +26,7 @@ public class ExamResultDto {
     private Integer attemptNo;
 
     @NotNull
-    private LocalDateTime dateTaken;
+    private LocalDateTime takenAt;
 
     @NotNull
     @DecimalMin("0.0")
@@ -34,8 +34,8 @@ public class ExamResultDto {
     private BigDecimal score;
 
     @Min(0)
-    private Integer duration;
+    private Integer durationSeconds;
 
     @NotNull
-    private Boolean result;
+    private Boolean isPassed;
 }

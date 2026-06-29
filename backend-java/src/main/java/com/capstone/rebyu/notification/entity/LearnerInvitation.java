@@ -1,10 +1,7 @@
 package com.capstone.rebyu.notification.entity;
 
 
-
-
-import com.capstone.rebyu.organization.entity.Enterprise;
-import com.capstone.rebyu.certification.entity.Certification;
+import com.capstone.rebyu.organization.entity.OrganizationCertificate;
 import com.capstone.rebyu.user.entity.Learner;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -31,22 +28,27 @@ public class LearnerInvitation {
     private Long invitationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "enterprise_id", nullable = false)
-    private Enterprise enterprise;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "certification_id")
-    private Certification certification;
+    @JoinColumn(name = "org_cert_id", nullable = false)
+    private OrganizationCertificate orgCert;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "learner_id")
     private Learner learner;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 254)
     private String email;
 
-    @Column(name = "sent_date", nullable = false)
-    private LocalDateTime sentDate;
+    @Column(name = "token_hash", nullable = false, unique = true, length = 255)
+    private String tokenHash;
+
+    @Column(name = "sent_at", nullable = false)
+    private LocalDateTime sentAt;
+
+    @Column(name = "expires_at", nullable = false)
+    private LocalDateTime expiresAt;
+
+    @Column(name = "accepted_at")
+    private LocalDateTime acceptedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

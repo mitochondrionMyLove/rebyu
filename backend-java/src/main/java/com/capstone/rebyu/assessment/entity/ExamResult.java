@@ -31,14 +31,15 @@ public class ExamResult {
     @MapsId("examId")
     private Exam exam;
 
-    @Column(name = "date_taken", nullable = false)
-    private LocalDateTime dateTaken;
+    @Column(name = "taken_at", nullable = false)
+    private LocalDateTime takenAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal score;
 
-    private Integer duration;
+    @Column(name = "duration_seconds", nullable = false)
+    private Integer durationSeconds;
 
-    @Column(nullable = false)
-    private boolean result;
+    @Column(name = "is_passed", nullable = false)
+    private boolean isPassed;
 }

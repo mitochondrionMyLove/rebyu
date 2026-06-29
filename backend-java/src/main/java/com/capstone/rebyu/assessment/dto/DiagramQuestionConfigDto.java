@@ -23,9 +23,6 @@ public class DiagramQuestionConfigDto {
     private String instructions;
 
     @NotBlank
-    private String expectedOutput;
-
-    @NotBlank
     private String referenceDiagramXml;
 
     @NotBlank

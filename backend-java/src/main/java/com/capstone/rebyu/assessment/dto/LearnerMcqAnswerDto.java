@@ -15,5 +15,8 @@ public class LearnerMcqAnswerDto {
     private Long learnerExamDetailId;
 
     @NotNull
+    private Long examQuestionId;
+
+    @NotNull
     private Long choiceId;
 }

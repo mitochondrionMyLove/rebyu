@@ -15,6 +15,11 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class User {
+
+    public enum AccountStatus {
+        active, inactive, suspended
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long userId;
@@ -23,12 +28,19 @@ public class User {
     @JoinColumn(name = "user_type_id", nullable = false)
     private UserType userType;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true, length = 254)
     private String email;
 
-    @Column(name = "joined_date", nullable = false)
-    private LocalDateTime joinedDate;
+    @Column(name = "password_hash", nullable = false, length = 255)
+    private String passwordHash;
 
-    @Column(name = "phone_number", length = 100)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 20)
+    private AccountStatus accountStatus = AccountStatus.active;
+
+    @Column(name = "joined_at", nullable = false)
+    private LocalDateTime joinedAt;
+
+    @Column(name = "phone_number", length = 30)
     private String phoneNumber;
 }

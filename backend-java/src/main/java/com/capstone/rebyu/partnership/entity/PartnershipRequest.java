@@ -30,8 +30,8 @@ public class PartnershipRequest {
     @JoinColumn(name = "enterprise_id", nullable = false)
     private Enterprise enterprise;
 
-    @Column(name = "submitted_date", nullable = false)
-    private LocalDateTime submittedDate;
+    @Column(name = "submitted_at", nullable = false)
+    private LocalDateTime submittedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 25)

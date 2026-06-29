@@ -18,7 +18,7 @@ public class PartnershipRequestDto {
     private Long enterpriseId;
 
     @NotNull
-    private LocalDateTime submittedDate;
+    private LocalDateTime submittedAt;
 
     @NotNull
     private PartnershipRequest.Status status = PartnershipRequest.Status.PENDING;

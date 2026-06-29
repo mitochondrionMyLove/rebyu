@@ -27,9 +27,6 @@ public class DiagramQuestionConfig {
     @Column(columnDefinition = "TEXT")
     private String instructions;
 
-    @Column(name = "expected_output", nullable = false, columnDefinition = "TEXT")
-    private String expectedOutput;
-
     @Column(name = "reference_diagram_xml", nullable = false, columnDefinition = "TEXT")
     private String referenceDiagramXml;
 

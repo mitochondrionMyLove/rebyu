@@ -8,6 +8,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "organization_certificates")
 @Data
@@ -15,6 +17,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class OrganizationCertificate {
+
+    public enum Status {
+        pending, active, expired, suspended, cancelled
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long orgCertId;
@@ -35,4 +42,14 @@ public class OrganizationCertificate {
 
     @Column(name = "remaining_slots", insertable = false, updatable = false)
     private Integer remainingSlots;
+
+    @Column(name = "access_start_date", nullable = false)
+    private LocalDate accessStartDate;
+
+    @Column(name = "access_expiry_date", nullable = false)
+    private LocalDate accessExpiryDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Status status = Status.active;
 }

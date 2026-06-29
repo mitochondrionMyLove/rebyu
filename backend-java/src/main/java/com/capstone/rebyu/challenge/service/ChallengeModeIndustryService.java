@@ -39,9 +39,9 @@ public class ChallengeModeIndustryService {
     public ChallengeModeIndustryDto create(ChallengeModeIndustryDto dto) {
         log.info("Creating new challenge mode industry");
         ChallengeModeIndustry entity = challengeModeIndustryMapper.toEntity(dto);
-        entity.setChallengeModeIndustriesId(null);
+        entity.setChallengeModeIndustryId(null);
         ChallengeModeIndustryDto result = challengeModeIndustryMapper.toDto(challengeModeIndustryRepository.save(entity));
-        log.info("ChallengeModeIndustry created with id: {}", result.getChallengeModeIndustriesId());
+        log.info("ChallengeModeIndustry created with id: {}", result.getChallengeModeIndustryId());
         return result;
     }
 
@@ -49,7 +49,7 @@ public class ChallengeModeIndustryService {
         log.info("Updating challenge mode industry id: {}", id);
         findEntity(id);
         ChallengeModeIndustry entity = challengeModeIndustryMapper.toEntity(dto);
-        entity.setChallengeModeIndustriesId(id);
+        entity.setChallengeModeIndustryId(id);
         ChallengeModeIndustryDto result = challengeModeIndustryMapper.toDto(challengeModeIndustryRepository.save(entity));
         log.info("ChallengeModeIndustry id: {} updated", id);
         return result;

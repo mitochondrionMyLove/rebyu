@@ -6,11 +6,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class PartnershipRequestItemDto {
-    private Long requestItemsId;
+    private Long partnershipRequestItemId;
 
     @NotNull
     private Long requestId;
@@ -21,4 +23,10 @@ public class PartnershipRequestItemDto {
     @NotNull
     @Min(1)
     private Integer slots;
+
+    @NotNull
+    private LocalDate requestedAccessStartDate;
+
+    @NotNull
+    private LocalDate requestedAccessEndDate;
 }

@@ -34,9 +34,9 @@ public class OrganizationCertificationLearnerService {
     public OrganizationCertificationLearnerDto create(OrganizationCertificationLearnerDto dto) {
         log.info("Creating new organization certification learner");
         OrganizationCertificationLearner entity = organizationCertificationLearnerMapper.toEntity(dto);
-        entity.setOrgCertLearnersId(null);
+        entity.setOrgCertLearnerId(null);
         OrganizationCertificationLearnerDto result = organizationCertificationLearnerMapper.toDto(organizationCertificationLearnerRepository.save(entity));
-        log.info("OrganizationCertificationLearner created with id: {}", result.getOrgCertLearnersId());
+        log.info("OrganizationCertificationLearner created with id: {}", result.getOrgCertLearnerId());
         return result;
     }
 
@@ -44,7 +44,7 @@ public class OrganizationCertificationLearnerService {
         log.info("Updating organization certification learner id: {}", id);
         findEntity(id);
         OrganizationCertificationLearner entity = organizationCertificationLearnerMapper.toEntity(dto);
-        entity.setOrgCertLearnersId(id);
+        entity.setOrgCertLearnerId(id);
         OrganizationCertificationLearnerDto result = organizationCertificationLearnerMapper.toDto(organizationCertificationLearnerRepository.save(entity));
         log.info("OrganizationCertificationLearner id: {} updated", id);
         return result;

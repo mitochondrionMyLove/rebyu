@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 public class PartnershipRequestItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long requestItemsId;
+    private Long partnershipRequestItemId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "request_id", nullable = false)
@@ -29,4 +29,10 @@ public class PartnershipRequestItem {
 
     @Column(nullable = false)
     private Integer slots;
+
+    @Column(name = "requested_access_start_date", nullable = false)
+    private java.time.LocalDate requestedAccessStartDate;
+
+    @Column(name = "requested_access_end_date", nullable = false)
+    private java.time.LocalDate requestedAccessEndDate;
 }

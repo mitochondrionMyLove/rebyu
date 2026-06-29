@@ -18,19 +18,26 @@ public class LearnerInvitationDto {
     private Long invitationId;
 
     @NotNull
-    private Long enterpriseId;
-
-    private Long certificationId;
+    private Long orgCertId;
 
     private Long learnerId;
 
     @NotBlank
     @Email
-    @Size(max = 100)
+    @Size(max = 254)
     private String email;
 
+    @NotBlank
+    @Size(max = 255)
+    private String tokenHash;
+
     @NotNull
-    private LocalDateTime sentDate;
+    private LocalDateTime sentAt;
+
+    @NotNull
+    private LocalDateTime expiresAt;
+
+    private LocalDateTime acceptedAt;
 
     @NotNull
     private LearnerInvitation.Status status = LearnerInvitation.Status.PENDING;

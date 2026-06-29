@@ -3,7 +3,6 @@ package com.capstone.rebyu.enrollment.service;
 import com.capstone.rebyu.enrollment.dto.LearnerCertificationDto;
 import com.capstone.rebyu.enrollment.mapper.LearnerCertificationMapper;
 import com.capstone.rebyu.enrollment.entity.LearnerCertification;
-import com.capstone.rebyu.enrollment.entity.LearnerCertificationId;
 import com.capstone.rebyu.enrollment.repository.LearnerCertificationRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -26,41 +25,38 @@ public class LearnerCertificationService {
         return learnerCertificationRepository.findAll().stream().map(learnerCertificationMapper::toDto).toList();
     }
 
-    public LearnerCertificationDto getById(Long learnerId, Long certificationId) {
-        log.debug("Fetching learner certification learnerId: {}, certificationId: {}", learnerId, certificationId);
-        return learnerCertificationMapper.toDto(findEntity(learnerId, certificationId));
+    public LearnerCertificationDto getById(Long id) {
+        log.debug("Fetching learner certification id: {}", id);
+        return learnerCertificationMapper.toDto(findEntity(id));
     }
 
     public LearnerCertificationDto create(LearnerCertificationDto dto) {
-        log.info("Creating learner certification learnerId: {}, certificationId: {}", dto.getLearnerId(), dto.getCertificationId());
+        log.info("Creating new learner certification");
         LearnerCertification entity = learnerCertificationMapper.toEntity(dto);
+        entity.setLearnerCertificationId(null);
         LearnerCertificationDto result = learnerCertificationMapper.toDto(learnerCertificationRepository.save(entity));
-        log.info("LearnerCertification created");
+        log.info("LearnerCertification created with id: {}", result.getLearnerCertificationId());
         return result;
     }
 
-    public LearnerCertificationDto update(Long learnerId, Long certificationId, LearnerCertificationDto dto) {
-        log.info("Updating learner certification learnerId: {}, certificationId: {}", learnerId, certificationId);
-        findEntity(learnerId, certificationId);
-        dto.setLearnerId(learnerId);
-        dto.setCertificationId(certificationId);
+    public LearnerCertificationDto update(Long id, LearnerCertificationDto dto) {
+        log.info("Updating learner certification id: {}", id);
+        findEntity(id);
         LearnerCertification entity = learnerCertificationMapper.toEntity(dto);
+        entity.setLearnerCertificationId(id);
         LearnerCertificationDto result = learnerCertificationMapper.toDto(learnerCertificationRepository.save(entity));
-        log.info("LearnerCertification updated");
+        log.info("LearnerCertification id: {} updated", id);
         return result;
     }
 
-    public void delete(Long learnerId, Long certificationId) {
-        log.info("Deleting learner certification learnerId: {}, certificationId: {}", learnerId, certificationId);
-        learnerCertificationRepository.delete(findEntity(learnerId, certificationId));
-        log.info("LearnerCertification deleted");
+    public void delete(Long id) {
+        log.info("Deleting learner certification id: {}", id);
+        learnerCertificationRepository.delete(findEntity(id));
+        log.info("LearnerCertification id: {} deleted", id);
     }
 
-    private LearnerCertification findEntity(Long learnerId, Long certificationId) {
-        LearnerCertificationId id = new LearnerCertificationId();
-        id.setLearnerId(learnerId);
-        id.setCertificationId(certificationId);
+    private LearnerCertification findEntity(Long id) {
         return learnerCertificationRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("LearnerCertification not found: " + learnerId + "/" + certificationId));
+                .orElseThrow(() -> new EntityNotFoundException("LearnerCertification not found: " + id));
     }
 }

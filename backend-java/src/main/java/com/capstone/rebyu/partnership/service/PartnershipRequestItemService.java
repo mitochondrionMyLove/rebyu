@@ -28,14 +28,14 @@ public class PartnershipRequestItemService {
 
     public PartnershipRequestItemDto create(PartnershipRequestItemDto dto) {
         PartnershipRequestItem entity = partnershipRequestItemMapper.toEntity(dto);
-        entity.setRequestItemsId(null);
+        entity.setPartnershipRequestItemId(null);
         return partnershipRequestItemMapper.toDto(partnershipRequestItemRepository.save(entity));
     }
 
     public PartnershipRequestItemDto update(Long id, PartnershipRequestItemDto dto) {
         findEntity(id);
         PartnershipRequestItem entity = partnershipRequestItemMapper.toEntity(dto);
-        entity.setRequestItemsId(id);
+        entity.setPartnershipRequestItemId(id);
         return partnershipRequestItemMapper.toDto(partnershipRequestItemRepository.save(entity));
     }
 

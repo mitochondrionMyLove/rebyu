@@ -16,16 +16,15 @@ public class PartnershipMeetingDto {
     private Long meetingId;
 
     @NotNull
-    private Long enterpriseId;
-
-    @NotNull
     private Long requestId;
 
     @NotNull
-    private LocalDateTime scheduledDate;
+    private LocalDateTime scheduledAt;
 
     @Size(max = 500)
     private String meetingLink;
+
+    private PartnershipMeeting.Status status = PartnershipMeeting.Status.scheduled;
 
     private PartnershipMeeting.Outcome outcome;
 }

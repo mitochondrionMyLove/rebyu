@@ -7,11 +7,13 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface LearnerCertificationMapper {
-    @Mapping(source = "id.learnerId", target = "learnerId")
-    @Mapping(source = "id.certificationId", target = "certificationId")
+    @Mapping(source = "learner.learnerId", target = "learnerId")
+    @Mapping(source = "certification.certificationId", target = "certificationId")
+    @Mapping(source = "orderDetail.orderDetailId", target = "orderDetailId")
     LearnerCertificationDto toDto(LearnerCertification entity);
 
-    @Mapping(source = "learnerId", target = "id.learnerId")
-    @Mapping(source = "certificationId", target = "id.certificationId")
+    @Mapping(source = "learnerId", target = "learner.learnerId")
+    @Mapping(source = "certificationId", target = "certification.certificationId")
+    @Mapping(source = "orderDetailId", target = "orderDetail.orderDetailId")
     LearnerCertification toEntity(LearnerCertificationDto dto);
 }

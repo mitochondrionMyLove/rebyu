@@ -1,5 +1,6 @@
 package com.capstone.rebyu.enrollment.dto;
 
+import com.capstone.rebyu.enrollment.entity.OrganizationCertificationLearner;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -14,13 +15,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrganizationCertificationLearnerDto {
-    private Long orgCertLearnersId;
+    private Long orgCertLearnerId;
 
     @NotNull
-    private Long organizationId;
-
-    @NotNull
-    private Long certificationId;
+    private Long orgCertId;
 
     @NotNull
     private Long learnerId;
@@ -30,7 +28,9 @@ public class OrganizationCertificationLearnerDto {
 
     @DecimalMin("0.0")
     @DecimalMax("100.0")
-    private BigDecimal progress = BigDecimal.ZERO;
+    private BigDecimal progressPercentage = BigDecimal.ZERO;
 
     private LocalDateTime completedAt;
+
+    private OrganizationCertificationLearner.Status status = OrganizationCertificationLearner.Status.active;
 }

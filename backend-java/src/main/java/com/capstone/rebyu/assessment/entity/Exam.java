@@ -8,6 +8,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "exams")
 @Data
@@ -27,11 +29,18 @@ public class Exam {
     @JoinColumn(name = "exam_type_id", nullable = false)
     private ExamType examType;
 
+    @Column(nullable = false, length = 150)
+    private String title;
+
     @Column(name = "is_generated", nullable = false)
     private boolean isGenerated = false;
 
-    private Integer duration;
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
 
-    @Column(nullable = false)
-    private Integer total;
+    @Column(name = "total_questions", nullable = false)
+    private Integer totalQuestions;
+
+    @Column(name = "passing_score", nullable = false, precision = 5, scale = 2)
+    private BigDecimal passingScore = new BigDecimal("70.00");
 }

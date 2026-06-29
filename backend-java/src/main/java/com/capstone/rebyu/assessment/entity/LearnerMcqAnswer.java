@@ -22,6 +22,10 @@ public class LearnerMcqAnswer {
     private LearnerExamDetail learnerExamDetail;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exam_question_id", nullable = false)
+    private ExamQuestion examQuestion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "choice_id", nullable = false)
     private Choice choice;
 }

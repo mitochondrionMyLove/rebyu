@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChallengeModeIndustryDto {
-    private Long challengeModeIndustriesId;
+    private Long challengeModeIndustryId;
 
     @NotBlank
     @Size(max = 100)

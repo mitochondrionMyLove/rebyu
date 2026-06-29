@@ -23,6 +23,6 @@ public class Achievement {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "image_key", length = 255)
+    @Column(name = "image_key", nullable = false, length = 255)
     private String imageKey;
 }
