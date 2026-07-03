@@ -43,6 +43,8 @@ public class CertificationDto {
 
     private String industry;
 
+    private LocalDateTime dateUpdated;
+
     private MultipartFile file;
 
 }

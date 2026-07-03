@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -44,6 +45,7 @@ public class CertificationService {
         Certification certification = certificationMapper.toEntity(dto);
 
         certification.setCertificationId(null);
+        certification.setDateUpdated(null);
 
         connectChildEntities(certification);
 
@@ -90,10 +92,8 @@ public class CertificationService {
             );
         }
 
-        /*
-         * Important:
-         * Reconnects all parent-child entity relationships before saving.
-         */
+        updatedCertification.setDateUpdated(LocalDateTime.now());
+
         connectChildEntities(updatedCertification);
 
         Certification savedCertification =

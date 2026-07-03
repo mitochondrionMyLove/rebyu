@@ -1,12 +1,35 @@
+let labelDecoderElement = null
+
 function cleanLabel(value = "") {
-    const parser = new DOMParser()
+    const label = String(value)
 
-    const document = parser.parseFromString(
-        `<div>${value}</div>`,
-        "text/html"
-    )
+    if (!/[<&]/.test(label)) {
+        return label.replace(/\s+/g, " ").trim()
+    }
 
-    return (document.body.textContent ?? "")
+    if (
+        typeof document === "undefined" ||
+        typeof document.createElement !== "function"
+    ) {
+        return label
+            .replace(/<[^>]*>/g, " ")
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, "\"")
+            .replace(/&#39;/g, "'")
+            .replace(/\s+/g, " ")
+            .trim()
+    }
+
+    labelDecoderElement ??= document.createElement("div")
+    labelDecoderElement.innerHTML = label
+
+    const text = labelDecoderElement.textContent ?? ""
+    labelDecoderElement.textContent = ""
+
+    return text
         .replace(/\s+/g, " ")
         .trim()
 }

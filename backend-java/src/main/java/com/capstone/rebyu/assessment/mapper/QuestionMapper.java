@@ -24,7 +24,7 @@ public abstract class QuestionMapper {
     public abstract QuestionDto toDto(Question entity);
 
     @Mapping(source = "lessonId", target = "lesson.lessonId")
-    @Mapping(source = "parentQuestionId", target = "parentQuestion.questionId")
+    @Mapping(target = "parentQuestion", ignore = true)
     @Mapping(target = "choices", ignore = true)
     public abstract Question toEntity(QuestionDto dto);
 

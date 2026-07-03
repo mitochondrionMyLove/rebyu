@@ -1,0 +1,2 @@
+ALTER TABLE public.certifications
+    ADD COLUMN IF NOT EXISTS date_updated TIMESTAMP WITHOUT TIME ZONE;

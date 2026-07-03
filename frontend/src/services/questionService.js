@@ -1,18 +1,61 @@
 import { base } from "./base"
 
+export async function saveQuestion(question) {
+    return await base("questions", {
+        method: "POST",
+        data: question,
+    })
+}
 
-export async function saveQuestions(questions){
-    return await base('questions', {method: 'POST',data:questions})
+export async function updateQuestion(questionId, question) {
+    return await base(`questions/${questionId}`, {
+        method: "PUT",
+        data: question,
+    })
 }
-export async function saveChoices(choices){
-    return await base('choices ', {method: 'POST',data:choices})
+
+export async function deleteQuestion(questionId) {
+    return await base(`questions/${questionId}`, {
+        method: "DELETE",
+    })
 }
-export async function saveTextQuestion(textQuestion){
-    return await base('text-question-configs ', {method: 'POST',data:textQuestion})
+
+export async function getQuestionsByLesson(lessonId) {
+    return await base(`questions?lessonId=${lessonId}`, {
+        method: "GET",
+    })
 }
-export async function saveDiagramQuestions(diagramQuestions){
-    return await base('diagram-question-configs', {method: 'POST',data:diagramQuestions})
+
+export async function getQuestions() {
+    return await base("questions", {
+        method: "GET",
+    })
 }
-export async function saveProgrammingQuestions(programmingQuestions){
-    return await base('programming-question-configs',{method:'POST',data: programmingQuestions})
+
+export async function saveChoices(choices) {
+    return await base("choices", {
+        method: "POST",
+        data: choices,
+    })
+}
+
+export async function saveTextQuestion(textQuestion) {
+    return await base("text-question-configs", {
+        method: "POST",
+        data: textQuestion,
+    })
+}
+
+export async function saveDiagramQuestion(diagramQuestion) {
+    return await base("diagram-question-configs", {
+        method: "POST",
+        data: diagramQuestion,
+    })
+}
+
+export async function saveProgrammingQuestion(programmingQuestion) {
+    return await base("programming-question-configs", {
+        method: "POST",
+        data: programmingQuestion,
+    })
 }

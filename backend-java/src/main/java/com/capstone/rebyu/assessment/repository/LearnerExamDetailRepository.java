@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface LearnerExamDetailRepository extends JpaRepository<LearnerExamDetail, Long> {
     List<LearnerExamDetail> findByLearner_LearnerIdAndExam_ExamIdAndAttemptNo(Long learnerId, Long examId, Integer attemptNo);
+
+    boolean existsByQuestion_QuestionId(Long questionId);
 }

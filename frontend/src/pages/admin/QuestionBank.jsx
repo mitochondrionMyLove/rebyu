@@ -1,6 +1,7 @@
 import React, {
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react"
 
@@ -13,10 +14,12 @@ import {
     ChevronsLeft,
     ChevronsRight,
     Code2,
+    Eye,
     FileQuestion,
     FileText,
     ListChecks,
     Maximize,
+    Pencil,
     Plus,
     Search,
     Trash2,
@@ -24,6 +27,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import {
     Dialog,
@@ -70,7 +74,16 @@ import BigDialog from "../../components/commons/dialog.jsx"
 import {
     extractDiagramData,
 } from "../../utils/diagram-graph.js"
-import {saveQuestions, saveDiagramQuestions, saveProgrammingQuestions, saveChoices, saveTextQuestion} from "../../services/questionService.js";
+import {
+    deleteQuestion,
+    getQuestions,
+    saveChoices,
+    saveDiagramQuestion,
+    saveProgrammingQuestion,
+    saveQuestion,
+    saveTextQuestion,
+    updateQuestion,
+} from "../../services/questionService.js"
 
 const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
@@ -80,6 +93,23 @@ const ALLOWED_IMAGE_TYPES = [
 ]
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+
+const ALL_FILTER_VALUE = "all"
+
+const PAGE_SIZE = 10
+
+const questionTypeLabels = {
+    MCQ: "Multiple Choice",
+    SHORT_ANSWER: "Short Answer",
+    DESCRIPTIVE: "Descriptive",
+    CRITICAL_THINKING: "Critical Thinking",
+}
+
+const difficultyLabels = {
+    easy: "Easy",
+    average: "Average",
+    hard: "Hard",
+}
 
 
 const questionTypes = [
@@ -229,6 +259,40 @@ function cloneQuestionData(data) {
     }
 
     return JSON.parse(JSON.stringify(data))
+}
+
+function scheduleIdleWork(callback, timeout = 500) {
+    if (
+        typeof window !== "undefined" &&
+        typeof window.requestIdleCallback === "function"
+    ) {
+        return {
+            type: "idle",
+            id: window.requestIdleCallback(callback, { timeout }),
+        }
+    }
+
+    return {
+        type: "timeout",
+        id: window.setTimeout(callback, timeout),
+    }
+}
+
+function cancelIdleWork(task) {
+    if (!task) {
+        return
+    }
+
+    if (
+        task.type === "idle" &&
+        typeof window !== "undefined" &&
+        typeof window.cancelIdleCallback === "function"
+    ) {
+        window.cancelIdleCallback(task.id)
+        return
+    }
+
+    clearTimeout(task.id)
 }
 
 function isBlank(value) {
@@ -1475,6 +1539,12 @@ function Diagram({
                      onDataChange,
                      errors = {},
                  }) {
+    const diagramTimerRef = useRef(null)
+
+    useEffect(() => {
+        return () => cancelIdleWork(diagramTimerRef.current)
+    }, [])
+
     function onFieldChange(path, value) {
         onDataChange((currentData) =>
             updateDataAtPath(currentData, path, value)
@@ -1482,33 +1552,32 @@ function Diagram({
     }
 
     function handleReferenceDiagramChange(xml) {
-        try {
-            const { nodes, edges } = extractDiagramData(xml)
+        cancelIdleWork(diagramTimerRef.current)
 
-            onDataChange((currentData) => ({
-                ...currentData,
-                referenceDiagramXml: xml,
-                referenceDiagramNodes: nodes,
-                referenceDiagramEdges: edges,
-            }))
-        } catch (error) {
-            console.error(
-                "Could not extract diagram nodes and connections:",
-                error
-            )
+        diagramTimerRef.current = scheduleIdleWork(() => {
+            try {
+                const { nodes, edges } = extractDiagramData(xml)
 
-            /*
-              Keep the XML so the admin's work is not lost.
-              Nodes and edges are hidden from this UI but remain
-              part of question.data for learner-answer comparison.
-            */
-            onDataChange((currentData) => ({
-                ...currentData,
-                referenceDiagramXml: xml,
-                referenceDiagramNodes: [],
-                referenceDiagramEdges: [],
-            }))
-        }
+                onDataChange((currentData) => ({
+                    ...currentData,
+                    referenceDiagramXml: xml,
+                    referenceDiagramNodes: nodes,
+                    referenceDiagramEdges: edges,
+                }))
+            } catch (error) {
+                console.error(
+                    "Could not extract diagram nodes and connections:",
+                    error
+                )
+
+                onDataChange((currentData) => ({
+                    ...currentData,
+                    referenceDiagramXml: xml,
+                    referenceDiagramNodes: [],
+                    referenceDiagramEdges: [],
+                }))
+            }
+        }, 600)
     }
 
     const diagramTypeLabel =
@@ -1807,11 +1876,92 @@ function getCertificationTitle(certification) {
     )
 }
 
+function getCertificationLessons(certification) {
+    if (!certification) {
+        return []
+    }
+
+    return (certification.majorCategory ?? []).flatMap(
+        (majorCategory, majorIndex) =>
+            (majorCategory.middleCategory ?? []).flatMap(
+                (middleCategory, middleIndex) =>
+                    (middleCategory.lessons ?? []).map(
+                        (lesson, lessonIndex) => ({
+                            id: String(
+                                lesson.lessonId ??
+                                lesson.id ??
+                                `${majorIndex}-${middleIndex}-${lessonIndex}`
+                            ),
+                            numericId:
+                                lesson.lessonId ?? lesson.id ?? null,
+                            name:
+                                lesson.name ??
+                                lesson.title ??
+                                "Untitled Lesson",
+                            majorCategoryTitle:
+                                majorCategory.title ??
+                                "Untitled Category",
+                            middleCategoryTitle:
+                                middleCategory.title ??
+                                "Untitled Category",
+                        })
+                    )
+            )
+    )
+}
+
+function getQuestionTypeLabel(questionType) {
+    return questionTypeLabels[questionType] ?? questionType ?? "Unknown"
+}
+
+function getDifficultyLabel(difficulty) {
+    return difficultyLabels[difficulty] ?? difficulty ?? "Unknown"
+}
+
+const QuestionCardWrapper = React.memo(function QuestionCardWrapper({
+    question,
+    index,
+    validationErrors,
+    onRemove,
+    onDataChange,
+}) {
+    const questionType = questionTypes.find(
+        (item) => item.id === question.typeId
+    )
+
+    if (!questionType) return null
+
+    const QuestionComponent = questionType.component
+
+    return (
+        <QuestionComponent
+            questionKey={question.id}
+            questionNumber={index + 1}
+            data={question.data}
+            errors={validationErrors[question.id] ?? {}}
+            onRemove={onRemove}
+            onDataChange={onDataChange}
+        />
+    )
+})
+
 function QuestionBank() {
     const [activeTab, setActiveTab] = useState("all-questions")
 
     const [filterCertificationId, setFilterCertificationId] =
         useState("")
+
+    const [filterLessonId, setFilterLessonId] = useState(ALL_FILTER_VALUE)
+
+    const [filterQuestionType, setFilterQuestionType] =
+        useState(ALL_FILTER_VALUE)
+
+    const [filterDifficulty, setFilterDifficulty] =
+        useState(ALL_FILTER_VALUE)
+
+    const [questionSearch, setQuestionSearch] = useState("")
+
+    const [questionPage, setQuestionPage] = useState(1)
 
     const [
         selectedCertificationId,
@@ -1829,12 +1979,23 @@ function QuestionBank() {
     const [validationErrors, setValidationErrors] =
         useState({})
 
+    const [isSavingQuestions, setIsSavingQuestions] =
+        useState(false)
+
     const [feedbackDialog, setFeedbackDialog] = useState({
         open: false,
         type: "success",
         title: "",
         description: "",
     })
+
+    const [questionDialog, setQuestionDialog] = useState({
+        open: false,
+        mode: "view",
+        question: null,
+    })
+
+    const [questionForm, setQuestionForm] = useState(null)
 
     const {
         data: certifications = [],
@@ -1843,6 +2004,16 @@ function QuestionBank() {
     } = useQuery({
         queryKey: ["certifications"],
         queryFn: getAllCertifications,
+    })
+
+    const {
+        data: allQuestions = [],
+        isPending: isQuestionsPending,
+        isError: isQuestionsError,
+        refetch: refetchQuestions,
+    } = useQuery({
+        queryKey: ["questions"],
+        queryFn: getQuestions,
     })
 
     const selectedCertification = useMemo(() => {
@@ -1860,6 +2031,103 @@ function QuestionBank() {
                 filterCertificationId
         )
     }, [certifications, filterCertificationId])
+
+    const filterLessons = useMemo(
+        () => getCertificationLessons(selectedFilterCertification),
+        [selectedFilterCertification]
+    )
+
+    const filterLessonMap = useMemo(
+        () =>
+            new Map(
+                filterLessons.map((lesson) => [
+                    String(lesson.numericId ?? lesson.id),
+                    lesson,
+                ])
+            ),
+        [filterLessons]
+    )
+
+    const filteredQuestions = useMemo(() => {
+        if (!selectedFilterCertification) {
+            return []
+        }
+
+        const allowedLessonIds = new Set(
+            filterLessons.map((lesson) =>
+                String(lesson.numericId ?? lesson.id)
+            )
+        )
+
+        const normalizedSearch = questionSearch.trim().toLowerCase()
+
+        return allQuestions.filter((question) => {
+            const questionLessonId = String(question.lessonId ?? "")
+
+            if (!allowedLessonIds.has(questionLessonId)) {
+                return false
+            }
+
+            if (
+                filterLessonId !== ALL_FILTER_VALUE &&
+                questionLessonId !== filterLessonId
+            ) {
+                return false
+            }
+
+            if (
+                filterQuestionType !== ALL_FILTER_VALUE &&
+                question.questionType !== filterQuestionType
+            ) {
+                return false
+            }
+
+            if (
+                filterDifficulty !== ALL_FILTER_VALUE &&
+                question.difficultyLevel !== filterDifficulty
+            ) {
+                return false
+            }
+
+            if (!normalizedSearch) {
+                return true
+            }
+
+            const lesson = filterLessonMap.get(questionLessonId)
+            const searchableText = [
+                question.questionText,
+                question.questionType,
+                question.difficultyLevel,
+                lesson?.name,
+                lesson?.majorCategoryTitle,
+                lesson?.middleCategoryTitle,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase()
+
+            return searchableText.includes(normalizedSearch)
+        })
+    }, [
+        allQuestions,
+        filterDifficulty,
+        filterLessonId,
+        filterLessonMap,
+        filterLessons,
+        filterQuestionType,
+        questionSearch,
+        selectedFilterCertification,
+    ])
+
+    const questionPageCount = Math.max(
+        1,
+        Math.ceil(filteredQuestions.length / PAGE_SIZE)
+    )
+
+    const paginatedQuestions = useMemo(() => {
+        const startIndex = (questionPage - 1) * PAGE_SIZE
+        return filteredQuestions.slice(startIndex, startIndex + PAGE_SIZE)
+    }, [filteredQuestions, questionPage])
 
     const normalizedLessonSearch = lessonSearch
         .trim()
@@ -1901,32 +2169,65 @@ function QuestionBank() {
 
     const hasMatchingLesson = visibleStructure.length > 0
 
+    const validationTimerRef = useRef(null)
+
     useEffect(() => {
-        setValidationErrors((currentErrors) => {
-            if (Object.keys(currentErrors).length === 0) {
-                return currentErrors
-            }
+        cancelIdleWork(validationTimerRef.current)
 
-            const nextErrors = {}
-
-            questions.forEach((question) => {
-                if (!currentErrors[question.id]) {
-                    return
+        validationTimerRef.current = scheduleIdleWork(() => {
+            setValidationErrors((currentErrors) => {
+                if (Object.keys(currentErrors).length === 0) {
+                    return currentErrors
                 }
 
-                const errors = validateQuestionData(
-                    question.typeId,
-                    question.data
-                )
+                const nextErrors = {}
 
-                if (Object.keys(errors).length > 0) {
-                    nextErrors[question.id] = errors
-                }
+                questions.forEach((question) => {
+                    if (!currentErrors[question.id]) {
+                        return
+                    }
+
+                    const errors = validateQuestionData(
+                        question.typeId,
+                        question.data
+                    )
+
+                    if (Object.keys(errors).length > 0) {
+                        nextErrors[question.id] = errors
+                    }
+                })
+
+                return nextErrors
             })
+        }, 350)
 
-            return nextErrors
-        })
+        return () => {
+            cancelIdleWork(validationTimerRef.current)
+        }
     }, [questions])
+
+    useEffect(() => {
+        setFilterLessonId(ALL_FILTER_VALUE)
+        setFilterQuestionType(ALL_FILTER_VALUE)
+        setFilterDifficulty(ALL_FILTER_VALUE)
+        setQuestionSearch("")
+        setQuestionPage(1)
+    }, [filterCertificationId])
+
+    useEffect(() => {
+        setQuestionPage(1)
+    }, [
+        filterDifficulty,
+        filterLessonId,
+        filterQuestionType,
+        questionSearch,
+    ])
+
+    useEffect(() => {
+        setQuestionPage((currentPage) =>
+            Math.min(currentPage, questionPageCount)
+        )
+    }, [questionPageCount])
 
     function showFeedbackDialog({
                                     type = "success",
@@ -1946,6 +2247,117 @@ function QuestionBank() {
             ...currentDialog,
             open: false,
         }))
+    }
+
+    function openQuestionDialog(question, mode) {
+        setQuestionDialog({
+            open: true,
+            mode,
+            question,
+        })
+        setQuestionForm({
+            questionId: question.questionId,
+            parentQuestionId: question.parentQuestionId ?? null,
+            questionType: question.questionType ?? "MCQ",
+            difficultyLevel: question.difficultyLevel ?? "average",
+            questionText: question.questionText ?? "",
+            imageKey: question.imageKey ?? null,
+            lessonId: String(question.lessonId ?? ""),
+            totalPoints: question.totalPoints ?? 1,
+        })
+    }
+
+    function closeQuestionDialog() {
+        setQuestionDialog((currentDialog) => ({
+            ...currentDialog,
+            open: false,
+        }))
+    }
+
+    function setQuestionFormField(field, value) {
+        setQuestionForm((currentForm) => ({
+            ...currentForm,
+            [field]: value,
+        }))
+    }
+
+    async function handleUpdateSavedQuestion() {
+        if (!questionForm?.questionId) {
+            return
+        }
+
+        if (isBlank(questionForm.questionText)) {
+            showFeedbackDialog({
+                type: "warning",
+                title: "Question Required",
+                description: "Enter a question prompt before saving.",
+            })
+            return
+        }
+
+        if (!questionForm.lessonId) {
+            showFeedbackDialog({
+                type: "warning",
+                title: "Lesson Required",
+                description: "Select a lesson before saving.",
+            })
+            return
+        }
+
+        try {
+            await updateQuestion(questionForm.questionId, {
+                parentQuestionId: questionForm.parentQuestionId,
+                questionType: questionForm.questionType,
+                difficultyLevel: questionForm.difficultyLevel,
+                questionText: questionForm.questionText,
+                imageKey: questionForm.imageKey,
+                lessonId: Number(questionForm.lessonId),
+                totalPoints: Number(questionForm.totalPoints || 1),
+            })
+            await refetchQuestions()
+            closeQuestionDialog()
+            showFeedbackDialog({
+                type: "success",
+                title: "Question Updated",
+                description: "The question details were saved.",
+            })
+        } catch (error) {
+            showFeedbackDialog({
+                type: "warning",
+                title: "Update Failed",
+                description:
+                    error.response?.data?.message ??
+                    "The question could not be updated. Please try again.",
+            })
+        }
+    }
+
+    async function handleDeleteSavedQuestion(question) {
+        const confirmed = window.confirm(
+            "Delete this question? This action cannot be undone."
+        )
+
+        if (!confirmed) {
+            return
+        }
+
+        try {
+            await deleteQuestion(question.questionId)
+            await refetchQuestions()
+            showFeedbackDialog({
+                type: "success",
+                title: "Question Deleted",
+                description: "The question was removed from the bank.",
+            })
+        } catch (error) {
+            showFeedbackDialog({
+                type: "warning",
+                title: "Delete Failed",
+                description:
+                    error.response?.data?.message ??
+                    "The question could not be deleted. It may already be used by an exam or learner answer.",
+            })
+        }
     }
 
     function handleBuilderCertificationChange(value) {
@@ -2051,104 +2463,143 @@ function QuestionBank() {
         })
     }
 
-    const submitQuestions = () => {
-        console.log(selectedLesson)
-        console.log(questions)
-
-        questions.map((question) =>{
+    const submitQuestions = async () => {
+        for (const question of questions) {
             switch (question.typeId) {
-                case 'MCQ':
-                    const savedMCQ = saveQuestions({
-                        questionType: question.typeId,
-                        difficultyLevel: question.difficultyLevel,
-                        questionText: question.question,
-                        imageKey: ''+image,
-                        lessonId: selectedLesson.lessonId,
-                        choices: [
-                            question.choices.map((choice) => {
-                                return {
-                                    questionId: savedMCQ.questionId,
-                                    choiceText: choice.choiceText,
-                                    imageKey: ''+choice.image,
-                                    correct: choice.isCorrect,
-                                    explanation: choice.explanation,
-                                }
-                            })
-                        ]
+                case 'MCQ': {
+                    const savedMCQ = await saveQuestion({
+                        questionType: question.data.questionType,
+                        difficultyLevel: question.data.difficulty,
+                        questionText: question.data.question,
+                        imageKey: null,
+                        lessonId: Number(selectedLesson.id),
+                        totalPoints: 1,
                     })
 
-
-                    break;
-                case 'SHORT_ANSWER':
-                    const savedShortAnswer = saveQuestions({
-                        questionType: question.typeId,
-                        difficultyLevel: question.difficultyLevel,
-                        questionText: question.question,
-                        imageKey: ''+image,
-                        lessonId: selectedLesson.lessonId,
+                    for (const choice of question.data.choices) {
+                        await saveChoices({
+                            questionId: savedMCQ.questionId,
+                            choiceText: choice.choiceText,
+                            imageKey: null,
+                            correct: choice.isCorrect,
+                            explanation: choice.explanation,
+                        })
+                    }
+                    break
+                }
+                case 'SHORT_ANSWER': {
+                    const savedShortAnswer = await saveQuestion({
+                        questionType: question.data.questionType,
+                        difficultyLevel: question.data.difficulty,
+                        questionText: question.data.question,
+                        imageKey: null,
+                        lessonId: Number(selectedLesson.id),
+                        totalPoints: 1,
                     })
-                    const textQuestionConfigShort = saveTextQuestion({
+                    await saveTextQuestion({
                         questionId: savedShortAnswer.questionId,
-                        correctAnswer: question.correctAnswer,
-                        checkingMethod: question.checkingMethod,
+                        correctAnswer: question.data.correctAnswer,
+                        checkingMethod: question.data.checkingMethod,
                     })
-
-                    break;
-                case 'DESCRIPTIVE':
-                    const savedDescriptive = saveQuestions({
-                        questionType: question.typeId,
-                        difficultyLevel: question.difficultyLevel,
-                        questionText: question.question,
-                        imageKey: ''+image,
-                        lessonId: selectedLesson.lessonId,
+                    break
+                }
+                case 'DESCRIPTIVE': {
+                    const savedDescriptive = await saveQuestion({
+                        questionType: question.data.questionType,
+                        difficultyLevel: question.data.difficulty,
+                        questionText: question.data.question,
+                        imageKey: null,
+                        lessonId: Number(selectedLesson.id),
+                        totalPoints: 1,
                     })
-                    const textQuestionConfigDescriptive = saveTextQuestion({
-                        questionId: savedShortAnswer.questionId,
-                        correctAnswer: question.rubricBasedAnswer,
-                        checkingMethod: question.checkingMethod,
+                    await saveTextQuestion({
+                        questionId: savedDescriptive.questionId,
+                        correctAnswer: question.data.rubricBasedAnswer,
+                        checkingMethod: question.data.checkingMethod,
                     })
-
-                    break;
-                case 'PROGRAMMING':
-                    const savedProgramming = saveQuestions({
-                        questionType: question.criticalThinkingType,
-                        difficultyLevel: question.difficultyLevel,
-                        questionText: question.question,
-                        imageKey: ''+image,
-                        lessonId: selectedLesson.lessonId,
+                    break
+                }
+                case 'PROGRAMMING': {
+                    const savedProgramming = await saveQuestion({
+                        questionType: question.data.questionType,
+                        difficultyLevel: question.data.difficulty,
+                        questionText: question.data.question,
+                        imageKey: null,
+                        lessonId: Number(selectedLesson.id),
+                        totalPoints: 1,
                     })
-                    const programmingConfig = saveProgrammingQuestions({
+                    await saveProgrammingQuestion({
                         questionId: savedProgramming.questionId,
-                        starterCode: question.starterCode,
-                        testCases: [
-                            question.testCases.map((testCase) => {
-                                return {
-                                    inputData: testCase.inputData,
-                                    expectedOutput: testCase.expectedOutput,
-                                }
-                            }),
-                        ]
+                        starterCode: question.data.starterCode,
+                        testCases: question.data.testCases.map((testCase) => ({
+                            inputData: testCase.inputData,
+                            expectedOutput: testCase.expectedOutput,
+                        })),
                     })
 
-                    question.subQuestions.map(subQuestion => {
-                        const subQuestions = saveQuestions({
-                            parentQuestionId: savedProgramming.id,
+                    for (const subQuestion of (question.data.subQuestions ?? [])) {
+                        const savedSub = await saveQuestion({
+                            parentQuestionId: savedProgramming.questionId,
+                            questionType: question.data.questionType,
+                            difficultyLevel: question.data.difficulty,
                             questionText: subQuestion.question,
+                            lessonId: Number(selectedLesson.id),
+                            totalPoints: 1,
                         })
-                        saveTextQuestion({
-                            questionId: subQuestions.questionId,
-                            correctAnswer: question.rubricBasedAnswer,
+                        await saveTextQuestion({
+                            questionId: savedSub.questionId,
+                            correctAnswer: subQuestion.correctAnswer,
+                            checkingMethod: 'AI_SEMANTIC',
                         })
+                    }
+                    break
+                }
+                case 'DIAGRAM': {
+                    const savedDiagram = await saveQuestion({
+                        questionType: question.data.questionType,
+                        difficultyLevel: question.data.difficulty,
+                        questionText: question.data.question,
+                        imageKey: null,
+                        lessonId: Number(selectedLesson.id),
+                        totalPoints: 1,
                     })
-                    break;
-                case 'DIAGRAM':
+                    await saveDiagramQuestion({
+                        questionId: savedDiagram.questionId,
+                        diagramType: question.data.diagramType,
+                        instructions: question.data.instructions,
+                        referenceDiagramXml: question.data.referenceDiagramXml,
+                        referenceDiagramJson: JSON.stringify({
+                            nodes: question.data.referenceDiagramNodes,
+                            edges: question.data.referenceDiagramEdges,
+                        }),
+                    })
 
-                    break;
+                    for (const subQuestion of (question.data.subQuestions ?? [])) {
+                        const savedSub = await saveQuestion({
+                            parentQuestionId: savedDiagram.questionId,
+                            questionType: question.data.questionType,
+                            difficultyLevel: question.data.difficulty,
+                            questionText: subQuestion.question,
+                            lessonId: Number(selectedLesson.id),
+                            totalPoints: 1,
+                        })
+                        await saveTextQuestion({
+                            questionId: savedSub.questionId,
+                            correctAnswer: subQuestion.correctAnswer,
+                            checkingMethod: 'AI_SEMANTIC',
+                        })
+                    }
+                    break
+                }
             }
-        })
+        }
     }
 
-    function handleSave() {
+    async function handleSave() {
+        if (isSavingQuestions) {
+            return
+        }
+
         const nextValidationErrors = {}
 
         questions.forEach((question) => {
@@ -2177,15 +2628,29 @@ function QuestionBank() {
             return
         }
 
-        submitQuestions()
-
-        showFeedbackDialog({
-            type: "success",
-            title: "Questions Ready",
-            description: `${questions.length} question${
-                questions.length === 1 ? "" : "s"
-            } passed validation and are ready to submit.`,
-        })
+        try {
+            setIsSavingQuestions(true)
+            await submitQuestions()
+            const savedCount = questions.length
+            await refetchQuestions()
+            setQuestions([])
+            setValidationErrors({})
+            showFeedbackDialog({
+                type: "success",
+                title: "Questions Saved",
+                description: `${savedCount} question${
+                    savedCount === 1 ? "" : "s"
+                } saved successfully.`,
+            })
+        } catch (error) {
+            showFeedbackDialog({
+                type: "warning",
+                title: "Save Failed",
+                description: "An error occurred while saving the questions. Please try again.",
+            })
+        } finally {
+            setIsSavingQuestions(false)
+        }
     }
 
     return (
@@ -2233,11 +2698,13 @@ function QuestionBank() {
                                 type="button"
                                 size="sm"
                                 disabled={
-                                    !selectedLesson || questions.length === 0
+                                    isSavingQuestions ||
+                                    !selectedLesson ||
+                                    questions.length === 0
                                 }
                                 onClick={handleSave}
                             >
-                                Save
+                                {isSavingQuestions ? "Saving..." : "Save"}
                             </Button>
                         </div>
                     )}
@@ -2266,9 +2733,17 @@ function QuestionBank() {
                                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
                                         <Input
+                                            value={questionSearch}
+                                            onChange={(event) =>
+                                                setQuestionSearch(
+                                                    event.target.value
+                                                )
+                                            }
                                             placeholder="Search questions..."
                                             className="pl-9"
-                                            disabled
+                                            disabled={
+                                                !selectedFilterCertification
+                                            }
                                         />
                                     </div>
 
@@ -2310,38 +2785,100 @@ function QuestionBank() {
                                         </SelectContent>
                                     </Select>
 
-                                    <Select disabled>
+                                    <Select
+                                        value={filterLessonId}
+                                        onValueChange={setFilterLessonId}
+                                        disabled={
+                                            !selectedFilterCertification ||
+                                            filterLessons.length === 0
+                                        }
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select lesson" />
                                         </SelectTrigger>
 
                                         <SelectContent>
-                                            <SelectItem value="sample-lesson">
-                                                Sample Lesson
+                                            <SelectItem value={ALL_FILTER_VALUE}>
+                                                All lessons
                                             </SelectItem>
+
+                                            {filterLessons.map((lesson) => (
+                                                <SelectItem
+                                                    key={lesson.id}
+                                                    value={String(
+                                                        lesson.numericId ??
+                                                        lesson.id
+                                                    )}
+                                                    title={lesson.name}
+                                                >
+                                                    <span className="block truncate">
+                                                        {lesson.name}
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
 
-                                    <Select disabled>
+                                    <Select
+                                        value={filterQuestionType}
+                                        onValueChange={setFilterQuestionType}
+                                        disabled={
+                                            !selectedFilterCertification
+                                        }
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Question type" />
                                         </SelectTrigger>
 
                                         <SelectContent>
-                                            <SelectItem value="mcq">
+                                            <SelectItem value={ALL_FILTER_VALUE}>
+                                                All types
+                                            </SelectItem>
+
+                                            <SelectItem value="MCQ">
                                                 Multiple Choice
+                                            </SelectItem>
+
+                                            <SelectItem value="SHORT_ANSWER">
+                                                Short Answer
+                                            </SelectItem>
+
+                                            <SelectItem value="DESCRIPTIVE">
+                                                Descriptive
+                                            </SelectItem>
+
+                                            <SelectItem value="CRITICAL_THINKING">
+                                                Critical Thinking
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
 
-                                    <Select disabled>
+                                    <Select
+                                        value={filterDifficulty}
+                                        onValueChange={setFilterDifficulty}
+                                        disabled={
+                                            !selectedFilterCertification
+                                        }
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Difficulty" />
                                         </SelectTrigger>
 
                                         <SelectContent>
+                                            <SelectItem value={ALL_FILTER_VALUE}>
+                                                All difficulties
+                                            </SelectItem>
+
                                             <SelectItem value="easy">
                                                 Easy
+                                            </SelectItem>
+
+                                            <SelectItem value="average">
+                                                Average
+                                            </SelectItem>
+
+                                            <SelectItem value="hard">
+                                                Hard
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -2371,32 +2908,161 @@ function QuestionBank() {
                                     </TableHeader>
 
                                     <TableBody>
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={7}
-                                                className="h-[390px]"
-                                            >
-                                                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                                                        <FileQuestion className="h-5 w-5 text-muted-foreground" />
+                                        {!selectedFilterCertification ||
+                                        isQuestionsPending ||
+                                        isQuestionsError ||
+                                        paginatedQuestions.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={7}
+                                                    className="h-[390px]"
+                                                >
+                                                    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                                                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                                                            <FileQuestion className="h-5 w-5 text-muted-foreground" />
+                                                        </div>
+
+                                                        <h3 className="mt-4 font-heading text-base font-bold text-foreground">
+                                                            {isQuestionsError
+                                                                ? "Questions could not be loaded"
+                                                                : isQuestionsPending
+                                                                    ? "Loading questions"
+                                                                    : selectedFilterCertification
+                                                                        ? "No questions found"
+                                                                        : "Select a certification"}
+                                                        </h3>
+
+                                                        <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+                                                            {isQuestionsError
+                                                                ? "Check the API connection and try again."
+                                                                : isQuestionsPending
+                                                                    ? "Fetching the latest question bank records."
+                                                                    : selectedFilterCertification
+                                                                        ? "Try a different lesson, type, difficulty, or search term."
+                                                                        : "Choose a certification above to view its questions."}
+                                                        </p>
                                                     </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            paginatedQuestions.map(
+                                                (question) => {
+                                                    const lesson =
+                                                        filterLessonMap.get(
+                                                            String(
+                                                                question.lessonId ??
+                                                                ""
+                                                            )
+                                                        )
 
-                                                    <h3 className="mt-4 font-heading text-base font-bold text-foreground">
-                                                        {selectedFilterCertification
-                                                            ? "No questions found"
-                                                            : "Select a certification"}
-                                                    </h3>
+                                                    return (
+                                                        <TableRow
+                                                            key={
+                                                                question.questionId
+                                                            }
+                                                        >
+                                                            <TableCell className="max-w-[360px]">
+                                                                <p
+                                                                    className="line-clamp-2 font-medium text-foreground"
+                                                                    title={
+                                                                        question.questionText
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        question.questionText
+                                                                    }
+                                                                </p>
+                                                            </TableCell>
 
-                                                    <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-                                                        {selectedFilterCertification
-                                                            ? `Questions for ${getCertificationTitle(
-                                                                selectedFilterCertification
-                                                            )} will appear here.`
-                                                            : "Choose a certification above to view its questions."}
-                                                    </p>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
+                                                            <TableCell>
+                                                                <Badge variant="secondary">
+                                                                    {getQuestionTypeLabel(
+                                                                        question.questionType
+                                                                    )}
+                                                                </Badge>
+                                                            </TableCell>
+
+                                                            <TableCell className="max-w-[220px]">
+                                                                <p
+                                                                    className="truncate text-sm text-foreground"
+                                                                    title={
+                                                                        lesson?.name
+                                                                    }
+                                                                >
+                                                                    {lesson?.name ??
+                                                                        "Unknown lesson"}
+                                                                </p>
+                                                            </TableCell>
+
+                                                            <TableCell>
+                                                                {getDifficultyLabel(
+                                                                    question.difficultyLevel
+                                                                )}
+                                                            </TableCell>
+
+                                                            <TableCell>
+                                                                <Badge variant="outline">
+                                                                    Saved
+                                                                </Badge>
+                                                            </TableCell>
+
+                                                            <TableCell className="text-muted-foreground">
+                                                                -
+                                                            </TableCell>
+
+                                                            <TableCell>
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        aria-label="View question"
+                                                                        onClick={() =>
+                                                                            openQuestionDialog(
+                                                                                question,
+                                                                                "view"
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Eye className="h-4 w-4" />
+                                                                    </Button>
+
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        aria-label="Edit question"
+                                                                        onClick={() =>
+                                                                            openQuestionDialog(
+                                                                                question,
+                                                                                "edit"
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" />
+                                                                    </Button>
+
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        aria-label="Delete question"
+                                                                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                                        onClick={() =>
+                                                                            handleDeleteSavedQuestion(
+                                                                                question
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                }
+                                            )
+                                        )}
                                     </TableBody>
                                 </Table>
                             </div>
@@ -2406,7 +3072,11 @@ function QuestionBank() {
                             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                                 <p className="min-w-0 truncate text-sm text-muted-foreground">
                                     {selectedFilterCertification
-                                        ? `No questions found for ${getCertificationTitle(
+                                        ? `${filteredQuestions.length} question${
+                                            filteredQuestions.length === 1
+                                                ? ""
+                                                : "s"
+                                        } for ${getCertificationTitle(
                                             selectedFilterCertification
                                         )}`
                                         : "No certification selected"}
@@ -2418,7 +3088,8 @@ function QuestionBank() {
                                         variant="outline"
                                         size="icon"
                                         aria-label="First page"
-                                        disabled
+                                        disabled={questionPage === 1}
+                                        onClick={() => setQuestionPage(1)}
                                     >
                                         <ChevronsLeft className="h-4 w-4" />
                                     </Button>
@@ -2428,7 +3099,12 @@ function QuestionBank() {
                                         variant="outline"
                                         size="icon"
                                         aria-label="Previous page"
-                                        disabled
+                                        disabled={questionPage === 1}
+                                        onClick={() =>
+                                            setQuestionPage((currentPage) =>
+                                                Math.max(1, currentPage - 1)
+                                            )
+                                        }
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                     </Button>
@@ -2439,7 +3115,7 @@ function QuestionBank() {
                                         size="sm"
                                         disabled
                                     >
-                                        1
+                                        {questionPage} / {questionPageCount}
                                     </Button>
 
                                     <Button
@@ -2447,7 +3123,17 @@ function QuestionBank() {
                                         variant="outline"
                                         size="icon"
                                         aria-label="Next page"
-                                        disabled
+                                        disabled={
+                                            questionPage >= questionPageCount
+                                        }
+                                        onClick={() =>
+                                            setQuestionPage((currentPage) =>
+                                                Math.min(
+                                                    questionPageCount,
+                                                    currentPage + 1
+                                                )
+                                            )
+                                        }
                                     >
                                         <ChevronRight className="h-4 w-4" />
                                     </Button>
@@ -2457,7 +3143,12 @@ function QuestionBank() {
                                         variant="outline"
                                         size="icon"
                                         aria-label="Last page"
-                                        disabled
+                                        disabled={
+                                            questionPage >= questionPageCount
+                                        }
+                                        onClick={() =>
+                                            setQuestionPage(questionPageCount)
+                                        }
                                     >
                                         <ChevronsRight className="h-4 w-4" />
                                     </Button>
@@ -2722,35 +3413,20 @@ function QuestionBank() {
                                             />
                                         ) : (
                                             questions.map((question, index) => {
-                                                const questionType = questionTypes.find(
-                                                    (item) => item.id === question.typeId
-                                                )
-
-                                                if (!questionType) {
-                                                    return null
+                                                function handleRemove() {
+                                                    removeQuestion(question.id)
                                                 }
-
-                                                const QuestionComponent =
-                                                    questionType.component
-
+                                                function handleDataChange(updater) {
+                                                    updateQuestionData(question.id, updater)
+                                                }
                                                 return (
-                                                    <QuestionComponent
+                                                    <QuestionCardWrapper
                                                         key={question.id}
-                                                        questionKey={question.id}
-                                                        questionNumber={index + 1}
-                                                        data={question.data}
-                                                        errors={
-                                                            validationErrors[question.id] ?? {}
-                                                        }
-                                                        onRemove={() =>
-                                                            removeQuestion(question.id)
-                                                        }
-                                                        onDataChange={(updater) =>
-                                                            updateQuestionData(
-                                                                question.id,
-                                                                updater
-                                                            )
-                                                        }
+                                                        question={question}
+                                                        index={index}
+                                                        validationErrors={validationErrors}
+                                                        onRemove={handleRemove}
+                                                        onDataChange={handleDataChange}
                                                     />
                                                 )
                                             })
@@ -2789,6 +3465,209 @@ function QuestionBank() {
                     </div>
                 </TabsContent>
             </Tabs>
+
+            <Dialog
+                open={questionDialog.open}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeQuestionDialog()
+                    }
+                }}
+            >
+                <DialogContent className="max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] max-w-none overflow-y-auto sm:w-[calc(100vw-4rem)] lg:w-[min(1180px,calc(100vw-4rem))]">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {questionDialog.mode === "edit"
+                                ? "Edit Question"
+                                : "View Question"}
+                        </DialogTitle>
+
+                        <DialogDescription>
+                            {questionDialog.mode === "edit"
+                                ? "Update the saved question details."
+                                : "Review the saved question details."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {questionForm && (
+                        <div className="space-y-5">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Question Type</Label>
+
+                                    <Select
+                                        value={questionForm.questionType}
+                                        disabled
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+
+                                        <SelectContent>
+                                            <SelectItem value="MCQ">
+                                                Multiple Choice
+                                            </SelectItem>
+                                            <SelectItem value="SHORT_ANSWER">
+                                                Short Answer
+                                            </SelectItem>
+                                            <SelectItem value="DESCRIPTIVE">
+                                                Descriptive
+                                            </SelectItem>
+                                            <SelectItem value="CRITICAL_THINKING">
+                                                Critical Thinking
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Difficulty</Label>
+
+                                    <Select
+                                        value={questionForm.difficultyLevel}
+                                        onValueChange={(value) =>
+                                            setQuestionFormField(
+                                                "difficultyLevel",
+                                                value
+                                            )
+                                        }
+                                        disabled={
+                                            questionDialog.mode !== "edit"
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+
+                                        <SelectContent>
+                                            <SelectItem value="easy">
+                                                Easy
+                                            </SelectItem>
+                                            <SelectItem value="average">
+                                                Average
+                                            </SelectItem>
+                                            <SelectItem value="hard">
+                                                Hard
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Question Prompt</Label>
+
+                                <Textarea
+                                    value={questionForm.questionText}
+                                    onChange={(event) =>
+                                        setQuestionFormField(
+                                            "questionText",
+                                            event.target.value
+                                        )
+                                    }
+                                    readOnly={questionDialog.mode !== "edit"}
+                                    className="min-h-32"
+                                />
+                            </div>
+
+                            <div className="grid gap-4">
+                                <div className="space-y-2">
+                                    <Label>Lesson</Label>
+
+                                    <Select
+                                        value={questionForm.lessonId}
+                                        onValueChange={(value) =>
+                                            setQuestionFormField(
+                                                "lessonId",
+                                                value
+                                            )
+                                        }
+                                        disabled={
+                                            questionDialog.mode !== "edit"
+                                        }
+                                    >
+                                        <SelectTrigger className="min-w-0 [&>span]:truncate">
+                                            <SelectValue placeholder="Select lesson" />
+                                        </SelectTrigger>
+
+                                        <SelectContent>
+                                            {filterLessons.map((lesson) => (
+                                                <SelectItem
+                                                    key={lesson.id}
+                                                    value={String(
+                                                        lesson.numericId ??
+                                                        lesson.id
+                                                    )}
+                                                    title={lesson.name}
+                                                >
+                                                    <span className="block truncate">
+                                                        {lesson.name}
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {questionDialog.question?.choices?.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label>Choices</Label>
+
+                                    <div className="space-y-2 rounded-lg border border-border p-3">
+                                        {questionDialog.question.choices.map(
+                                            (choice, index) => (
+                                                <div
+                                                    key={
+                                                        choice.choiceId ??
+                                                        index
+                                                    }
+                                                    className="flex gap-2 text-sm"
+                                                >
+                                                    <Badge
+                                                        variant={
+                                                            choice.correct
+                                                                ? "default"
+                                                                : "outline"
+                                                        }
+                                                    >
+                                                        {String.fromCharCode(
+                                                            65 + index
+                                                        )}
+                                                    </Badge>
+
+                                                    <p className="min-w-0 flex-1">
+                                                        {choice.choiceText}
+                                                    </p>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end gap-2 border-t border-border pt-4">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeQuestionDialog}
+                                >
+                                    Close
+                                </Button>
+
+                                {questionDialog.mode === "edit" && (
+                                    <Button
+                                        type="button"
+                                        onClick={handleUpdateSavedQuestion}
+                                    >
+                                        Save Changes
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <FeedbackDialog
                 open={feedbackDialog.open}

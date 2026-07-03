@@ -8,11 +8,15 @@ import {
   ChevronRight,
   ClipboardPlus,
   Layers3,
+  Pencil,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getFileViewUrl } from "@/services/fileService.js"
+import CertificationFormDrawer from "@/components/certifications/certification-form-drawer"
+import { useQueryClient } from "@tanstack/react-query"
+
 
 function getCertification(location) {
   return (
@@ -30,6 +34,12 @@ function ViewCertificationAdmin() {
   const location = useLocation()
   const navigate = useNavigate()
   const pageRef = useRef(null)
+  const queryClient = useQueryClient()
+  const [certification, setCertification] = useState(() =>
+      getCertification(location)
+  )
+
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
 
   useEffect(() => {
     pageRef.current?.scrollIntoView({
@@ -44,7 +54,24 @@ function ViewCertificationAdmin() {
     })
   }, [location.key])
 
-  const certification = getCertification(location)
+  useEffect(() => {
+    setCertification(getCertification(location))
+  }, [location.key])
+
+  async function handleCertificationSaved(updatedCertification) {
+    setCertification((currentCertification) => ({
+      ...currentCertification,
+      ...updatedCertification,
+
+      majorCategory:
+          updatedCertification.majorCategory ??
+          currentCertification?.majorCategory ??
+          [],
+    }))
+    await queryClient.invalidateQueries({
+      queryKey: ["admin-certifications"],
+    })
+  }
 
   if (!certification) {
     return (
@@ -144,7 +171,9 @@ function ViewCertificationAdmin() {
 
                 <span>
                 {majorCategories.length} major{" "}
-                  {majorCategories.length === 1 ? "category" : "categories"}
+                  {majorCategories.length === 1
+                      ? "category"
+                      : "categories"}
               </span>
               </div>
 
@@ -177,14 +206,34 @@ function ViewCertificationAdmin() {
                 </p>
               </div>
 
-              <Button
-                  type="button"
-                  onClick={handleAddMockExam}
-                  className="h-11 rounded-xl px-5 font-medium shadow-sm"
-              >
-                <ClipboardPlus className="mr-2 h-4 w-4" />
-                Add Mock Exam
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                    type="button"
+                    onClick={handleAddMockExam}
+                    className="h-11 rounded-xl px-5 font-medium shadow-sm"
+                >
+                  <ClipboardPlus className="mr-2 h-4 w-4" />
+                  Add Mock Exam
+                </Button>
+
+                <CertificationFormDrawer
+                    mode="edit"
+                    certification={certification}
+                    open={isEditDrawerOpen}
+                    onOpenChange={setIsEditDrawerOpen}
+                    onSaved={handleCertificationSaved}
+                    trigger={
+                      <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 rounded-xl px-5 font-medium shadow-sm"
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit Certification
+                      </Button>
+                    }
+                />
+              </div>
             </div>
 
             {majorCategories.length === 0 ? (
@@ -286,6 +335,9 @@ function MiddleCategoryCard({
       state: {
         lessonId: lesson.lessonId,
         lessonName,
+        certification,
+        majorCategory,
+        middleCategory,
       },
     })
   }
@@ -293,7 +345,7 @@ function MiddleCategoryCard({
   function handleCreateQuiz(event) {
     event.stopPropagation()
 
-    alert('testing')
+    alert("Quiz creation is still in progress.")
   }
 
   return (
@@ -361,7 +413,9 @@ function MiddleCategoryCard({
 
                           <button
                               type="button"
-                              onClick={(event) => handleCreateLesson(event, lesson)}
+                              onClick={(event) =>
+                                  handleCreateLesson(event, lesson)
+                              }
                               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary transition hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               title="Create lesson content"
                               aria-label={`Create lesson content for ${getLessonTitle(

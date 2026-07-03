@@ -16,7 +16,11 @@ public class QuestionController {
     private final QuestionService questionService;
 
     @GetMapping
-    public List<QuestionDto> getAll() {
+    public List<QuestionDto> getAll(@RequestParam(required = false) Long lessonId) {
+        if (lessonId != null) {
+            return questionService.getByLessonId(lessonId);
+        }
+
         return questionService.getAll();
     }
 

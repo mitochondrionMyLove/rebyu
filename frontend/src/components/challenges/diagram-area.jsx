@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { LoaderCircle } from "lucide-react"
 import { DrawIoEmbed } from "react-drawio"
 
@@ -31,6 +31,8 @@ export default function DiagramArea({
                                         onChange,
                                     }) {
     const [isLoading, setIsLoading] = useState(true)
+    const onChangeRef = useRef(onChange)
+    const autosaveTimerRef = useRef(null)
 
     /*
       Prevents Draw.io from reloading every time
@@ -46,7 +48,19 @@ export default function DiagramArea({
         startingXmlRef.current
     )
 
-    function handleAutoSave(data) {
+    useEffect(() => {
+        onChangeRef.current = onChange
+    }, [onChange])
+
+    useEffect(() => {
+        return () => {
+            if (autosaveTimerRef.current) {
+                clearTimeout(autosaveTimerRef.current)
+            }
+        }
+    }, [])
+
+    const handleAutoSave = useCallback((data) => {
         const nextXml =
             typeof data?.xml === "string"
                 ? data.xml
@@ -57,8 +71,15 @@ export default function DiagramArea({
         }
 
         lastSavedXmlRef.current = nextXml
-        onChange?.(nextXml)
-    }
+
+        if (autosaveTimerRef.current) {
+            clearTimeout(autosaveTimerRef.current)
+        }
+
+        autosaveTimerRef.current = setTimeout(() => {
+            onChangeRef.current?.(lastSavedXmlRef.current)
+        }, 750)
+    }, [])
 
     return (
         <div className="relative h-full w-full overflow-hidden bg-white">

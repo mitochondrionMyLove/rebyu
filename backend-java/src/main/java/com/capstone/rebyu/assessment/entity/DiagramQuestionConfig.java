@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "diagram_question_configs")
@@ -30,6 +32,7 @@ public class DiagramQuestionConfig {
     @Column(name = "reference_diagram_xml", nullable = false, columnDefinition = "TEXT")
     private String referenceDiagramXml;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "reference_diagram_json", nullable = false, columnDefinition = "JSONB")
     private String referenceDiagramJson;
 }
