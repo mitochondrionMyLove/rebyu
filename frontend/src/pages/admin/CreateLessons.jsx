@@ -5,6 +5,7 @@ import {
   AlignLeft,
   ArrowLeft,
   BetweenHorizontalEnd,
+  CheckCircle2,
   CircleAlert,
   FilePlay,
   FlipHorizontal,
@@ -22,15 +23,12 @@ import {
 } from "lucide-react"
 
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -254,6 +252,61 @@ function SectionToolsRail({ isLoadingLesson, onAddTool }) {
             />
         ))}
       </div>
+  )
+}
+
+function LessonFeedbackDialog({
+                                open,
+                                type = "success",
+                                title,
+                                description,
+                                onClose,
+                              }) {
+  const isSuccess = type === "success"
+
+  return (
+      <Dialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              onClose()
+            }
+          }}
+      >
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-2xl p-5 sm:p-6">
+          <DialogHeader>
+            <div
+                className={`mb-2 flex h-11 w-11 items-center justify-center rounded-xl ${
+                    isSuccess
+                        ? "bg-primary/10 text-primary"
+                        : "bg-destructive/10 text-destructive"
+                }`}
+            >
+              {isSuccess ? (
+                  <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                  <CircleAlert className="h-5 w-5" />
+              )}
+            </div>
+
+            <DialogTitle className="pr-8 text-lg">{title}</DialogTitle>
+
+            <DialogDescription className="leading-6">
+              {description}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-end pt-2">
+            <Button
+                type="button"
+                onClick={onClose}
+                className="min-w-20 rounded-lg"
+            >
+              Okay
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
   )
 }
 
@@ -866,82 +919,29 @@ function CreateLessons() {
             </div>
           </header>
 
-          <AlertDialog
+          <LessonFeedbackDialog
               open={isSuccessDialogOpen}
-              onOpenChange={setIsSuccessDialogOpen}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Lesson saved</AlertDialogTitle>
+              type="success"
+              title="Lesson Saved"
+              description={`${lessonName} was saved successfully.`}
+              onClose={() => setIsSuccessDialogOpen(false)}
+          />
 
-                <AlertDialogDescription>
-                  {lessonName} was saved successfully.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-
-              <AlertDialogFooter>
-                <AlertDialogAction onClick={() => navigate(-1)}>
-                  Done
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <AlertDialog
+          <LessonFeedbackDialog
               open={Boolean(validationError)}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setValidationError("")
-                }
-              }}
-          >
-            <AlertDialogContent size="sm">
-              <AlertDialogHeader>
-                <AlertDialogMedia className="bg-destructive/10 text-destructive">
-                  <CircleAlert />
-                </AlertDialogMedia>
+              type="error"
+              title="Cannot Save Lesson"
+              description={validationError}
+              onClose={() => setValidationError("")}
+          />
 
-                <AlertDialogTitle>Cannot save lesson</AlertDialogTitle>
-
-                <AlertDialogDescription>
-                  {validationError}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-
-              <AlertDialogFooter>
-                <AlertDialogAction onClick={() => setValidationError("")}>
-                  Okay
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <AlertDialog
+          <LessonFeedbackDialog
               open={isErrorAddingToolWithoutSection}
-              onOpenChange={setIsErrorAddingToolWithoutSection}
-          >
-            <AlertDialogContent size="sm">
-              <AlertDialogHeader>
-                <AlertDialogMedia className="bg-destructive/10 text-destructive">
-                  <CircleAlert />
-                </AlertDialogMedia>
-
-                <AlertDialogTitle>Create a section first</AlertDialogTitle>
-
-                <AlertDialogDescription>
-                  Add a section before adding lesson content.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-
-              <AlertDialogFooter>
-                <AlertDialogAction
-                    onClick={() => setIsErrorAddingToolWithoutSection(false)}
-                >
-                  Okay
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+              type="error"
+              title="Create a Section First"
+              description="Add a section before adding lesson content."
+              onClose={() => setIsErrorAddingToolWithoutSection(false)}
+          />
 
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-4 sm:p-6">
             <div className="mx-auto h-full min-h-0 w-full max-w-[1600px] overflow-hidden rounded-lg border bg-background">
@@ -1033,7 +1033,7 @@ function CreateLessons() {
                           )
                         })}
 
-                        <div className=" flex pl-10">
+                        <div className="flex pl-10">
                           <Button
                               type="button"
                               variant="outline"

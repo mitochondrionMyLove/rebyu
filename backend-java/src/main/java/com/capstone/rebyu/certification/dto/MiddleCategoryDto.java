@@ -9,7 +9,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Set;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -24,5 +24,5 @@ public class MiddleCategoryDto {
     @Size(max = 150)
     private String title;
 
-    private Set<LessonDto> lessons;
+    private List<LessonDto> lessons;
 }

@@ -178,7 +178,7 @@ function CertificationCard({ item, certification }) {
                 {certificationIndustry}
               </span>
 
-                <h2 className="font-heading mt-2 line-clamp-2 text-lg font-semibold leading-6 text-foreground">
+                <h2 className="font-heading mt-2  line-clamp-2 text-md font-semibold leading-6 text-foreground">
                   {certificationTitle}
                 </h2>
               </div>
@@ -215,9 +215,9 @@ function CertificationCard({ item, certification }) {
 
             <div className="mt-3 h-1 w-10 shrink-0 rounded-full bg-primary" />
 
-            <p className="mt-3 line-clamp-3 flex-1 text-sm leading-5 text-muted-foreground">
-              {certificationDescription}
-            </p>
+            {/*<p className="mt-3 line-clamp-3 flex-1 text-sm leading-5 text-muted-foreground">*/}
+            {/*  {certificationDescription}*/}
+            {/*</p>*/}
           </div>
         </div>
 

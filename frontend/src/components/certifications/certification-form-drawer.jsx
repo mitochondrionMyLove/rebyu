@@ -46,6 +46,35 @@ import {
 
 const TOTAL_STEPS = 2
 
+const MIN_CERTIFICATION_PRICE = 99
+const MAX_CERTIFICATION_PRICE = 9_999_999.99
+
+const MIN_TITLE_LENGTH = 3
+const MAX_TITLE_LENGTH = 150
+
+const MIN_DESCRIPTION_LENGTH = 20
+const MAX_DESCRIPTION_LENGTH = 2000
+
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+
+const ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+]
+
+const ALLOWED_IMAGE_NAME_PATTERN = /\.(jpg|jpeg|png|webp)$/i
+
+const INVALID_INDUSTRY_VALUES = new Set([
+    "",
+    "all",
+    "none",
+    "select",
+    "select industry",
+    "undefined",
+    "null",
+])
+
 const emptySubmissionDialog = {
     open: false,
     title: "",
@@ -88,6 +117,16 @@ function formatLocalDateTime(date = new Date()) {
     )}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
         date.getSeconds()
     )}`
+}
+
+function normalizeText(value) {
+    return String(value ?? "")
+        .trim()
+        .replace(/\s+/g, " ")
+}
+
+function hasMeaningfulText(value) {
+    return /[\p{L}\p{N}]/u.test(value)
 }
 
 function getLessonComponentStructure(lesson) {
@@ -145,14 +184,17 @@ function toEditableModuleCategories(certification) {
                 return {
                     id: createUiId("middle"),
                     middleCategoryId:
-                        middleCategory.middleCategoryId ?? middleCategory.id ?? null,
+                        middleCategory.middleCategoryId ??
+                        middleCategory.id ??
+                        null,
                     title: middleCategory.title ?? "",
 
                     lessons: lessons.map((lesson) => ({
                         id: createUiId("lesson"),
                         lessonId: lesson.lessonId ?? lesson.id ?? null,
                         name: lesson.name ?? lesson.title ?? "",
-                        lessonComponentStructure: getLessonComponentStructure(lesson),
+                        lessonComponentStructure:
+                            getLessonComponentStructure(lesson),
                     })),
                 }
             }),
@@ -163,28 +205,135 @@ function toEditableModuleCategories(certification) {
 function validateCertificationDetails(details) {
     const errors = {}
 
-    if (!details.title.trim()) {
+    const title = normalizeText(details?.title)
+    const description = normalizeText(details?.description)
+    const industry = normalizeText(details?.industry)
+    const rawPrice = String(details?.price ?? "").trim()
+
+    const imageFile = details?.imageFile
+    const hasExistingImage = Boolean(
+        String(details?.existingImageKey ?? "").trim()
+    )
+
+    // -----------------------------
+    // Certification name validation
+    // -----------------------------
+    if (!title) {
         errors.title = "Certification name is required."
+    } else if (title.length < MIN_TITLE_LENGTH) {
+        errors.title = `Certification name must be at least ${MIN_TITLE_LENGTH} characters.`
+    } else if (title.length > MAX_TITLE_LENGTH) {
+        errors.title = `Certification name must not exceed ${MAX_TITLE_LENGTH} characters.`
+    } else if (!hasMeaningfulText(title)) {
+        errors.title =
+            "Certification name must contain letters or numbers, not symbols only."
     }
 
-    if (
-        details.price === "" ||
-        Number.isNaN(Number(details.price)) ||
-        Number(details.price) < 0
-    ) {
-        errors.price = "Enter a valid price."
+    // -----------------------------
+    // Price validation
+    //
+    // Allowed:
+    // 99
+    // 99.50
+    // 1000
+    // 2500.00
+    //
+    // Rejected:
+    // abc, ₱99, $99, -99, +99,
+    // 1e3, 99.999, .99, 99.,
+    // 1,000, 1 000
+    // -----------------------------
+    const validPricePattern = /^\d+(?:\.\d{1,2})?$/
+
+    if (!rawPrice) {
+        errors.price = "Price is required."
+    } else if (rawPrice.startsWith("-")) {
+        errors.price = "Price cannot be negative."
+    } else if (rawPrice.startsWith("+")) {
+        errors.price = "Do not use a plus sign in the price."
+    } else if (rawPrice.length > 12) {
+        errors.price = "Price is too long. Enter a valid amount."
+    } else if (/[a-zA-Z]/.test(rawPrice)) {
+        errors.price = "Price must not contain letters."
+    } else if (/[₱$€£¥, ]/.test(rawPrice)) {
+        errors.price =
+            "Do not include currency symbols, commas, or spaces in the price."
+    } else if (!validPricePattern.test(rawPrice)) {
+        errors.price =
+            "Use numbers only with up to 2 decimal places. Example: 99 or 99.50."
+    } else {
+        const numericPrice = Number(rawPrice)
+
+        if (!Number.isFinite(numericPrice)) {
+            errors.price = "Enter a valid price."
+        } else if (!Number.isSafeInteger(Math.round(numericPrice * 100))) {
+            errors.price = "Price is too large."
+        } else if (numericPrice < MIN_CERTIFICATION_PRICE) {
+            errors.price = `Price must be at least ₱${MIN_CERTIFICATION_PRICE}.`
+        } else if (numericPrice > MAX_CERTIFICATION_PRICE) {
+            errors.price = `Price must not exceed ₱${MAX_CERTIFICATION_PRICE.toLocaleString()}.`
+        }
     }
 
-    if (!details.industry.trim()) {
-        errors.industry = "Industry is required."
+    // -----------------------------
+    // Industry validation
+    // -----------------------------
+    if (INVALID_INDUSTRY_VALUES.has(industry.toLowerCase())) {
+        errors.industry = "Please select an industry."
+    } else if (industry.length > 100) {
+        errors.industry = "Industry must not exceed 100 characters."
     }
 
-    if (!details.description.trim()) {
+    // -----------------------------
+    // Description validation
+    // -----------------------------
+    if (!description) {
         errors.description = "Description is required."
+    } else if (description.length < MIN_DESCRIPTION_LENGTH) {
+        errors.description =
+            `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters.`
+    } else if (description.length > MAX_DESCRIPTION_LENGTH) {
+        errors.description =
+            `Description must not exceed ${MAX_DESCRIPTION_LENGTH} characters.`
+    } else if (!hasMeaningfulText(description)) {
+        errors.description =
+            "Description must contain meaningful text, not symbols only."
     }
 
-    if (!details.imageFile && !details.existingImageKey) {
-        errors.imageFile = "Certification cover image is required."
+    // -----------------------------
+    // Image validation
+    //
+    // Existing image is allowed in Edit mode.
+    // A new selected image is required in Create mode.
+    // -----------------------------
+    if (!imageFile && !hasExistingImage) {
+        errors.imageFile = "Please select a certification cover image."
+    }
+
+    if (imageFile) {
+        const isValidFile =
+            typeof File !== "undefined" && imageFile instanceof File
+
+        const hasAllowedExtension = ALLOWED_IMAGE_NAME_PATTERN.test(
+            imageFile?.name ?? ""
+        )
+
+        const hasAllowedType = ALLOWED_IMAGE_TYPES.includes(
+            imageFile?.type ?? ""
+        )
+
+        if (!isValidFile) {
+            errors.imageFile = "The selected image file is invalid."
+        } else if (!imageFile.name?.trim()) {
+            errors.imageFile = "The selected image has no file name."
+        } else if (imageFile.size === 0) {
+            errors.imageFile = "The selected image file is empty."
+        } else if (imageFile.size > MAX_IMAGE_SIZE_BYTES) {
+            errors.imageFile = "Image size must not exceed 5 MB."
+        } else if (!hasAllowedExtension || !hasAllowedType) {
+            errors.imageFile =
+                "Only JPG, JPEG, PNG, and WEBP images are allowed."
+        }
     }
 
     return errors
@@ -311,7 +460,7 @@ export default function CertificationFormDrawer({
                                                     onOpenChange,
                                                     onSaved,
                                                     trigger,
-                                                    image
+                                                    image,
                                                 }) {
     const isEditing = mode === "edit"
     const certificationId = getCertificationId(certification)
@@ -328,8 +477,6 @@ export default function CertificationFormDrawer({
     const [submissionDialog, setSubmissionDialog] = useState(
         emptySubmissionDialog
     )
-
-
 
     const {
         mutateAsync: saveCertification,
@@ -571,7 +718,9 @@ export default function CertificationFormDrawer({
 
                     <div className="min-w-0 flex-1">
                         <DrawerTitle className="text-lg font-semibold text-foreground">
-                            {isEditing ? "Edit Certification" : "Create Certification"}
+                            {isEditing
+                                ? "Edit Certification"
+                                : "Create Certification"}
                         </DrawerTitle>
 
                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -583,12 +732,12 @@ export default function CertificationFormDrawer({
                 <div className="flex-1 overflow-y-auto">
                     <div className="w-full px-4 py-5 sm:px-6">
                         {page === 1 ? (
-                                <CertificationDetails
-                                    value={certificationDetails}
-                                    onChange={handleDetailsChange}
-                                    errors={detailsErrors}
-                                    mode={mode}
-                                />
+                            <CertificationDetails
+                                value={certificationDetails}
+                                onChange={handleDetailsChange}
+                                errors={detailsErrors}
+                                mode={mode}
+                            />
                         ) : (
                             <CertificationModules
                                 value={moduleCategories}
@@ -609,7 +758,9 @@ export default function CertificationFormDrawer({
                                 <CircleAlert className="h-4 w-4" />
 
                                 <AlertTitle>
-                                    Cannot {isEditing ? "update" : "create"} certification
+                                    Cannot{" "}
+                                    {isEditing ? "update" : "create"}{" "}
+                                    certification
                                 </AlertTitle>
 
                                 <AlertDescription>

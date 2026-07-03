@@ -10,7 +10,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,4 +65,13 @@ public class Question {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<Choice> choices = new ArrayList<>();
+
+    @OneToOne(mappedBy = "question", orphanRemoval = true, cascade = CascadeType.ALL)
+    private DiagramQuestionConfig diagramQuestionConfig;
+
+    @OneToOne(mappedBy = "question", orphanRemoval = true, cascade = CascadeType.ALL)
+    private ProgrammingQuestionConfig programmingQuestionConfig;
+
+    @OneToOne(mappedBy = "question", orphanRemoval = true, cascade = CascadeType.ALL)
+    private TextQuestionConfig textQuestionConfig;
 }

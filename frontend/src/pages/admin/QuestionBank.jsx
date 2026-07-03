@@ -1,9 +1,4 @@
-import React, {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import {
     AlertCircle,
@@ -24,24 +19,21 @@ import {
     Search,
     Trash2,
     Workflow,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-    RadioGroup,
-    RadioGroupItem,
-} from "@/components/ui/radio-group"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
     Select,
     SelectContent,
@@ -49,8 +41,8 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
     Table,
     TableBody,
@@ -58,22 +50,15 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table"
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
-import { useQuery } from "@tanstack/react-query"
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
 
-import { getAllCertifications } from "../../services/certificationService.js"
-import DiagramArea from "../../components/challenges/diagram-area.jsx"
-import BigDialog from "../../components/commons/dialog.jsx"
-import {
-    extractDiagramData,
-} from "../../utils/diagram-graph.js"
+import { getAllCertifications } from "../../services/certificationService.js";
+import DiagramArea from "../../components/challenges/diagram-area.jsx";
+import BigDialog from "../../components/commons/dialog.jsx";
+import { extractDiagramData } from "../../utils/diagram-graph.js";
 import {
     deleteQuestion,
     getQuestions,
@@ -83,34 +68,33 @@ import {
     saveQuestion,
     saveTextQuestion,
     updateQuestion,
-} from "../../services/questionService.js"
+} from "../../services/questionService.js";
 
 const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
     "image/png",
     "image/webp",
     "image/gif",
-]
+];
 
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
-const ALL_FILTER_VALUE = "all"
+const ALL_FILTER_VALUE = "all";
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 10;
 
 const questionTypeLabels = {
     MCQ: "Multiple Choice",
     SHORT_ANSWER: "Short Answer",
     DESCRIPTIVE: "Descriptive",
     CRITICAL_THINKING: "Critical Thinking",
-}
+};
 
 const difficultyLabels = {
     easy: "Easy",
     average: "Average",
     hard: "Hard",
-}
-
+};
 
 const questionTypes = [
     {
@@ -223,10 +207,10 @@ const questionTypes = [
             referenceDiagramXml: "",
 
             /*
-              Automatically filled from the XML.
-              These are the fields you will compare with
-              the learner's diagram later.
-            */
+                    Automatically filled from the XML.
+                    These are the fields you will compare with
+                    the learner's diagram later.
+                  */
             referenceDiagramNodes: [],
             referenceDiagramEdges: [],
 
@@ -234,31 +218,29 @@ const questionTypes = [
             difficulty: "average",
         },
     },
-]
+];
 
 function createLocalId() {
     if (
         typeof crypto !== "undefined" &&
         typeof crypto.randomUUID === "function"
     ) {
-        return crypto.randomUUID()
+        return crypto.randomUUID();
     }
 
-    return `${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}`
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function getQuestionFieldName(questionKey, fieldName) {
-    return `questions[${questionKey}].${fieldName}`
+    return `questions[${questionKey}].${fieldName}`;
 }
 
 function cloneQuestionData(data) {
     if (typeof structuredClone === "function") {
-        return structuredClone(data)
+        return structuredClone(data);
     }
 
-    return JSON.parse(JSON.stringify(data))
+    return JSON.parse(JSON.stringify(data));
 }
 
 function scheduleIdleWork(callback, timeout = 500) {
@@ -269,18 +251,18 @@ function scheduleIdleWork(callback, timeout = 500) {
         return {
             type: "idle",
             id: window.requestIdleCallback(callback, { timeout }),
-        }
+        };
     }
 
     return {
         type: "timeout",
         id: window.setTimeout(callback, timeout),
-    }
+    };
 }
 
 function cancelIdleWork(task) {
     if (!task) {
-        return
+        return;
     }
 
     if (
@@ -288,199 +270,175 @@ function cancelIdleWork(task) {
         typeof window !== "undefined" &&
         typeof window.cancelIdleCallback === "function"
     ) {
-        window.cancelIdleCallback(task.id)
-        return
+        window.cancelIdleCallback(task.id);
+        return;
     }
 
-    clearTimeout(task.id)
+    clearTimeout(task.id);
 }
 
 function isBlank(value) {
-    return typeof value !== "string" || value.trim() === ""
+    return typeof value !== "string" || value.trim() === "";
 }
 
 function updateDataAtPath(data, path, value) {
-    const parts = path.split(".")
+    const parts = path.split(".");
 
     function update(currentValue, index) {
-        const key = parts[index]
-        const isLastPart = index === parts.length - 1
+        const key = parts[index];
+        const isLastPart = index === parts.length - 1;
 
         const copy = Array.isArray(currentValue)
             ? [...currentValue]
-            : { ...currentValue }
+            : { ...currentValue };
 
         if (isLastPart) {
-            copy[key] = value
-            return copy
+            copy[key] = value;
+            return copy;
         }
 
-        const nextKey = parts[index + 1]
+        const nextKey = parts[index + 1];
 
-        const defaultNextValue = /^\d+$/.test(nextKey)
-            ? []
-            : {}
+        const defaultNextValue = /^\d+$/.test(nextKey) ? [] : {};
 
-        copy[key] = update(
-            currentValue?.[key] ?? defaultNextValue,
-            index + 1
-        )
+        copy[key] = update(currentValue?.[key] ?? defaultNextValue, index + 1);
 
-        return copy
+        return copy;
     }
 
-    return update(data, 0)
+    return update(data, 0);
 }
 
 function validateOptionalImage(file, label) {
     if (!file) {
-        return ""
+        return "";
     }
 
-    if (
-        typeof File !== "undefined" &&
-        !(file instanceof File)
-    ) {
-        return `${label} is invalid. Please choose the image again.`
+    if (typeof File !== "undefined" && !(file instanceof File)) {
+        return `${label} is invalid. Please choose the image again.`;
     }
 
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-        return `${label} must be a JPG, PNG, WebP, or GIF file.`
+        return `${label} must be a JPG, PNG, WebP, or GIF file.`;
     }
 
     if (file.size > MAX_IMAGE_SIZE_BYTES) {
-        return `${label} must be 5 MB or smaller.`
+        return `${label} must be 5 MB or smaller.`;
     }
 
-    return ""
+    return "";
 }
 
 function hasSavedDiagram(xml) {
-    return (
-        typeof xml === "string" &&
-        xml.trim().length > 0
-    )
+    return typeof xml === "string" && xml.trim().length > 0;
 }
 
 function validateSubQuestions(data, errors) {
-    const subQuestions = data.subQuestions ?? []
+    const subQuestions = data.subQuestions ?? [];
 
     subQuestions.forEach((subQuestion, index) => {
         if (isBlank(subQuestion.question)) {
             errors[`subQuestions.${index}.question`] =
-                `Sub-question ${index + 1} needs a question.`
+                `Sub-question ${index + 1} needs a question.`;
         }
 
         if (isBlank(subQuestion.correctAnswer)) {
             errors[`subQuestions.${index}.correctAnswer`] =
-                `Sub-question ${index + 1} needs an expected answer.`
+                `Sub-question ${index + 1} needs an expected answer.`;
         }
-    })
+    });
 }
 
 function validateQuestionData(typeId, data) {
-    const errors = {}
+    const errors = {};
 
     if (isBlank(data.question)) {
-        errors.question = "Question prompt is required."
+        errors.question = "Question prompt is required.";
     }
 
     const questionImageError = validateOptionalImage(
         data.image,
-        "Question image"
-    )
+        "Question image",
+    );
 
     if (questionImageError) {
-        errors.image = questionImageError
+        errors.image = questionImageError;
     }
 
     if (typeId === "MCQ") {
-        const choices = data.choices ?? []
+        const choices = data.choices ?? [];
 
         choices.forEach((choice, index) => {
-            const letter = String.fromCharCode(65 + index)
+            const letter = String.fromCharCode(65 + index);
 
             if (isBlank(choice.choiceText)) {
-                errors[`choices.${index}.choiceText`] =
-                    `Choice ${letter} is required.`
+                errors[`choices.${index}.choiceText`] = `Choice ${letter} is required.`;
             }
 
             const choiceImageError = validateOptionalImage(
                 choice.image,
-                `Choice ${letter} image`
-            )
+                `Choice ${letter} image`,
+            );
 
             if (choiceImageError) {
-                errors[`choices.${index}.image`] =
-                    choiceImageError
+                errors[`choices.${index}.image`] = choiceImageError;
             }
-        })
+        });
 
         if (
             data.correctChoiceIndex === null ||
             data.correctChoiceIndex === undefined
         ) {
-            errors.correctChoiceIndex =
-                "Select which answer choice is correct."
+            errors.correctChoiceIndex = "Select which answer choice is correct.";
         }
     }
 
-    if (
-        typeId === "SHORT_ANSWER" &&
-        isBlank(data.correctAnswer)
-    ) {
-        errors.correctAnswer = "Correct answer is required."
+    if (typeId === "SHORT_ANSWER" && isBlank(data.correctAnswer)) {
+        errors.correctAnswer = "Correct answer is required.";
     }
 
-    if (
-        typeId === "DESCRIPTIVE" &&
-        isBlank(data.rubricBasedAnswer)
-    ) {
-        errors.rubricBasedAnswer =
-            "Model answer or rubric is required."
+    if (typeId === "DESCRIPTIVE" && isBlank(data.rubricBasedAnswer)) {
+        errors.rubricBasedAnswer = "Model answer or rubric is required.";
     }
 
     if (typeId === "PROGRAMMING") {
-        const testCases = data.testCases ?? []
+        const testCases = data.testCases ?? [];
 
         if (testCases.length === 0) {
-            errors.testCases =
-                "Add at least one programming test case."
+            errors.testCases = "Add at least one programming test case.";
         }
 
         testCases.forEach((testCase, index) => {
             if (isBlank(testCase.expectedOutput)) {
                 errors[`testCases.${index}.expectedOutput`] =
-                    `Test case ${index + 1} needs an expected output.`
+                    `Test case ${index + 1} needs an expected output.`;
             }
-        })
+        });
 
-        validateSubQuestions(data, errors)
+        validateSubQuestions(data, errors);
     }
 
     if (typeId === "DIAGRAM") {
         const labeledNodes =
-            data.referenceDiagramNodes?.filter(
-                (node) => node.labelKey
-            ) ?? []
+            data.referenceDiagramNodes?.filter((node) => node.labelKey) ?? [];
 
         if (
             !hasSavedDiagram(data.referenceDiagramXml) ||
             labeledNodes.length === 0
         ) {
             errors.referenceDiagramXml =
-                "Create a reference diagram with at least one labeled node."
+                "Create a reference diagram with at least one labeled node.";
         }
 
-        validateSubQuestions(data, errors)
+        validateSubQuestions(data, errors);
     }
 
-    return errors
+    return errors;
 }
 
 function FieldError({ message }) {
     if (!message) {
-        return null
+        return null;
     }
 
     return (
@@ -488,7 +446,7 @@ function FieldError({ message }) {
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>{message}</span>
         </p>
-    )
+    );
 }
 
 function ImageUpload({
@@ -500,11 +458,11 @@ function ImageUpload({
                          onFileChange,
                          error,
                      }) {
-    const [inputKey, setInputKey] = useState(0)
+    const [inputKey, setInputKey] = useState(0);
 
     function clearImage() {
-        onFileChange?.(null)
-        setInputKey((currentKey) => currentKey + 1)
+        onFileChange?.(null);
+        setInputKey((currentKey) => currentKey + 1);
     }
 
     return (
@@ -538,14 +496,10 @@ function ImageUpload({
                 accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
                 aria-invalid={Boolean(error)}
                 onChange={(event) => {
-                    onFileChange?.(
-                        event.target.files?.[0] ?? null
-                    )
+                    onFileChange?.(event.target.files?.[0] ?? null);
                 }}
                 className={`h-9 cursor-pointer text-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-xs file:font-medium file:text-foreground hover:file:bg-muted/80 ${
-                    error
-                        ? "border-destructive focus-visible:ring-destructive"
-                        : ""
+                    error ? "border-destructive focus-visible:ring-destructive" : ""
                 }`}
             />
 
@@ -554,14 +508,12 @@ function ImageUpload({
                     Selected: {file.name}
                 </p>
             ) : (
-                <p className="text-xs text-muted-foreground">
-                    {description}
-                </p>
+                <p className="text-xs text-muted-foreground">{description}</p>
             )}
 
             <FieldError message={error} />
         </div>
-    )
+    );
 }
 
 function CompactQuestionCard({
@@ -572,14 +524,12 @@ function CompactQuestionCard({
                                  errors = {},
                                  children,
                              }) {
-    const errorCount = Object.keys(errors).length
-    const hasErrors = errorCount > 0
+    const errorCount = Object.keys(errors).length;
+    const hasErrors = errorCount > 0;
 
     return (
         <Card
-            data-question-invalid={
-                hasErrors ? "true" : undefined
-            }
+            data-question-invalid={hasErrors ? "true" : undefined}
             className={`overflow-hidden shadow-sm ${
                 hasErrors ? "border-destructive/70" : ""
             }`}
@@ -621,88 +571,88 @@ function CompactQuestionCard({
                 {children}
             </CardContent>
         </Card>
-    )
+    );
 }
 
-function DifficultySelect({
-                              questionKey,
-                              value,
-                              onValueChange,
-                          }) {
+function DifficultySelect({ questionKey, value, onValueChange }) {
     return (
         <>
             <input
                 type="hidden"
-                name={getQuestionFieldName(
-                    questionKey,
-                    "difficulty"
-                )}
+                name={getQuestionFieldName(questionKey, "difficulty")}
                 value={value}
             />
 
             <Select value={value} onValueChange={onValueChange}>
-                <SelectTrigger className="w-full sm:w-36">
+                <SelectTrigger className="h-10 w-full rounded-lg bg-background px-3 text-sm sm:w-40">
                     <SelectValue placeholder="Difficulty" />
                 </SelectTrigger>
 
-                <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="average">
+                <SelectContent
+                    position="popper"
+                    align="end"
+                    sideOffset={6}
+                    className="max-h-60 w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl p-1"
+                >
+                    <SelectItem value="easy" className="min-h-10">
+                        Easy
+                    </SelectItem>
+
+                    <SelectItem value="average" className="min-h-10">
                         Average
                     </SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
+
+                    <SelectItem value="hard" className="min-h-10">
+                        Hard
+                    </SelectItem>
                 </SelectContent>
             </Select>
         </>
-    )
+    );
 }
 
-function DiagramTypeSelect({
-                               questionKey,
-                               value,
-                               onValueChange,
-                           }) {
+function DiagramTypeSelect({ questionKey, value, onValueChange }) {
     return (
         <>
             <input
                 type="hidden"
-                name={getQuestionFieldName(
-                    questionKey,
-                    "diagramType"
-                )}
+                name={getQuestionFieldName(questionKey, "diagramType")}
                 value={value}
             />
 
             <Select value={value} onValueChange={onValueChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="h-10 w-full min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate">
                     <SelectValue placeholder="Select diagram type" />
                 </SelectTrigger>
 
-                <SelectContent>
-                    <SelectItem value="ERD">ERD</SelectItem>
+                <SelectContent
+                    position="popper"
+                    align="start"
+                    sideOffset={6}
+                    className="max-h-60 w-[min(320px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                >
+                    <SelectItem value="ERD" className="min-h-10">
+                        ERD
+                    </SelectItem>
 
-                    <SelectItem value="UML_CLASS">
+                    <SelectItem value="UML_CLASS" className="min-h-10">
                         UML Class Diagram
                     </SelectItem>
 
-                    <SelectItem value="FLOWCHART">
+                    <SelectItem value="FLOWCHART" className="min-h-10">
                         Flowchart
                     </SelectItem>
 
-                    <SelectItem value="DFD">
+                    <SelectItem value="DFD" className="min-h-10">
                         Data Flow Diagram
                     </SelectItem>
                 </SelectContent>
             </Select>
         </>
-    )
+    );
 }
 
-function QuestionMetaFields({
-                                questionKey,
-                                data,
-                                onFieldChange,
-                            }) {
+function QuestionMetaFields({ questionKey, data, onFieldChange }) {
     return (
         <div className="border-t border-border pt-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -712,21 +662,18 @@ function QuestionMetaFields({
                     </p>
 
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                        Points are assigned later in quizzes, middle exams,
-                        or mock exams.
+                        Points are assigned later in quizzes, middle exams, or mock exams.
                     </p>
                 </div>
 
                 <DifficultySelect
                     questionKey={questionKey}
                     value={data.difficulty}
-                    onValueChange={(value) =>
-                        onFieldChange("difficulty", value)
-                    }
+                    onValueChange={(value) => onFieldChange("difficulty", value)}
                 />
             </div>
         </div>
-    )
+    );
 }
 
 function QuestionPromptFields({
@@ -748,15 +695,10 @@ function QuestionPromptFields({
 
                 <Textarea
                     id={`${questionKey}-question-text`}
-                    name={getQuestionFieldName(
-                        questionKey,
-                        "question"
-                    )}
+                    name={getQuestionFieldName(questionKey, "question")}
                     value={data.question ?? ""}
                     aria-invalid={Boolean(errors.question)}
-                    onChange={(event) =>
-                        onFieldChange("question", event.target.value)
-                    }
+                    onChange={(event) => onFieldChange("question", event.target.value)}
                     placeholder="Write the question, scenario, or instructions..."
                     className={`min-h-24 resize-y ${
                         errors.question
@@ -776,22 +718,17 @@ function QuestionPromptFields({
                 <div className="mt-3">
                     <ImageUpload
                         id={`${questionKey}-question-image`}
-                        name={getQuestionFieldName(
-                            questionKey,
-                            "image"
-                        )}
+                        name={getQuestionFieldName(questionKey, "image")}
                         label="Question Image"
                         file={data.image}
                         error={errors.image}
-                        onFileChange={(file) =>
-                            onFieldChange("image", file)
-                        }
+                        onFileChange={(file) => onFieldChange("image", file)}
                         description="Optional image displayed with the question."
                     />
                 </div>
             </details>
         </div>
-    )
+    );
 }
 
 function SubQuestions({
@@ -801,7 +738,7 @@ function SubQuestions({
                           onFieldChange,
                           errors = {},
                       }) {
-    const subQuestions = data.subQuestions ?? []
+    const subQuestions = data.subQuestions ?? [];
 
     function addSubQuestion() {
         onDataChange((currentData) => ({
@@ -813,16 +750,16 @@ function SubQuestions({
                     correctAnswer: "",
                 },
             ],
-        }))
+        }));
     }
 
     function removeSubQuestion(indexToRemove) {
         onDataChange((currentData) => ({
             ...currentData,
             subQuestions: currentData.subQuestions.filter(
-                (_, index) => index !== indexToRemove
+                (_, index) => index !== indexToRemove,
             ),
-        }))
+        }));
     }
 
     return (
@@ -855,11 +792,9 @@ function SubQuestions({
             {subQuestions.length > 0 && (
                 <div className="space-y-3">
                     {subQuestions.map((subQuestion, index) => {
-                        const questionError =
-                            errors[`subQuestions.${index}.question`]
+                        const questionError = errors[`subQuestions.${index}.question`];
 
-                        const answerError =
-                            errors[`subQuestions.${index}.correctAnswer`]
+                        const answerError = errors[`subQuestions.${index}.correctAnswer`];
 
                         return (
                             <div
@@ -904,7 +839,7 @@ function SubQuestions({
                                             onChange={(event) =>
                                                 onFieldChange(
                                                     `subQuestions.${index}.question`,
-                                                    event.target.value
+                                                    event.target.value,
                                                 )
                                             }
                                             placeholder="Write the follow-up question..."
@@ -934,7 +869,7 @@ function SubQuestions({
                                             onChange={(event) =>
                                                 onFieldChange(
                                                     `subQuestions.${index}.correctAnswer`,
-                                                    event.target.value
+                                                    event.target.value,
                                                 )
                                             }
                                             placeholder="Accepted answer, keywords, or key points..."
@@ -949,12 +884,12 @@ function SubQuestions({
                                     </div>
                                 </div>
                             </div>
-                        )
+                        );
                     })}
                 </div>
             )}
         </div>
-    )
+    );
 }
 
 function MultipleChoices({
@@ -965,12 +900,10 @@ function MultipleChoices({
                              onDataChange,
                              errors = {},
                          }) {
-    const choices = data.choices ?? []
+    const choices = data.choices ?? [];
 
     function onFieldChange(path, value) {
-        onDataChange((currentData) =>
-            updateDataAtPath(currentData, path, value)
-        )
+        onDataChange((currentData) => updateDataAtPath(currentData, path, value));
     }
 
     function chooseCorrectChoice(correctIndex) {
@@ -981,7 +914,7 @@ function MultipleChoices({
                 ...choice,
                 isCorrect: index === correctIndex,
             })),
-        }))
+        }));
     }
 
     return (
@@ -1025,22 +958,17 @@ function MultipleChoices({
                             ? ""
                             : String(data.correctChoiceIndex)
                     }
-                    onValueChange={(value) =>
-                        chooseCorrectChoice(Number(value))
-                    }
+                    onValueChange={(value) => chooseCorrectChoice(Number(value))}
                     className="grid gap-3 sm:grid-cols-2"
                 >
                     {choices.map((choice, index) => {
-                        const letter = String.fromCharCode(65 + index)
+                        const letter = String.fromCharCode(65 + index);
 
-                        const choiceError =
-                            errors[`choices.${index}.choiceText`]
+                        const choiceError = errors[`choices.${index}.choiceText`];
 
-                        const imageError =
-                            errors[`choices.${index}.image`]
+                        const imageError = errors[`choices.${index}.image`];
 
-                        const isCorrect =
-                            data.correctChoiceIndex === index
+                        const isCorrect = data.correctChoiceIndex === index;
 
                         return (
                             <div
@@ -1074,14 +1002,14 @@ function MultipleChoices({
                                     <Input
                                         name={getQuestionFieldName(
                                             questionKey,
-                                            `choices[${index}].choiceText`
+                                            `choices[${index}].choiceText`,
                                         )}
                                         value={choice.choiceText ?? ""}
                                         aria-invalid={Boolean(choiceError)}
                                         onChange={(event) =>
                                             onFieldChange(
                                                 `choices.${index}.choiceText`,
-                                                event.target.value
+                                                event.target.value,
                                             )
                                         }
                                         placeholder={`Choice ${letter}`}
@@ -1108,16 +1036,13 @@ function MultipleChoices({
                                             id={`${questionKey}-choice-image-${index}`}
                                             name={getQuestionFieldName(
                                                 questionKey,
-                                                `choices[${index}].image`
+                                                `choices[${index}].image`,
                                             )}
                                             label="Choice Image"
                                             file={choice.image}
                                             error={imageError}
                                             onFileChange={(file) =>
-                                                onFieldChange(
-                                                    `choices.${index}.image`,
-                                                    file
-                                                )
+                                                onFieldChange(`choices.${index}.image`, file)
                                             }
                                             description="Optional image for this answer choice."
                                         />
@@ -1127,7 +1052,7 @@ function MultipleChoices({
                                             onChange={(event) =>
                                                 onFieldChange(
                                                     `choices.${index}.explanation`,
-                                                    event.target.value
+                                                    event.target.value,
                                                 )
                                             }
                                             placeholder="Optional explanation shown after answering..."
@@ -1136,7 +1061,7 @@ function MultipleChoices({
                                     </div>
                                 </details>
                             </div>
-                        )
+                        );
                     })}
                 </RadioGroup>
 
@@ -1149,7 +1074,7 @@ function MultipleChoices({
                 onFieldChange={onFieldChange}
             />
         </CompactQuestionCard>
-    )
+    );
 }
 
 function ShortAnswer({
@@ -1161,9 +1086,7 @@ function ShortAnswer({
                          errors = {},
                      }) {
     function onFieldChange(path, value) {
-        onDataChange((currentData) =>
-            updateDataAtPath(currentData, path, value)
-        )
+        onDataChange((currentData) => updateDataAtPath(currentData, path, value));
     }
 
     return (
@@ -1195,10 +1118,7 @@ function ShortAnswer({
                     value={data.correctAnswer ?? ""}
                     aria-invalid={Boolean(errors.correctAnswer)}
                     onChange={(event) =>
-                        onFieldChange(
-                            "correctAnswer",
-                            event.target.value
-                        )
+                        onFieldChange("correctAnswer", event.target.value)
                     }
                     placeholder="Enter the exact answer or accepted keywords..."
                     className={`min-h-20 resize-y ${
@@ -1221,7 +1141,7 @@ function ShortAnswer({
                 onFieldChange={onFieldChange}
             />
         </CompactQuestionCard>
-    )
+    );
 }
 
 function Descriptive({
@@ -1233,9 +1153,7 @@ function Descriptive({
                          errors = {},
                      }) {
     function onFieldChange(path, value) {
-        onDataChange((currentData) =>
-            updateDataAtPath(currentData, path, value)
-        )
+        onDataChange((currentData) => updateDataAtPath(currentData, path, value));
     }
 
     return (
@@ -1267,10 +1185,7 @@ function Descriptive({
                     value={data.rubricBasedAnswer ?? ""}
                     aria-invalid={Boolean(errors.rubricBasedAnswer)}
                     onChange={(event) =>
-                        onFieldChange(
-                            "rubricBasedAnswer",
-                            event.target.value
-                        )
+                        onFieldChange("rubricBasedAnswer", event.target.value)
                     }
                     placeholder="Write the expected explanation, key points, or grading guide..."
                     className={`min-h-28 resize-y ${
@@ -1284,9 +1199,7 @@ function Descriptive({
                     Descriptive answers use the rubric automatically.
                 </p>
 
-                <FieldError
-                    message={errors.rubricBasedAnswer}
-                />
+                <FieldError message={errors.rubricBasedAnswer} />
             </div>
 
             <QuestionMetaFields
@@ -1295,7 +1208,7 @@ function Descriptive({
                 onFieldChange={onFieldChange}
             />
         </CompactQuestionCard>
-    )
+    );
 }
 
 function Programming({
@@ -1306,12 +1219,10 @@ function Programming({
                          onDataChange,
                          errors = {},
                      }) {
-    const testCases = data.testCases ?? []
+    const testCases = data.testCases ?? [];
 
     function onFieldChange(path, value) {
-        onDataChange((currentData) =>
-            updateDataAtPath(currentData, path, value)
-        )
+        onDataChange((currentData) => updateDataAtPath(currentData, path, value));
     }
 
     function addTestCase() {
@@ -1324,20 +1235,20 @@ function Programming({
                     expectedOutput: "",
                 },
             ],
-        }))
+        }));
     }
 
     function removeTestCase(indexToRemove) {
         if (testCases.length === 1) {
-            return
+            return;
         }
 
         onDataChange((currentData) => ({
             ...currentData,
             testCases: currentData.testCases.filter(
-                (_, index) => index !== indexToRemove
+                (_, index) => index !== indexToRemove,
             ),
-        }))
+        }));
     }
 
     return (
@@ -1369,12 +1280,7 @@ function Programming({
                 <Textarea
                     id={`${questionKey}-starter-code`}
                     value={data.starterCode ?? ""}
-                    onChange={(event) =>
-                        onFieldChange(
-                            "starterCode",
-                            event.target.value
-                        )
-                    }
+                    onChange={(event) => onFieldChange("starterCode", event.target.value)}
                     spellCheck={false}
                     placeholder="// Optional code template..."
                     className="min-h-32 resize-y font-mono text-sm"
@@ -1396,8 +1302,7 @@ function Programming({
                         </p>
 
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            Input is optional. Every test case needs an expected
-                            output.
+                            Input is optional. Every test case needs an expected output.
                         </p>
                     </div>
 
@@ -1417,7 +1322,7 @@ function Programming({
                 <div className="space-y-3">
                     {testCases.map((testCase, index) => {
                         const expectedOutputError =
-                            errors[`testCases.${index}.expectedOutput`]
+                            errors[`testCases.${index}.expectedOutput`];
 
                         return (
                             <div
@@ -1464,7 +1369,7 @@ function Programming({
                                             onChange={(event) =>
                                                 onFieldChange(
                                                     `testCases.${index}.inputData`,
-                                                    event.target.value
+                                                    event.target.value,
                                                 )
                                             }
                                             spellCheck={false}
@@ -1485,13 +1390,11 @@ function Programming({
                                         <Textarea
                                             id={`${questionKey}-test-case-${index}-output`}
                                             value={testCase.expectedOutput ?? ""}
-                                            aria-invalid={Boolean(
-                                                expectedOutputError
-                                            )}
+                                            aria-invalid={Boolean(expectedOutputError)}
                                             onChange={(event) =>
                                                 onFieldChange(
                                                     `testCases.${index}.expectedOutput`,
-                                                    event.target.value
+                                                    event.target.value,
                                                 )
                                             }
                                             spellCheck={false}
@@ -1503,13 +1406,11 @@ function Programming({
                                             }`}
                                         />
 
-                                        <FieldError
-                                            message={expectedOutputError}
-                                        />
+                                        <FieldError message={expectedOutputError} />
                                     </div>
                                 </div>
                             </div>
-                        )
+                        );
                     })}
                 </div>
             </div>
@@ -1528,7 +1429,7 @@ function Programming({
                 onFieldChange={onFieldChange}
             />
         </CompactQuestionCard>
-    )
+    );
 }
 
 function Diagram({
@@ -1539,45 +1440,43 @@ function Diagram({
                      onDataChange,
                      errors = {},
                  }) {
-    const diagramTimerRef = useRef(null)
+    const diagramTimerRef = useRef(null);
 
     useEffect(() => {
-        return () => cancelIdleWork(diagramTimerRef.current)
-    }, [])
+        return () => cancelIdleWork(diagramTimerRef.current);
+    }, []);
 
     function onFieldChange(path, value) {
-        onDataChange((currentData) =>
-            updateDataAtPath(currentData, path, value)
-        )
+        onDataChange((currentData) => updateDataAtPath(currentData, path, value));
     }
 
     function handleReferenceDiagramChange(xml) {
-        cancelIdleWork(diagramTimerRef.current)
+        cancelIdleWork(diagramTimerRef.current);
 
         diagramTimerRef.current = scheduleIdleWork(() => {
             try {
-                const { nodes, edges } = extractDiagramData(xml)
+                const { nodes, edges } = extractDiagramData(xml);
 
                 onDataChange((currentData) => ({
                     ...currentData,
                     referenceDiagramXml: xml,
                     referenceDiagramNodes: nodes,
                     referenceDiagramEdges: edges,
-                }))
+                }));
             } catch (error) {
                 console.error(
                     "Could not extract diagram nodes and connections:",
-                    error
-                )
+                    error,
+                );
 
                 onDataChange((currentData) => ({
                     ...currentData,
                     referenceDiagramXml: xml,
                     referenceDiagramNodes: [],
                     referenceDiagramEdges: [],
-                }))
+                }));
             }
-        }, 600)
+        }, 600);
     }
 
     const diagramTypeLabel =
@@ -1586,11 +1485,9 @@ function Diagram({
             UML_CLASS: "UML Class Diagram",
             FLOWCHART: "Flowchart",
             DFD: "Data Flow Diagram",
-        }[data.diagramType] ?? "Diagram"
+        }[data.diagramType] ?? "Diagram";
 
-    const hasDiagram = hasSavedDiagram(
-        data.referenceDiagramXml
-    )
+    const hasDiagram = hasSavedDiagram(data.referenceDiagramXml);
 
     return (
         <CompactQuestionCard
@@ -1609,16 +1506,12 @@ function Diagram({
 
             <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                    <Label className="text-sm font-medium">
-                        Diagram Type
-                    </Label>
+                    <Label className="text-sm font-medium">Diagram Type</Label>
 
                     <DiagramTypeSelect
                         questionKey={questionKey}
                         value={data.diagramType}
-                        onValueChange={(value) =>
-                            onFieldChange("diagramType", value)
-                        }
+                        onValueChange={(value) => onFieldChange("diagramType", value)}
                     />
                 </div>
 
@@ -1629,18 +1522,15 @@ function Diagram({
                     >
                         Instructions
                         <span className="ml-1 font-normal text-muted-foreground">
-                            (Optional)
-                        </span>
+              (Optional)
+            </span>
                     </Label>
 
                     <Input
                         id={`${questionKey}-instructions`}
                         value={data.instructions ?? ""}
                         onChange={(event) =>
-                            onFieldChange(
-                                "instructions",
-                                event.target.value
-                            )
+                            onFieldChange("instructions", event.target.value)
                         }
                         placeholder="Example: Include PK and FK labels."
                     />
@@ -1649,9 +1539,7 @@ function Diagram({
 
             <section
                 className={`overflow-hidden rounded-xl border bg-background ${
-                    errors.referenceDiagramXml
-                        ? "border-destructive/70"
-                        : "border-border"
+                    errors.referenceDiagramXml ? "border-destructive/70" : "border-border"
                 }`}
             >
                 <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
@@ -1668,19 +1556,18 @@ function Diagram({
                                 </p>
 
                                 <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                    {data.diagramType}
-                                </span>
+                  {data.diagramType}
+                </span>
                             </div>
 
                             <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                                Create the correct {diagramTypeLabel.toLowerCase()} that learners will be compared against.
+                                Create the correct {diagramTypeLabel.toLowerCase()} that
+                                learners will be compared against.
                             </p>
 
                             <p
                                 className={`mt-2 text-xs font-medium ${
-                                    hasDiagram
-                                        ? "text-primary"
-                                        : "text-muted-foreground"
+                                    hasDiagram ? "text-primary" : "text-muted-foreground"
                                 }`}
                             >
                                 {hasDiagram
@@ -1694,11 +1581,7 @@ function Diagram({
                         title={`${diagramTypeLabel} Editor`}
                         description="Your diagram is saved automatically while you edit."
                         trigger={
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="shrink-0"
-                            >
+                            <Button type="button" size="sm" className="shrink-0">
                                 <Maximize className="mr-2 h-4 w-4" />
                                 Open Editor
                             </Button>
@@ -1706,9 +1589,7 @@ function Diagram({
                         content={
                             <div className="h-full w-full overflow-hidden rounded-lg border border-border bg-white shadow-sm">
                                 <DiagramArea
-                                    initialXml={
-                                        data.referenceDiagramXml || undefined
-                                    }
+                                    initialXml={data.referenceDiagramXml || undefined}
                                     onChange={handleReferenceDiagramChange}
                                 />
                             </div>
@@ -1718,9 +1599,7 @@ function Diagram({
 
                 {errors.referenceDiagramXml && (
                     <div className="border-t border-destructive/30 bg-destructive/5 px-4 py-3">
-                        <FieldError
-                            message={errors.referenceDiagramXml}
-                        />
+                        <FieldError message={errors.referenceDiagramXml} />
                     </div>
                 )}
             </section>
@@ -1739,15 +1618,11 @@ function Diagram({
                 onFieldChange={onFieldChange}
             />
         </CompactQuestionCard>
-    )
+    );
 }
 
-function QuestionTypeButton({
-                                questionType,
-                                onAdd,
-                                disabled,
-                            }) {
-    const Icon = questionType.icon
+function QuestionTypeButton({ questionType, onAdd, disabled }) {
+    const Icon = questionType.icon;
 
     return (
         <Button
@@ -1760,68 +1635,49 @@ function QuestionTypeButton({
             <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
 
             <span className="min-w-0 text-left">
-        <span className="block text-sm font-medium">
-          {questionType.title}
-        </span>
+        <span className="block text-sm font-medium">{questionType.title}</span>
 
         <span className="mt-0.5 block text-xs font-normal leading-4 text-muted-foreground">
           {questionType.description}
         </span>
       </span>
         </Button>
-    )
+    );
 }
 
-function EmptyState({
-                        icon: Icon,
-                        title,
-                        description,
-                        size = "lg",
-                    }) {
+function EmptyState({ icon: Icon, title, description, size = "lg" }) {
     if (size === "sm") {
         return (
             <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center">
-                <p className="text-sm font-medium text-foreground">
-                    {title}
-                </p>
+                <p className="text-sm font-medium text-foreground">{title}</p>
 
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     {description}
                 </p>
             </div>
-        )
+        );
     }
 
     return (
         <div className="rounded-lg border border-dashed border-border bg-background px-6 py-16 text-center">
             <Icon className="mx-auto h-7 w-7 text-muted-foreground" />
 
-            <h3 className="mt-4 text-base font-semibold text-foreground">
-                {title}
-            </h3>
+            <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
 
-            <p className="mt-1 text-sm text-muted-foreground">
-                {description}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
-    )
+    );
 }
 
-function FeedbackDialog({
-                            open,
-                            type,
-                            title,
-                            description,
-                            onClose,
-                        }) {
-    const isSuccess = type === "success"
+function FeedbackDialog({ open, type, title, description, onClose }) {
+    const isSuccess = type === "success";
 
     return (
         <Dialog
             open={open}
             onOpenChange={(nextOpen) => {
                 if (!nextOpen) {
-                    onClose()
+                    onClose();
                 }
             }}
         >
@@ -1855,7 +1711,7 @@ function FeedbackDialog({
                 </div>
             </DialogContent>
         </Dialog>
-    )
+    );
 }
 
 function getCertificationValue(certification) {
@@ -1864,74 +1720,60 @@ function getCertificationValue(certification) {
         certification.id ??
         certification.title ??
         certification.name ??
-        "unknown-certification"
-    )
+        "unknown-certification",
+    );
 }
 
 function getCertificationTitle(certification) {
-    return (
-        certification.title ??
-        certification.name ??
-        "Untitled Certification"
-    )
+    return certification.title ?? certification.name ?? "Untitled Certification";
 }
 
 function getCertificationLessons(certification) {
     if (!certification) {
-        return []
+        return [];
     }
 
     return (certification.majorCategory ?? []).flatMap(
         (majorCategory, majorIndex) =>
             (majorCategory.middleCategory ?? []).flatMap(
                 (middleCategory, middleIndex) =>
-                    (middleCategory.lessons ?? []).map(
-                        (lesson, lessonIndex) => ({
-                            id: String(
-                                lesson.lessonId ??
-                                lesson.id ??
-                                `${majorIndex}-${middleIndex}-${lessonIndex}`
-                            ),
-                            numericId:
-                                lesson.lessonId ?? lesson.id ?? null,
-                            name:
-                                lesson.name ??
-                                lesson.title ??
-                                "Untitled Lesson",
-                            majorCategoryTitle:
-                                majorCategory.title ??
-                                "Untitled Category",
-                            middleCategoryTitle:
-                                middleCategory.title ??
-                                "Untitled Category",
-                        })
-                    )
-            )
-    )
+                    (middleCategory.lessons ?? []).map((lesson, lessonIndex) => ({
+                        id: String(
+                            lesson.lessonId ??
+                            lesson.id ??
+                            `${majorIndex}-${middleIndex}-${lessonIndex}`,
+                        ),
+                        numericId: lesson.lessonId ?? lesson.id ?? null,
+                        name: lesson.name ?? lesson.title ?? "Untitled Lesson",
+                        majorCategoryTitle: majorCategory.title ?? "Untitled Category",
+                        middleCategoryTitle: middleCategory.title ?? "Untitled Category",
+                    })),
+            ),
+    );
 }
 
 function getQuestionTypeLabel(questionType) {
-    return questionTypeLabels[questionType] ?? questionType ?? "Unknown"
+    return questionTypeLabels[questionType] ?? questionType ?? "Unknown";
 }
 
 function getDifficultyLabel(difficulty) {
-    return difficultyLabels[difficulty] ?? difficulty ?? "Unknown"
+    return difficultyLabels[difficulty] ?? difficulty ?? "Unknown";
 }
 
 const QuestionCardWrapper = React.memo(function QuestionCardWrapper({
-    question,
-    index,
-    validationErrors,
-    onRemove,
-    onDataChange,
-}) {
+                                                                        question,
+                                                                        index,
+                                                                        validationErrors,
+                                                                        onRemove,
+                                                                        onDataChange,
+                                                                    }) {
     const questionType = questionTypes.find(
-        (item) => item.id === question.typeId
-    )
+        (item) => item.id === question.typeId,
+    );
 
-    if (!questionType) return null
+    if (!questionType) return null;
 
-    const QuestionComponent = questionType.component
+    const QuestionComponent = questionType.component;
 
     return (
         <QuestionComponent
@@ -1942,60 +1784,56 @@ const QuestionCardWrapper = React.memo(function QuestionCardWrapper({
             onRemove={onRemove}
             onDataChange={onDataChange}
         />
-    )
-})
+    );
+});
 
 function QuestionBank() {
-    const [activeTab, setActiveTab] = useState("all-questions")
+    const [activeTab, setActiveTab] = useState("all-questions");
 
-    const [filterCertificationId, setFilterCertificationId] =
-        useState("")
+    const [filterCertificationId, setFilterCertificationId] = useState("");
 
-    const [filterLessonId, setFilterLessonId] = useState(ALL_FILTER_VALUE)
+    const [filterLessonId, setFilterLessonId] = useState(ALL_FILTER_VALUE);
 
     const [filterQuestionType, setFilterQuestionType] =
-        useState(ALL_FILTER_VALUE)
+        useState(ALL_FILTER_VALUE);
 
-    const [filterDifficulty, setFilterDifficulty] =
-        useState(ALL_FILTER_VALUE)
+    const [filterDifficulty, setFilterDifficulty] = useState(ALL_FILTER_VALUE);
 
-    const [questionSearch, setQuestionSearch] = useState("")
+    // Built-in question search is disabled.
+    // Keep this commented while using your own search implementation.
+    // const [questionSearch, setQuestionSearch] = useState("");
 
-    const [questionPage, setQuestionPage] = useState(1)
+    const [questionPage, setQuestionPage] = useState(1);
 
-    const [
-        selectedCertificationId,
-        setSelectedCertificationId,
-    ] = useState("")
+    const [selectedCertificationId, setSelectedCertificationId] = useState("");
 
-    const [selectedLesson, setSelectedLesson] =
-        useState(null)
+    const [selectedLesson, setSelectedLesson] = useState(null);
 
-    const [lessonSearch, setLessonSearch] =
-        useState("")
+    const [lessonSearch, setLessonSearch] = useState("");
 
-    const [questions, setQuestions] = useState([])
+    const [questions, setQuestions] = useState([]);
 
-    const [validationErrors, setValidationErrors] =
-        useState({})
+    const [validationErrors, setValidationErrors] = useState({});
 
-    const [isSavingQuestions, setIsSavingQuestions] =
-        useState(false)
+    const [isSavingQuestions, setIsSavingQuestions] = useState(false);
+
+    // Prevents duplicate requests when saving changes to one existing question.
+    const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false);
 
     const [feedbackDialog, setFeedbackDialog] = useState({
         open: false,
         type: "success",
         title: "",
         description: "",
-    })
+    });
 
     const [questionDialog, setQuestionDialog] = useState({
         open: false,
         mode: "view",
         question: null,
-    })
+    });
 
-    const [questionForm, setQuestionForm] = useState(null)
+    const [questionForm, setQuestionForm] = useState(null);
 
     const {
         data: certifications = [],
@@ -2004,7 +1842,7 @@ function QuestionBank() {
     } = useQuery({
         queryKey: ["certifications"],
         queryFn: getAllCertifications,
-    })
+    });
 
     const {
         data: allQuestions = [],
@@ -2014,28 +1852,26 @@ function QuestionBank() {
     } = useQuery({
         queryKey: ["questions"],
         queryFn: getQuestions,
-    })
+    });
 
     const selectedCertification = useMemo(() => {
         return certifications.find(
             (certification) =>
-                getCertificationValue(certification) ===
-                selectedCertificationId
-        )
-    }, [certifications, selectedCertificationId])
+                getCertificationValue(certification) === selectedCertificationId,
+        );
+    }, [certifications, selectedCertificationId]);
 
     const selectedFilterCertification = useMemo(() => {
         return certifications.find(
             (certification) =>
-                getCertificationValue(certification) ===
-                filterCertificationId
-        )
-    }, [certifications, filterCertificationId])
+                getCertificationValue(certification) === filterCertificationId,
+        );
+    }, [certifications, filterCertificationId]);
 
     const filterLessons = useMemo(
         () => getCertificationLessons(selectedFilterCertification),
-        [selectedFilterCertification]
-    )
+        [selectedFilterCertification],
+    );
 
     const filterLessonMap = useMemo(
         () =>
@@ -2043,210 +1879,175 @@ function QuestionBank() {
                 filterLessons.map((lesson) => [
                     String(lesson.numericId ?? lesson.id),
                     lesson,
-                ])
+                ]),
             ),
-        [filterLessons]
-    )
+        [filterLessons],
+    );
 
     const filteredQuestions = useMemo(() => {
         if (!selectedFilterCertification) {
-            return []
+            return [];
         }
 
         const allowedLessonIds = new Set(
-            filterLessons.map((lesson) =>
-                String(lesson.numericId ?? lesson.id)
-            )
-        )
+            filterLessons.map((lesson) => String(lesson.numericId ?? lesson.id)),
+        );
 
-        const normalizedSearch = questionSearch.trim().toLowerCase()
+        /*
+         * Built-in keyword search is disabled.
+         * Add your own search logic here when ready.
+         */
 
         return allQuestions.filter((question) => {
-            const questionLessonId = String(question.lessonId ?? "")
+            const questionLessonId = String(question.lessonId ?? "");
 
             if (!allowedLessonIds.has(questionLessonId)) {
-                return false
+                return false;
             }
 
             if (
                 filterLessonId !== ALL_FILTER_VALUE &&
                 questionLessonId !== filterLessonId
             ) {
-                return false
+                return false;
             }
 
             if (
                 filterQuestionType !== ALL_FILTER_VALUE &&
                 question.questionType !== filterQuestionType
             ) {
-                return false
+                return false;
             }
 
             if (
                 filterDifficulty !== ALL_FILTER_VALUE &&
                 question.difficultyLevel !== filterDifficulty
             ) {
-                return false
+                return false;
             }
 
-            if (!normalizedSearch) {
-                return true
-            }
-
-            const lesson = filterLessonMap.get(questionLessonId)
-            const searchableText = [
-                question.questionText,
-                question.questionType,
-                question.difficultyLevel,
-                lesson?.name,
-                lesson?.majorCategoryTitle,
-                lesson?.middleCategoryTitle,
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase()
-
-            return searchableText.includes(normalizedSearch)
-        })
+            /*
+             * Built-in keyword-search filtering is disabled.
+             * Your custom search implementation can add a condition here.
+             */
+            return true;
+        });
     }, [
         allQuestions,
         filterDifficulty,
         filterLessonId,
-        filterLessonMap,
         filterLessons,
         filterQuestionType,
-        questionSearch,
         selectedFilterCertification,
-    ])
+    ]);
 
     const questionPageCount = Math.max(
         1,
-        Math.ceil(filteredQuestions.length / PAGE_SIZE)
-    )
+        Math.ceil(filteredQuestions.length / PAGE_SIZE),
+    );
 
     const paginatedQuestions = useMemo(() => {
-        const startIndex = (questionPage - 1) * PAGE_SIZE
-        return filteredQuestions.slice(startIndex, startIndex + PAGE_SIZE)
-    }, [filteredQuestions, questionPage])
+        const startIndex = (questionPage - 1) * PAGE_SIZE;
+        return filteredQuestions.slice(startIndex, startIndex + PAGE_SIZE);
+    }, [filteredQuestions, questionPage]);
 
-    const normalizedLessonSearch = lessonSearch
-        .trim()
-        .toLowerCase()
+    const normalizedLessonSearch = lessonSearch.trim().toLowerCase();
 
     const visibleStructure = useMemo(() => {
         if (!selectedCertification) {
-            return []
+            return [];
         }
 
         return (selectedCertification.majorCategory ?? [])
             .map((majorCategory, majorIndex) => ({
                 ...majorCategory,
                 key: `major-${majorIndex}`,
-                visibleMiddleCategories: (
-                    majorCategory.middleCategory ?? []
-                )
+                visibleMiddleCategories: (majorCategory.middleCategory ?? [])
                     .map((middleCategory, middleIndex) => ({
                         ...middleCategory,
                         key: `middle-${majorIndex}-${middleIndex}`,
-                        visibleLessons: (
-                            middleCategory.lessons ?? []
-                        ).filter((lesson) =>
+                        visibleLessons: (middleCategory.lessons ?? []).filter((lesson) =>
                             (lesson.name ?? lesson.title ?? "")
                                 .toLowerCase()
-                                .includes(normalizedLessonSearch)
+                                .includes(normalizedLessonSearch),
                         ),
                     }))
-                    .filter(
-                        (middleCategory) =>
-                            middleCategory.visibleLessons.length > 0
-                    ),
+                    .filter((middleCategory) => middleCategory.visibleLessons.length > 0),
             }))
             .filter(
-                (majorCategory) =>
-                    majorCategory.visibleMiddleCategories.length > 0
-            )
-    }, [selectedCertification, normalizedLessonSearch])
+                (majorCategory) => majorCategory.visibleMiddleCategories.length > 0,
+            );
+    }, [selectedCertification, normalizedLessonSearch]);
 
-    const hasMatchingLesson = visibleStructure.length > 0
+    const hasMatchingLesson = visibleStructure.length > 0;
 
-    const validationTimerRef = useRef(null)
+    const validationTimerRef = useRef(null);
 
     useEffect(() => {
-        cancelIdleWork(validationTimerRef.current)
+        cancelIdleWork(validationTimerRef.current);
 
         validationTimerRef.current = scheduleIdleWork(() => {
             setValidationErrors((currentErrors) => {
                 if (Object.keys(currentErrors).length === 0) {
-                    return currentErrors
+                    return currentErrors;
                 }
 
-                const nextErrors = {}
+                const nextErrors = {};
 
                 questions.forEach((question) => {
                     if (!currentErrors[question.id]) {
-                        return
+                        return;
                     }
 
-                    const errors = validateQuestionData(
-                        question.typeId,
-                        question.data
-                    )
+                    const errors = validateQuestionData(question.typeId, question.data);
 
                     if (Object.keys(errors).length > 0) {
-                        nextErrors[question.id] = errors
+                        nextErrors[question.id] = errors;
                     }
-                })
+                });
 
-                return nextErrors
-            })
-        }, 350)
+                return nextErrors;
+            });
+        }, 350);
 
         return () => {
-            cancelIdleWork(validationTimerRef.current)
-        }
-    }, [questions])
+            cancelIdleWork(validationTimerRef.current);
+        };
+    }, [questions]);
 
     useEffect(() => {
-        setFilterLessonId(ALL_FILTER_VALUE)
-        setFilterQuestionType(ALL_FILTER_VALUE)
-        setFilterDifficulty(ALL_FILTER_VALUE)
-        setQuestionSearch("")
-        setQuestionPage(1)
-    }, [filterCertificationId])
+        setFilterLessonId(ALL_FILTER_VALUE);
+        setFilterQuestionType(ALL_FILTER_VALUE);
+        setFilterDifficulty(ALL_FILTER_VALUE);
+
+        // Built-in question-search reset is disabled.
+        // setQuestionSearch("");
+
+        setQuestionPage(1);
+    }, [filterCertificationId]);
 
     useEffect(() => {
-        setQuestionPage(1)
-    }, [
-        filterDifficulty,
-        filterLessonId,
-        filterQuestionType,
-        questionSearch,
-    ])
+        setQuestionPage(1);
+    }, [filterDifficulty, filterLessonId, filterQuestionType]);
 
     useEffect(() => {
-        setQuestionPage((currentPage) =>
-            Math.min(currentPage, questionPageCount)
-        )
-    }, [questionPageCount])
+        setQuestionPage((currentPage) => Math.min(currentPage, questionPageCount));
+    }, [questionPageCount]);
 
-    function showFeedbackDialog({
-                                    type = "success",
-                                    title,
-                                    description,
-                                }) {
+    function showFeedbackDialog({ type = "success", title, description }) {
         setFeedbackDialog({
             open: true,
             type,
             title,
             description,
-        })
+        });
     }
 
     function closeFeedbackDialog() {
         setFeedbackDialog((currentDialog) => ({
             ...currentDialog,
             open: false,
-        }))
+        }));
     }
 
     function openQuestionDialog(question, mode) {
@@ -2254,7 +2055,7 @@ function QuestionBank() {
             open: true,
             mode,
             question,
-        })
+        });
         setQuestionForm({
             questionId: question.questionId,
             parentQuestionId: question.parentQuestionId ?? null,
@@ -2264,26 +2065,26 @@ function QuestionBank() {
             imageKey: question.imageKey ?? null,
             lessonId: String(question.lessonId ?? ""),
             totalPoints: question.totalPoints ?? 1,
-        })
+        });
     }
 
     function closeQuestionDialog() {
         setQuestionDialog((currentDialog) => ({
             ...currentDialog,
             open: false,
-        }))
+        }));
     }
 
     function setQuestionFormField(field, value) {
         setQuestionForm((currentForm) => ({
             ...currentForm,
             [field]: value,
-        }))
+        }));
     }
 
     async function handleUpdateSavedQuestion() {
-        if (!questionForm?.questionId) {
-            return
+        if (!questionForm?.questionId || isUpdatingQuestion) {
+            return;
         }
 
         if (isBlank(questionForm.questionText)) {
@@ -2291,8 +2092,8 @@ function QuestionBank() {
                 type: "warning",
                 title: "Question Required",
                 description: "Enter a question prompt before saving.",
-            })
-            return
+            });
+            return;
         }
 
         if (!questionForm.lessonId) {
@@ -2300,11 +2101,13 @@ function QuestionBank() {
                 type: "warning",
                 title: "Lesson Required",
                 description: "Select a lesson before saving.",
-            })
-            return
+            });
+            return;
         }
 
         try {
+            setIsUpdatingQuestion(true);
+
             await updateQuestion(questionForm.questionId, {
                 parentQuestionId: questionForm.parentQuestionId,
                 questionType: questionForm.questionType,
@@ -2313,14 +2116,16 @@ function QuestionBank() {
                 imageKey: questionForm.imageKey,
                 lessonId: Number(questionForm.lessonId),
                 totalPoints: Number(questionForm.totalPoints || 1),
-            })
-            await refetchQuestions()
-            closeQuestionDialog()
+            });
+
+            await refetchQuestions();
+            closeQuestionDialog();
+
             showFeedbackDialog({
                 type: "success",
                 title: "Question Updated",
                 description: "The question details were saved.",
-            })
+            });
         } catch (error) {
             showFeedbackDialog({
                 type: "warning",
@@ -2328,27 +2133,29 @@ function QuestionBank() {
                 description:
                     error.response?.data?.message ??
                     "The question could not be updated. Please try again.",
-            })
+            });
+        } finally {
+            setIsUpdatingQuestion(false);
         }
     }
 
     async function handleDeleteSavedQuestion(question) {
         const confirmed = window.confirm(
-            "Delete this question? This action cannot be undone."
-        )
+            "Delete this question? This action cannot be undone.",
+        );
 
         if (!confirmed) {
-            return
+            return;
         }
 
         try {
-            await deleteQuestion(question.questionId)
-            await refetchQuestions()
+            await deleteQuestion(question.questionId);
+            await refetchQuestions();
             showFeedbackDialog({
                 type: "success",
                 title: "Question Deleted",
                 description: "The question was removed from the bank.",
-            })
+            });
         } catch (error) {
             showFeedbackDialog({
                 type: "warning",
@@ -2356,14 +2163,13 @@ function QuestionBank() {
                 description:
                     error.response?.data?.message ??
                     "The question could not be deleted. It may already be used by an exam or learner answer.",
-            })
+            });
         }
     }
 
     function handleBuilderCertificationChange(value) {
         const isChangingCertification =
-            selectedCertificationId &&
-            selectedCertificationId !== value
+            selectedCertificationId && selectedCertificationId !== value;
 
         if (isChangingCertification && questions.length > 0) {
             showFeedbackDialog({
@@ -2371,16 +2177,16 @@ function QuestionBank() {
                 title: "Unsaved Questions",
                 description:
                     "Save or remove the current questions before changing certifications.",
-            })
+            });
 
-            return
+            return;
         }
 
-        setSelectedCertificationId(value)
-        setSelectedLesson(null)
-        setLessonSearch("")
-        setQuestions([])
-        setValidationErrors({})
+        setSelectedCertificationId(value);
+        setSelectedLesson(null);
+        setLessonSearch("");
+        setQuestions([]);
+        setValidationErrors({});
     }
 
     function handleLessonSelect({
@@ -2390,12 +2196,10 @@ function QuestionBank() {
                                     middleCategoryTitle,
                                 }) {
         if (selectedLesson?.id === lessonId) {
-            return
+            return;
         }
 
-        const isChangingLesson =
-            selectedLesson &&
-            selectedLesson.id !== lessonId
+        const isChangingLesson = selectedLesson && selectedLesson.id !== lessonId;
 
         if (isChangingLesson && questions.length > 0) {
             showFeedbackDialog({
@@ -2403,9 +2207,9 @@ function QuestionBank() {
                 title: "Unsaved Questions",
                 description:
                     "Save or remove the current questions before selecting another lesson.",
-            })
+            });
 
-            return
+            return;
         }
 
         setSelectedLesson({
@@ -2413,10 +2217,10 @@ function QuestionBank() {
             name: lesson.name ?? lesson.title ?? "Untitled Lesson",
             majorCategoryTitle,
             middleCategoryTitle,
-        })
+        });
 
-        setQuestions([])
-        setValidationErrors({})
+        setQuestions([]);
+        setValidationErrors({});
     }
 
     function addQuestion(questionType) {
@@ -2428,45 +2232,41 @@ function QuestionBank() {
                 questionTypeName: questionType.title,
                 data: cloneQuestionData(questionType.data),
             },
-        ])
+        ]);
     }
 
     function updateQuestionData(questionId, updater) {
         setQuestions((previousQuestions) =>
             previousQuestions.map((question) => {
                 if (question.id !== questionId) {
-                    return question
+                    return question;
                 }
 
                 return {
                     ...question,
                     data:
-                        typeof updater === "function"
-                            ? updater(question.data)
-                            : updater,
-                }
-            })
-        )
+                        typeof updater === "function" ? updater(question.data) : updater,
+                };
+            }),
+        );
     }
 
     function removeQuestion(questionId) {
         setQuestions((previousQuestions) =>
-            previousQuestions.filter(
-                (question) => question.id !== questionId
-            )
-        )
+            previousQuestions.filter((question) => question.id !== questionId),
+        );
 
         setValidationErrors((currentErrors) => {
-            const nextErrors = { ...currentErrors }
-            delete nextErrors[questionId]
-            return nextErrors
-        })
+            const nextErrors = { ...currentErrors };
+            delete nextErrors[questionId];
+            return nextErrors;
+        });
     }
 
     const submitQuestions = async () => {
         for (const question of questions) {
             switch (question.typeId) {
-                case 'MCQ': {
+                case "MCQ": {
                     const savedMCQ = await saveQuestion({
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
@@ -2474,7 +2274,7 @@ function QuestionBank() {
                         imageKey: null,
                         lessonId: Number(selectedLesson.id),
                         totalPoints: 1,
-                    })
+                    });
 
                     for (const choice of question.data.choices) {
                         await saveChoices({
@@ -2483,11 +2283,11 @@ function QuestionBank() {
                             imageKey: null,
                             correct: choice.isCorrect,
                             explanation: choice.explanation,
-                        })
+                        });
                     }
-                    break
+                    break;
                 }
-                case 'SHORT_ANSWER': {
+                case "SHORT_ANSWER": {
                     const savedShortAnswer = await saveQuestion({
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
@@ -2495,15 +2295,15 @@ function QuestionBank() {
                         imageKey: null,
                         lessonId: Number(selectedLesson.id),
                         totalPoints: 1,
-                    })
+                    });
                     await saveTextQuestion({
                         questionId: savedShortAnswer.questionId,
                         correctAnswer: question.data.correctAnswer,
                         checkingMethod: question.data.checkingMethod,
-                    })
-                    break
+                    });
+                    break;
                 }
-                case 'DESCRIPTIVE': {
+                case "DESCRIPTIVE": {
                     const savedDescriptive = await saveQuestion({
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
@@ -2511,15 +2311,15 @@ function QuestionBank() {
                         imageKey: null,
                         lessonId: Number(selectedLesson.id),
                         totalPoints: 1,
-                    })
+                    });
                     await saveTextQuestion({
                         questionId: savedDescriptive.questionId,
                         correctAnswer: question.data.rubricBasedAnswer,
                         checkingMethod: question.data.checkingMethod,
-                    })
-                    break
+                    });
+                    break;
                 }
-                case 'PROGRAMMING': {
+                case "PROGRAMMING": {
                     const savedProgramming = await saveQuestion({
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
@@ -2527,7 +2327,7 @@ function QuestionBank() {
                         imageKey: null,
                         lessonId: Number(selectedLesson.id),
                         totalPoints: 1,
-                    })
+                    });
                     await saveProgrammingQuestion({
                         questionId: savedProgramming.questionId,
                         starterCode: question.data.starterCode,
@@ -2535,9 +2335,9 @@ function QuestionBank() {
                             inputData: testCase.inputData,
                             expectedOutput: testCase.expectedOutput,
                         })),
-                    })
+                    });
 
-                    for (const subQuestion of (question.data.subQuestions ?? [])) {
+                    for (const subQuestion of question.data.subQuestions ?? []) {
                         const savedSub = await saveQuestion({
                             parentQuestionId: savedProgramming.questionId,
                             questionType: question.data.questionType,
@@ -2545,16 +2345,16 @@ function QuestionBank() {
                             questionText: subQuestion.question,
                             lessonId: Number(selectedLesson.id),
                             totalPoints: 1,
-                        })
+                        });
                         await saveTextQuestion({
                             questionId: savedSub.questionId,
                             correctAnswer: subQuestion.correctAnswer,
-                            checkingMethod: 'AI_SEMANTIC',
-                        })
+                            checkingMethod: "AI_SEMANTIC",
+                        });
                     }
-                    break
+                    break;
                 }
-                case 'DIAGRAM': {
+                case "DIAGRAM": {
                     const savedDiagram = await saveQuestion({
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
@@ -2562,7 +2362,7 @@ function QuestionBank() {
                         imageKey: null,
                         lessonId: Number(selectedLesson.id),
                         totalPoints: 1,
-                    })
+                    });
                     await saveDiagramQuestion({
                         questionId: savedDiagram.questionId,
                         diagramType: question.data.diagramType,
@@ -2572,9 +2372,9 @@ function QuestionBank() {
                             nodes: question.data.referenceDiagramNodes,
                             edges: question.data.referenceDiagramEdges,
                         }),
-                    })
+                    });
 
-                    for (const subQuestion of (question.data.subQuestions ?? [])) {
+                    for (const subQuestion of question.data.subQuestions ?? []) {
                         const savedSub = await saveQuestion({
                             parentQuestionId: savedDiagram.questionId,
                             questionType: question.data.questionType,
@@ -2582,38 +2382,35 @@ function QuestionBank() {
                             questionText: subQuestion.question,
                             lessonId: Number(selectedLesson.id),
                             totalPoints: 1,
-                        })
+                        });
                         await saveTextQuestion({
                             questionId: savedSub.questionId,
                             correctAnswer: subQuestion.correctAnswer,
-                            checkingMethod: 'AI_SEMANTIC',
-                        })
+                            checkingMethod: "AI_SEMANTIC",
+                        });
                     }
-                    break
+                    break;
                 }
             }
         }
-    }
+    };
 
     async function handleSave() {
         if (isSavingQuestions) {
-            return
+            return;
         }
 
-        const nextValidationErrors = {}
+        const nextValidationErrors = {};
 
         questions.forEach((question) => {
-            const errors = validateQuestionData(
-                question.typeId,
-                question.data
-            )
+            const errors = validateQuestionData(question.typeId, question.data);
 
             if (Object.keys(errors).length > 0) {
-                nextValidationErrors[question.id] = errors
+                nextValidationErrors[question.id] = errors;
             }
-        })
+        });
 
-        setValidationErrors(nextValidationErrors)
+        setValidationErrors(nextValidationErrors);
 
         if (Object.keys(nextValidationErrors).length > 0) {
             window.setTimeout(() => {
@@ -2622,34 +2419,35 @@ function QuestionBank() {
                     ?.scrollIntoView({
                         behavior: "smooth",
                         block: "center",
-                    })
-            }, 0)
+                    });
+            }, 0);
 
-            return
+            return;
         }
 
         try {
-            setIsSavingQuestions(true)
-            await submitQuestions()
-            const savedCount = questions.length
-            await refetchQuestions()
-            setQuestions([])
-            setValidationErrors({})
+            setIsSavingQuestions(true);
+            await submitQuestions();
+            const savedCount = questions.length;
+            await refetchQuestions();
+            setQuestions([]);
+            setValidationErrors({});
             showFeedbackDialog({
                 type: "success",
                 title: "Questions Saved",
                 description: `${savedCount} question${
                     savedCount === 1 ? "" : "s"
                 } saved successfully.`,
-            })
+            });
         } catch (error) {
             showFeedbackDialog({
                 type: "warning",
                 title: "Save Failed",
-                description: "An error occurred while saving the questions. Please try again.",
-            })
+                description:
+                    "An error occurred while saving the questions. Please try again.",
+            });
         } finally {
-            setIsSavingQuestions(false)
+            setIsSavingQuestions(false);
         }
     }
 
@@ -2667,8 +2465,8 @@ function QuestionBank() {
                         </h1>
 
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Create and manage questions for certifications,
-                            quizzes, and exams.
+                            Create and manage questions for certifications, quizzes, and
+                            exams.
                         </p>
                     </div>
                 </header>
@@ -2698,9 +2496,7 @@ function QuestionBank() {
                                 type="button"
                                 size="sm"
                                 disabled={
-                                    isSavingQuestions ||
-                                    !selectedLesson ||
-                                    questions.length === 0
+                                    isSavingQuestions || !selectedLesson || questions.length === 0
                                 }
                                 onClick={handleSave}
                             >
@@ -2721,167 +2517,262 @@ function QuestionBank() {
                             </h2>
 
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Select a certification to view and manage its
-                                questions.
+                                Select a certification to view and manage its questions.
                             </p>
                         </div>
 
-                        <Card className="mt-5">
-                            <CardContent className="p-4">
-                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_190px_170px_150px_160px]">
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Card className="mt-5 border-border/80 shadow-sm">
+                            <CardContent className="p-4 sm:p-5">
+                                <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-foreground">
+                                            Find questions
+                                        </h3>
 
-                                        <Input
-                                            value={questionSearch}
-                                            onChange={(event) =>
-                                                setQuestionSearch(
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder="Search questions..."
-                                            className="pl-9"
-                                            disabled={
-                                                !selectedFilterCertification
-                                            }
-                                        />
+                                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                            Choose a certification, then narrow the results by lesson,
+                                            question type, or difficulty.
+                                        </p>
                                     </div>
 
-                                    <Select
-                                        value={filterCertificationId}
-                                        onValueChange={setFilterCertificationId}
-                                        disabled={isPending}
-                                    >
-                                        <SelectTrigger className="min-w-0 [&>span]:truncate">
-                                            <SelectValue placeholder="Select certification" />
-                                        </SelectTrigger>
+                                    {selectedFilterCertification && (
+                                        <p className="max-w-full truncate text-xs text-muted-foreground sm:max-w-[280px]">
+                                            Viewing:{" "}
+                                            <span className="font-medium text-foreground">
+                        {getCertificationTitle(selectedFilterCertification)}
+                      </span>
+                                        </p>
+                                    )}
+                                </div>
 
-                                        <SelectContent>
-                                            <SelectGroup>
-                                                {certifications.map(
-                                                    (certification, index) => (
+                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(250px,1.35fr)_minmax(230px,1.2fr)_minmax(185px,0.9fr)_minmax(165px,0.8fr)]">
+                                    <div className="space-y-1.5">
+                                        <Label
+                                            htmlFor="question-filter-certification"
+                                            className="text-xs font-medium text-muted-foreground"
+                                        >
+                                            Certification
+                                        </Label>
+
+                                        <Select
+                                            value={filterCertificationId}
+                                            onValueChange={setFilterCertificationId}
+                                            disabled={isPending}
+                                        >
+                                            <SelectTrigger
+                                                id="question-filter-certification"
+                                                className="h-10 w-full min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate"
+                                            >
+                                                <SelectValue placeholder="Select certification" />
+                                            </SelectTrigger>
+
+                                            <SelectContent
+                                                position="popper"
+                                                align="start"
+                                                sideOffset={6}
+                                                className="max-h-72 w-[min(440px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                                            >
+                                                <SelectGroup>
+                                                    {certifications.map((certification, index) => (
                                                         <SelectItem
                                                             key={
                                                                 certification.certificationId ??
                                                                 certification.id ??
                                                                 index
                                                             }
-                                                            value={getCertificationValue(
-                                                                certification
-                                                            )}
-                                                            title={getCertificationTitle(
-                                                                certification
-                                                            )}
+                                                            value={getCertificationValue(certification)}
+                                                            title={getCertificationTitle(certification)}
+                                                            className="h-auto min-h-10 whitespace-normal py-2 pr-8 text-sm leading-5"
                                                         >
-                              <span className="block truncate">
-                                {getCertificationTitle(
-                                    certification
-                                )}
-                              </span>
+                                                            {getCertificationTitle(certification)}
                                                         </SelectItem>
-                                                    )
-                                                )}
-                                            </SelectGroup>
-                                        </SelectContent>
-                                    </Select>
+                                                    ))}
+                                                </SelectGroup>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-                                    <Select
-                                        value={filterLessonId}
-                                        onValueChange={setFilterLessonId}
-                                        disabled={
-                                            !selectedFilterCertification ||
-                                            filterLessons.length === 0
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select lesson" />
-                                        </SelectTrigger>
+                                    <div className="space-y-1.5">
+                                        <Label
+                                            htmlFor="question-filter-lesson"
+                                            className="text-xs font-medium text-muted-foreground"
+                                        >
+                                            Lesson
+                                        </Label>
 
-                                        <SelectContent>
-                                            <SelectItem value={ALL_FILTER_VALUE}>
-                                                All lessons
-                                            </SelectItem>
+                                        <Select
+                                            value={filterLessonId}
+                                            onValueChange={setFilterLessonId}
+                                            disabled={
+                                                !selectedFilterCertification ||
+                                                filterLessons.length === 0
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id="question-filter-lesson"
+                                                className="h-10 w-full min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate"
+                                            >
+                                                <SelectValue placeholder="All lessons" />
+                                            </SelectTrigger>
 
-                                            {filterLessons.map((lesson) => (
+                                            <SelectContent
+                                                position="popper"
+                                                align="start"
+                                                sideOffset={6}
+                                                className="max-h-72 w-[min(400px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                                            >
                                                 <SelectItem
-                                                    key={lesson.id}
-                                                    value={String(
-                                                        lesson.numericId ??
-                                                        lesson.id
-                                                    )}
-                                                    title={lesson.name}
+                                                    value={ALL_FILTER_VALUE}
+                                                    className="min-h-10"
                                                 >
-                                                    <span className="block truncate">
-                                                        {lesson.name}
-                                                    </span>
+                                                    All lessons
                                                 </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
 
-                                    <Select
-                                        value={filterQuestionType}
-                                        onValueChange={setFilterQuestionType}
-                                        disabled={
-                                            !selectedFilterCertification
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Question type" />
-                                        </SelectTrigger>
+                                                {filterLessons.map((lesson) => (
+                                                    <SelectItem
+                                                        key={lesson.id}
+                                                        value={String(lesson.numericId ?? lesson.id)}
+                                                        title={lesson.name}
+                                                        className="h-auto min-h-10 whitespace-normal py-2 pr-8 text-sm leading-5"
+                                                    >
+                                                        {lesson.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-                                        <SelectContent>
-                                            <SelectItem value={ALL_FILTER_VALUE}>
-                                                All types
-                                            </SelectItem>
+                                    <div className="space-y-1.5">
+                                        <Label
+                                            htmlFor="question-filter-type"
+                                            className="text-xs font-medium text-muted-foreground"
+                                        >
+                                            Question type
+                                        </Label>
 
-                                            <SelectItem value="MCQ">
-                                                Multiple Choice
-                                            </SelectItem>
+                                        <Select
+                                            value={filterQuestionType}
+                                            onValueChange={setFilterQuestionType}
+                                            disabled={!selectedFilterCertification}
+                                        >
+                                            <SelectTrigger
+                                                id="question-filter-type"
+                                                className="h-10 w-full min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate"
+                                            >
+                                                <SelectValue placeholder="All types" />
+                                            </SelectTrigger>
 
-                                            <SelectItem value="SHORT_ANSWER">
-                                                Short Answer
-                                            </SelectItem>
+                                            <SelectContent
+                                                position="popper"
+                                                align="start"
+                                                sideOffset={6}
+                                                className="max-h-60 w-[min(280px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                                            >
+                                                <SelectItem
+                                                    value={ALL_FILTER_VALUE}
+                                                    className="min-h-10"
+                                                >
+                                                    All types
+                                                </SelectItem>
 
-                                            <SelectItem value="DESCRIPTIVE">
-                                                Descriptive
-                                            </SelectItem>
+                                                <SelectItem value="MCQ" className="min-h-10">
+                                                    Multiple Choice
+                                                </SelectItem>
 
-                                            <SelectItem value="CRITICAL_THINKING">
-                                                Critical Thinking
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                                <SelectItem value="SHORT_ANSWER" className="min-h-10">
+                                                    Short Answer
+                                                </SelectItem>
 
-                                    <Select
-                                        value={filterDifficulty}
-                                        onValueChange={setFilterDifficulty}
-                                        disabled={
-                                            !selectedFilterCertification
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Difficulty" />
-                                        </SelectTrigger>
+                                                <SelectItem value="DESCRIPTIVE" className="min-h-10">
+                                                    Descriptive
+                                                </SelectItem>
 
-                                        <SelectContent>
-                                            <SelectItem value={ALL_FILTER_VALUE}>
-                                                All difficulties
-                                            </SelectItem>
+                                                <SelectItem
+                                                    value="CRITICAL_THINKING"
+                                                    className="min-h-10"
+                                                >
+                                                    Critical Thinking
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-                                            <SelectItem value="easy">
-                                                Easy
-                                            </SelectItem>
+                                    <div className="space-y-1.5">
+                                        <Label
+                                            htmlFor="question-filter-difficulty"
+                                            className="text-xs font-medium text-muted-foreground"
+                                        >
+                                            Difficulty
+                                        </Label>
 
-                                            <SelectItem value="average">
-                                                Average
-                                            </SelectItem>
+                                        <Select
+                                            value={filterDifficulty}
+                                            onValueChange={setFilterDifficulty}
+                                            disabled={!selectedFilterCertification}
+                                        >
+                                            <SelectTrigger
+                                                id="question-filter-difficulty"
+                                                className="h-10 w-full min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate"
+                                            >
+                                                <SelectValue placeholder="All difficulties" />
+                                            </SelectTrigger>
 
-                                            <SelectItem value="hard">
-                                                Hard
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                            <SelectContent
+                                                position="popper"
+                                                align="start"
+                                                sideOffset={6}
+                                                className="max-h-60 w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl p-1"
+                                            >
+                                                <SelectItem
+                                                    value={ALL_FILTER_VALUE}
+                                                    className="min-h-10"
+                                                >
+                                                    All difficulties
+                                                </SelectItem>
+
+                                                <SelectItem value="easy" className="min-h-10">
+                                                    Easy
+                                                </SelectItem>
+
+                                                <SelectItem value="average" className="min-h-10">
+                                                    Average
+                                                </SelectItem>
+
+                                                <SelectItem value="hard" className="min-h-10">
+                                                    Hard
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/*
+                                      Built-in question search is disabled.
+                                      Add your own search UI and logic here later.
+
+                                    <div className="space-y-1.5 md:col-span-2 xl:col-span-4">
+                                        <Label
+                                            htmlFor="question-search"
+                                            className="text-xs font-medium text-muted-foreground"
+                                        >
+                                            Search
+                                        </Label>
+
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                                            <Input
+                                                id="question-search"
+                                                value={questionSearch}
+                                                onChange={(event) =>
+                                                    setQuestionSearch(event.target.value)
+                                                }
+                                                placeholder="Search question text, lesson, category, or question type..."
+                                                className="h-10 rounded-lg bg-background pl-9"
+                                                disabled={!selectedFilterCertification}
+                                            />
+                                        </div>
+                                    </div>
+                                    */}
                                 </div>
                             </CardContent>
                         </Card>
@@ -2891,9 +2782,7 @@ function QuestionBank() {
                                 <Table className="min-w-[880px]">
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="min-w-72">
-                                                Question
-                                            </TableHead>
+                                            <TableHead className="min-w-72">Question</TableHead>
 
                                             <TableHead>Type</TableHead>
                                             <TableHead>Lesson</TableHead>
@@ -2901,9 +2790,7 @@ function QuestionBank() {
                                             <TableHead>Status</TableHead>
                                             <TableHead>Updated</TableHead>
 
-                                            <TableHead className="text-right">
-                                                Actions
-                                            </TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
 
@@ -2913,10 +2800,7 @@ function QuestionBank() {
                                         isQuestionsError ||
                                         paginatedQuestions.length === 0 ? (
                                             <TableRow>
-                                                <TableCell
-                                                    colSpan={7}
-                                                    className="h-[390px]"
-                                                >
+                                                <TableCell colSpan={7} className="h-[390px]">
                                                     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
                                                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                                                             <FileQuestion className="h-5 w-5 text-muted-foreground" />
@@ -2938,130 +2822,99 @@ function QuestionBank() {
                                                                 : isQuestionsPending
                                                                     ? "Fetching the latest question bank records."
                                                                     : selectedFilterCertification
-                                                                        ? "Try a different lesson, type, difficulty, or search term."
+                                                                        ? "Try a different lesson, question type, or difficulty."
                                                                         : "Choose a certification above to view its questions."}
                                                         </p>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            paginatedQuestions.map(
-                                                (question) => {
-                                                    const lesson =
-                                                        filterLessonMap.get(
-                                                            String(
-                                                                question.lessonId ??
-                                                                ""
-                                                            )
-                                                        )
+                                            paginatedQuestions.map((question) => {
+                                                const lesson = filterLessonMap.get(
+                                                    String(question.lessonId ?? ""),
+                                                );
 
-                                                    return (
-                                                        <TableRow
-                                                            key={
-                                                                question.questionId
-                                                            }
-                                                        >
-                                                            <TableCell className="max-w-[360px]">
-                                                                <p
-                                                                    className="line-clamp-2 font-medium text-foreground"
-                                                                    title={
-                                                                        question.questionText
+                                                return (
+                                                    <TableRow key={question.questionId}>
+                                                        <TableCell className="max-w-[360px]">
+                                                            <p
+                                                                className="line-clamp-2 font-medium text-foreground"
+                                                                title={question.questionText}
+                                                            >
+                                                                {question.questionText}
+                                                            </p>
+                                                        </TableCell>
+
+                                                        <TableCell>
+                                                            <Badge variant="secondary">
+                                                                {getQuestionTypeLabel(question.questionType)}
+                                                            </Badge>
+                                                        </TableCell>
+
+                                                        <TableCell className="max-w-[220px]">
+                                                            <p
+                                                                className="truncate text-sm text-foreground"
+                                                                title={lesson?.name}
+                                                            >
+                                                                {lesson?.name ?? "Unknown lesson"}
+                                                            </p>
+                                                        </TableCell>
+
+                                                        <TableCell>
+                                                            {getDifficultyLabel(question.difficultyLevel)}
+                                                        </TableCell>
+
+                                                        <TableCell>
+                                                            <Badge variant="outline">Saved</Badge>
+                                                        </TableCell>
+
+                                                        <TableCell className="text-muted-foreground">
+                                                            -
+                                                        </TableCell>
+
+                                                        <TableCell>
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label="View question"
+                                                                    onClick={() =>
+                                                                        openQuestionDialog(question, "view")
                                                                     }
                                                                 >
-                                                                    {
-                                                                        question.questionText
-                                                                    }
-                                                                </p>
-                                                            </TableCell>
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
 
-                                                            <TableCell>
-                                                                <Badge variant="secondary">
-                                                                    {getQuestionTypeLabel(
-                                                                        question.questionType
-                                                                    )}
-                                                                </Badge>
-                                                            </TableCell>
-
-                                                            <TableCell className="max-w-[220px]">
-                                                                <p
-                                                                    className="truncate text-sm text-foreground"
-                                                                    title={
-                                                                        lesson?.name
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label="Edit question"
+                                                                    onClick={() =>
+                                                                        openQuestionDialog(question, "edit")
                                                                     }
                                                                 >
-                                                                    {lesson?.name ??
-                                                                        "Unknown lesson"}
-                                                                </p>
-                                                            </TableCell>
+                                                                    <Pencil className="h-4 w-4" />
+                                                                </Button>
 
-                                                            <TableCell>
-                                                                {getDifficultyLabel(
-                                                                    question.difficultyLevel
-                                                                )}
-                                                            </TableCell>
-
-                                                            <TableCell>
-                                                                <Badge variant="outline">
-                                                                    Saved
-                                                                </Badge>
-                                                            </TableCell>
-
-                                                            <TableCell className="text-muted-foreground">
-                                                                -
-                                                            </TableCell>
-
-                                                            <TableCell>
-                                                                <div className="flex justify-end gap-1">
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        aria-label="View question"
-                                                                        onClick={() =>
-                                                                            openQuestionDialog(
-                                                                                question,
-                                                                                "view"
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Eye className="h-4 w-4" />
-                                                                    </Button>
-
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        aria-label="Edit question"
-                                                                        onClick={() =>
-                                                                            openQuestionDialog(
-                                                                                question,
-                                                                                "edit"
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Pencil className="h-4 w-4" />
-                                                                    </Button>
-
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        aria-label="Delete question"
-                                                                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                                        onClick={() =>
-                                                                            handleDeleteSavedQuestion(
-                                                                                question
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </div>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )
-                                                }
-                                            )
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label="Delete question"
+                                                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                                    onClick={() =>
+                                                                        handleDeleteSavedQuestion(question)
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
                                         )}
                                     </TableBody>
                                 </Table>
@@ -3073,11 +2926,9 @@ function QuestionBank() {
                                 <p className="min-w-0 truncate text-sm text-muted-foreground">
                                     {selectedFilterCertification
                                         ? `${filteredQuestions.length} question${
-                                            filteredQuestions.length === 1
-                                                ? ""
-                                                : "s"
+                                            filteredQuestions.length === 1 ? "" : "s"
                                         } for ${getCertificationTitle(
-                                            selectedFilterCertification
+                                            selectedFilterCertification,
                                         )}`
                                         : "No certification selected"}
                                 </p>
@@ -3102,19 +2953,14 @@ function QuestionBank() {
                                         disabled={questionPage === 1}
                                         onClick={() =>
                                             setQuestionPage((currentPage) =>
-                                                Math.max(1, currentPage - 1)
+                                                Math.max(1, currentPage - 1),
                                             )
                                         }
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                     </Button>
 
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        disabled
-                                    >
+                                    <Button type="button" variant="outline" size="sm" disabled>
                                         {questionPage} / {questionPageCount}
                                     </Button>
 
@@ -3123,15 +2969,10 @@ function QuestionBank() {
                                         variant="outline"
                                         size="icon"
                                         aria-label="Next page"
-                                        disabled={
-                                            questionPage >= questionPageCount
-                                        }
+                                        disabled={questionPage >= questionPageCount}
                                         onClick={() =>
                                             setQuestionPage((currentPage) =>
-                                                Math.min(
-                                                    questionPageCount,
-                                                    currentPage + 1
-                                                )
+                                                Math.min(questionPageCount, currentPage + 1),
                                             )
                                         }
                                     >
@@ -3143,12 +2984,8 @@ function QuestionBank() {
                                         variant="outline"
                                         size="icon"
                                         aria-label="Last page"
-                                        disabled={
-                                            questionPage >= questionPageCount
-                                        }
-                                        onClick={() =>
-                                            setQuestionPage(questionPageCount)
-                                        }
+                                        disabled={questionPage >= questionPageCount}
+                                        onClick={() => setQuestionPage(questionPageCount)}
                                     >
                                         <ChevronsRight className="h-4 w-4" />
                                     </Button>
@@ -3172,40 +3009,37 @@ function QuestionBank() {
 
                                     <Select
                                         value={selectedCertificationId}
-                                        onValueChange={
-                                            handleBuilderCertificationChange
-                                        }
+                                        onValueChange={handleBuilderCertificationChange}
                                         disabled={isPending}
                                     >
-                                        <SelectTrigger className="mt-3 w-full min-w-0 [&>span]:truncate">
+                                        <SelectTrigger
+                                            id="builder-certification"
+                                            className="mt-3 h-10 w-full min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate"
+                                        >
                                             <SelectValue placeholder="Select a certification" />
                                         </SelectTrigger>
 
-                                        <SelectContent className="w-[var(--radix-select-trigger-width)]">
+                                        <SelectContent
+                                            position="popper"
+                                            align="start"
+                                            sideOffset={6}
+                                            className="max-h-72 w-[min(440px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                                        >
                                             <SelectGroup>
-                                                {certifications.map(
-                                                    (certification, index) => (
-                                                        <SelectItem
-                                                            key={
-                                                                certification.certificationId ??
-                                                                certification.id ??
-                                                                index
-                                                            }
-                                                            value={getCertificationValue(
-                                                                certification
-                                                            )}
-                                                            title={getCertificationTitle(
-                                                                certification
-                                                            )}
-                                                        >
-                              <span className="block w-full truncate">
-                                {getCertificationTitle(
-                                    certification
-                                )}
-                              </span>
-                                                        </SelectItem>
-                                                    )
-                                                )}
+                                                {certifications.map((certification, index) => (
+                                                    <SelectItem
+                                                        key={
+                                                            certification.certificationId ??
+                                                            certification.id ??
+                                                            index
+                                                        }
+                                                        value={getCertificationValue(certification)}
+                                                        title={getCertificationTitle(certification)}
+                                                        className="h-auto min-h-10 whitespace-normal py-2 pr-8 text-sm leading-5"
+                                                    >
+                                                        {getCertificationTitle(certification)}
+                                                    </SelectItem>
+                                                ))}
                                             </SelectGroup>
                                         </SelectContent>
                                     </Select>
@@ -3216,9 +3050,7 @@ function QuestionBank() {
 
                                     <Input
                                         value={lessonSearch}
-                                        onChange={(event) =>
-                                            setLessonSearch(event.target.value)
-                                        }
+                                        onChange={(event) => setLessonSearch(event.target.value)}
                                         placeholder="Search lessons..."
                                         className="pl-9"
                                         disabled={!selectedCertification}
@@ -3260,10 +3092,7 @@ function QuestionBank() {
                                                 <div className="space-y-4 p-3">
                                                     {majorCategory.visibleMiddleCategories.map(
                                                         (middleCategory) => (
-                                                            <div
-                                                                key={middleCategory.key}
-                                                                className="min-w-0"
-                                                            >
+                                                            <div key={middleCategory.key} className="min-w-0">
                                                                 <div className="mb-1.5 flex min-w-0 items-center gap-2 px-2">
                                                                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
 
@@ -3275,10 +3104,7 @@ function QuestionBank() {
                                                                     </p>
 
                                                                     <span className="shrink-0 text-[11px] text-muted-foreground">
-                                    {
-                                        middleCategory
-                                            .visibleLessons.length
-                                    }
+                                    {middleCategory.visibleLessons.length}
                                   </span>
                                                                 </div>
 
@@ -3288,16 +3114,16 @@ function QuestionBank() {
                                                                             const lessonId = String(
                                                                                 lesson.lessonId ??
                                                                                 lesson.id ??
-                                                                                `${middleCategory.key}-lesson-${lessonIndex}`
-                                                                            )
+                                                                                `${middleCategory.key}-lesson-${lessonIndex}`,
+                                                                            );
 
                                                                             const lessonName =
                                                                                 lesson.name ??
                                                                                 lesson.title ??
-                                                                                "Untitled Lesson"
+                                                                                "Untitled Lesson";
 
                                                                             const isSelected =
-                                                                                selectedLesson?.id === lessonId
+                                                                                selectedLesson?.id === lessonId;
 
                                                                             return (
                                                                                 <button
@@ -3333,25 +3159,24 @@ function QuestionBank() {
                                             {lessonName}
                                           </span>
                                                                                 </button>
-                                                                            )
-                                                                        }
+                                                                            );
+                                                                        },
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                        )
+                                                        ),
                                                     )}
                                                 </div>
                                             </section>
                                         ))}
 
-                                        {normalizedLessonSearch &&
-                                            !hasMatchingLesson && (
-                                                <EmptyState
-                                                    size="sm"
-                                                    title="No lessons found"
-                                                    description="Try another lesson name."
-                                                />
-                                            )}
+                                        {normalizedLessonSearch && !hasMatchingLesson && (
+                                            <EmptyState
+                                                size="sm"
+                                                title="No lessons found"
+                                                description="Try another lesson name."
+                                            />
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -3381,9 +3206,7 @@ function QuestionBank() {
 
                                             <p className="shrink-0 text-sm text-muted-foreground">
                                                 {questions.length}{" "}
-                                                {questions.length === 1
-                                                    ? "question"
-                                                    : "questions"}
+                                                {questions.length === 1 ? "question" : "questions"}
                                             </p>
                                         </div>
 
@@ -3397,9 +3220,8 @@ function QuestionBank() {
                                                     </p>
 
                                                     <p className="mt-1 text-xs leading-5">
-                                                        Review the highlighted question cards,
-                                                        complete the required fields, then save
-                                                        again.
+                                                        Review the highlighted question cards, complete the
+                                                        required fields, then save again.
                                                     </p>
                                                 </div>
                                             </div>
@@ -3414,10 +3236,10 @@ function QuestionBank() {
                                         ) : (
                                             questions.map((question, index) => {
                                                 function handleRemove() {
-                                                    removeQuestion(question.id)
+                                                    removeQuestion(question.id);
                                                 }
                                                 function handleDataChange(updater) {
-                                                    updateQuestionData(question.id, updater)
+                                                    updateQuestionData(question.id, updater);
                                                 }
                                                 return (
                                                     <QuestionCardWrapper
@@ -3428,7 +3250,7 @@ function QuestionBank() {
                                                         onRemove={handleRemove}
                                                         onDataChange={handleDataChange}
                                                     />
-                                                )
+                                                );
                                             })
                                         )}
                                     </>
@@ -3469,8 +3291,8 @@ function QuestionBank() {
             <Dialog
                 open={questionDialog.open}
                 onOpenChange={(open) => {
-                    if (!open) {
-                        closeQuestionDialog()
+                    if (!open && !isUpdatingQuestion) {
+                        closeQuestionDialog();
                     }
                 }}
             >
@@ -3495,25 +3317,30 @@ function QuestionBank() {
                                 <div className="space-y-2">
                                     <Label>Question Type</Label>
 
-                                    <Select
-                                        value={questionForm.questionType}
-                                        disabled
-                                    >
-                                        <SelectTrigger>
+                                    <Select value={questionForm.questionType} disabled>
+                                        <SelectTrigger className="h-10 rounded-lg bg-muted/30 px-3 text-sm">
                                             <SelectValue />
                                         </SelectTrigger>
 
-                                        <SelectContent>
-                                            <SelectItem value="MCQ">
+                                        <SelectContent
+                                            position="popper"
+                                            align="start"
+                                            sideOffset={6}
+                                            className="max-h-60 w-[min(280px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                                        >
+                                            <SelectItem value="MCQ" className="min-h-10">
                                                 Multiple Choice
                                             </SelectItem>
-                                            <SelectItem value="SHORT_ANSWER">
+                                            <SelectItem value="SHORT_ANSWER" className="min-h-10">
                                                 Short Answer
                                             </SelectItem>
-                                            <SelectItem value="DESCRIPTIVE">
+                                            <SelectItem value="DESCRIPTIVE" className="min-h-10">
                                                 Descriptive
                                             </SelectItem>
-                                            <SelectItem value="CRITICAL_THINKING">
+                                            <SelectItem
+                                                value="CRITICAL_THINKING"
+                                                className="min-h-10"
+                                            >
                                                 Critical Thinking
                                             </SelectItem>
                                         </SelectContent>
@@ -3526,27 +3353,27 @@ function QuestionBank() {
                                     <Select
                                         value={questionForm.difficultyLevel}
                                         onValueChange={(value) =>
-                                            setQuestionFormField(
-                                                "difficultyLevel",
-                                                value
-                                            )
+                                            setQuestionFormField("difficultyLevel", value)
                                         }
-                                        disabled={
-                                            questionDialog.mode !== "edit"
-                                        }
+                                        disabled={questionDialog.mode !== "edit"}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="h-10 rounded-lg bg-background px-3 text-sm">
                                             <SelectValue />
                                         </SelectTrigger>
 
-                                        <SelectContent>
-                                            <SelectItem value="easy">
+                                        <SelectContent
+                                            position="popper"
+                                            align="start"
+                                            sideOffset={6}
+                                            className="max-h-60 w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl p-1"
+                                        >
+                                            <SelectItem value="easy" className="min-h-10">
                                                 Easy
                                             </SelectItem>
-                                            <SelectItem value="average">
+                                            <SelectItem value="average" className="min-h-10">
                                                 Average
                                             </SelectItem>
-                                            <SelectItem value="hard">
+                                            <SelectItem value="hard" className="min-h-10">
                                                 Hard
                                             </SelectItem>
                                         </SelectContent>
@@ -3560,10 +3387,7 @@ function QuestionBank() {
                                 <Textarea
                                     value={questionForm.questionText}
                                     onChange={(event) =>
-                                        setQuestionFormField(
-                                            "questionText",
-                                            event.target.value
-                                        )
+                                        setQuestionFormField("questionText", event.target.value)
                                     }
                                     readOnly={questionDialog.mode !== "edit"}
                                     className="min-h-32"
@@ -3577,32 +3401,28 @@ function QuestionBank() {
                                     <Select
                                         value={questionForm.lessonId}
                                         onValueChange={(value) =>
-                                            setQuestionFormField(
-                                                "lessonId",
-                                                value
-                                            )
+                                            setQuestionFormField("lessonId", value)
                                         }
-                                        disabled={
-                                            questionDialog.mode !== "edit"
-                                        }
+                                        disabled={questionDialog.mode !== "edit"}
                                     >
-                                        <SelectTrigger className="min-w-0 [&>span]:truncate">
+                                        <SelectTrigger className="h-10 min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate">
                                             <SelectValue placeholder="Select lesson" />
                                         </SelectTrigger>
 
-                                        <SelectContent>
+                                        <SelectContent
+                                            position="popper"
+                                            align="start"
+                                            sideOffset={6}
+                                            className="max-h-72 w-[min(400px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                                        >
                                             {filterLessons.map((lesson) => (
                                                 <SelectItem
                                                     key={lesson.id}
-                                                    value={String(
-                                                        lesson.numericId ??
-                                                        lesson.id
-                                                    )}
+                                                    value={String(lesson.numericId ?? lesson.id)}
                                                     title={lesson.name}
+                                                    className="h-auto min-h-10 whitespace-normal py-2 pr-8 text-sm leading-5"
                                                 >
-                                                    <span className="block truncate">
-                                                        {lesson.name}
-                                                    </span>
+                                                    {lesson.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -3615,33 +3435,18 @@ function QuestionBank() {
                                     <Label>Choices</Label>
 
                                     <div className="space-y-2 rounded-lg border border-border p-3">
-                                        {questionDialog.question.choices.map(
-                                            (choice, index) => (
-                                                <div
-                                                    key={
-                                                        choice.choiceId ??
-                                                        index
-                                                    }
-                                                    className="flex gap-2 text-sm"
-                                                >
-                                                    <Badge
-                                                        variant={
-                                                            choice.correct
-                                                                ? "default"
-                                                                : "outline"
-                                                        }
-                                                    >
-                                                        {String.fromCharCode(
-                                                            65 + index
-                                                        )}
-                                                    </Badge>
+                                        {questionDialog.question.choices.map((choice, index) => (
+                                            <div
+                                                key={choice.choiceId ?? index}
+                                                className="flex gap-2 text-sm"
+                                            >
+                                                <Badge variant={choice.correct ? "default" : "outline"}>
+                                                    {String.fromCharCode(65 + index)}
+                                                </Badge>
 
-                                                    <p className="min-w-0 flex-1">
-                                                        {choice.choiceText}
-                                                    </p>
-                                                </div>
-                                            )
-                                        )}
+                                                <p className="min-w-0 flex-1">{choice.choiceText}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
@@ -3651,6 +3456,7 @@ function QuestionBank() {
                                     type="button"
                                     variant="outline"
                                     onClick={closeQuestionDialog}
+                                    disabled={isUpdatingQuestion}
                                 >
                                     Close
                                 </Button>
@@ -3659,8 +3465,12 @@ function QuestionBank() {
                                     <Button
                                         type="button"
                                         onClick={handleUpdateSavedQuestion}
+                                        disabled={isUpdatingQuestion}
+                                        className="min-w-[128px]"
                                     >
-                                        Save Changes
+                                        {isUpdatingQuestion
+                                            ? "Saving..."
+                                            : "Save Changes"}
                                     </Button>
                                 )}
                             </div>
@@ -3677,7 +3487,7 @@ function QuestionBank() {
                 onClose={closeFeedbackDialog}
             />
         </section>
-    )
+    );
 }
 
-export default QuestionBank
+export default QuestionBank;

@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.util.Set;
+import java.util.List;
 
 @Entity
 @Table(name = "major_categories")
@@ -38,5 +38,5 @@ public class MajorCategory {
     @OneToMany(mappedBy = "majorCategory", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    private Set<MiddleCategory> middleCategory;
+    private List<MiddleCategory> middleCategory;
 }
