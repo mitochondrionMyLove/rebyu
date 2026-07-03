@@ -88,7 +88,7 @@ function validateCertificationDetails(details) {
   if (
     details.price === "" ||
     Number.isNaN(Number(details.price)) ||
-    Number(details.price) < 0
+    Number(details.price) < 0 || Number(details.price) == 0 || Number(details.price) < 100
   ) {
     errors.price = "Enter a valid price."
   }

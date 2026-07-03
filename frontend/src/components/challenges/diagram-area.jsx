@@ -1,3 +1,5 @@
+import { useRef, useState } from "react"
+import { LoaderCircle } from "lucide-react"
 import { DrawIoEmbed } from "react-drawio"
 
 const EMPTY_GRID_DIAGRAM = `
@@ -24,11 +26,63 @@ const EMPTY_GRID_DIAGRAM = `
 </mxGraphModel>
 `
 
-export default function DiagramArea() {
+export default function DiagramArea({
+                                        initialXml,
+                                        onChange,
+                                    }) {
+    const [isLoading, setIsLoading] = useState(true)
+
+    /*
+      Prevents Draw.io from reloading every time
+      onAutoSave updates the QuestionBank state.
+    */
+    const startingXmlRef = useRef(
+        typeof initialXml === "string" && initialXml.trim()
+            ? initialXml
+            : EMPTY_GRID_DIAGRAM
+    )
+
+    const lastSavedXmlRef = useRef(
+        startingXmlRef.current
+    )
+
+    function handleAutoSave(data) {
+        const nextXml =
+            typeof data?.xml === "string"
+                ? data.xml
+                : ""
+
+        if (!nextXml || nextXml === lastSavedXmlRef.current) {
+            return
+        }
+
+        lastSavedXmlRef.current = nextXml
+        onChange?.(nextXml)
+    }
+
     return (
-        <div className="h-full w-full overflow-hidden bg-white">
+        <div className="relative h-full w-full overflow-hidden bg-white">
+            {isLoading && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white">
+                    <LoaderCircle className="h-7 w-7 animate-spin text-muted-foreground" />
+
+                    <div className="text-center">
+                        <p className="text-sm font-medium text-foreground">
+                            Loading diagram editor
+                        </p>
+
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Preparing Draw.io workspace...
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <DrawIoEmbed
-                xml={EMPTY_GRID_DIAGRAM}
+                xml={startingXmlRef.current}
+                autosave
+                onLoad={() => setIsLoading(false)}
+                onAutoSave={handleAutoSave}
                 style={{
                     width: "100%",
                     height: "100%",
@@ -37,21 +91,23 @@ export default function DiagramArea() {
                 }}
                 urlParameters={{
                     ui: "simple",
-
                     sidebar: 1,
                     libraries: 1,
                     libs: "flowchart;er;uml",
-
                     format: 0,
-
-                    // Hide Draw.io save/exit controls
                     noSaveBtn: 1,
                     noExitBtn: 1,
                     saveAndExit: 0,
-
                     splash: 0,
                 }}
                 configuration={{
+                    /*
+                      Important for node extraction:
+                      save readable XML rather than compressed XML.
+                    */
+                    compressXml: false,
+                    compact: true,
+
                     hideMenus: [
                         "file",
                         "edit",
@@ -79,11 +135,12 @@ export default function DiagramArea() {
               display: none !important;
             }
           `,
+
                     defaultGridEnabled: true,
                     defaultGridSize: 10,
                     defaultPageVisible: false,
                     override: true,
-                    version: "codestrike-simple-editor-v3",
+                    version: "rebyu-diagram-editor-v2",
                 }}
             />
         </div>

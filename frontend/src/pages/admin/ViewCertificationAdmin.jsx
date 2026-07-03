@@ -293,23 +293,7 @@ function MiddleCategoryCard({
   function handleCreateQuiz(event) {
     event.stopPropagation()
 
-    navigate("/admin/quizzes/create", {
-      state: {
-        quizType: "MIDDLE_CATEGORY_QUIZ",
-
-        certificationId:
-            certification.certificationId ?? certification.id ?? null,
-        certificationTitle: certification.title ?? "",
-
-        majorCategoryId: majorCategory.majorCategoryId ?? null,
-        majorCategoryTitle: majorCategory.title ?? "",
-
-        middleCategoryId: middleCategory.middleCategoryId ?? null,
-        middleCategoryTitle: middleCategory.title ?? "",
-
-        lessons,
-      },
-    })
+    alert('testing')
   }
 
   return (
