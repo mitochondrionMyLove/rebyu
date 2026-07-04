@@ -21,5 +21,5 @@ public class ChallengeSessionDto {
     private LocalDateTime endedTime;
     @Min(0)
     private Integer score;
-    private String status; // PASSED or FAILED
+    private String status; 
 }

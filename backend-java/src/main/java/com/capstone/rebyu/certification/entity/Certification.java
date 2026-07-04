@@ -10,8 +10,8 @@ import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "certifications")
@@ -44,10 +44,10 @@ public class Certification {
     @Column(nullable = false)
     private BigDecimal price = BigDecimal.ZERO;
 
-    @OneToMany(mappedBy = "certification", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "certification", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("majorCategoryId ASC")
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
-    private Set<MajorCategory> majorCategory = new LinkedHashSet<>();
+    private List<MajorCategory> majorCategory = new ArrayList<>();
 
     private String industry;
 

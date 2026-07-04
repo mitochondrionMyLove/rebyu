@@ -20,7 +20,6 @@ import dev.langchain4j.service.V;
         2. Base the lesson only on:
            - lesson title
            - topic
-           - learner level
            - learning objectives
            - additional instructions
            - provided reference context

@@ -4,7 +4,6 @@ package com.capstone.rebyu.certification.entity;
 import com.capstone.rebyu.assessment.entity.Question;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -21,19 +20,16 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString(onlyExplicitlyIncluded = true)
 public class Lesson {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     @ToString.Include
     private Long lessonId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "middle_category_id", nullable = false)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private MiddleCategory middleCategory;
 
     @ToString.Include

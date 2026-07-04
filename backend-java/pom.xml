@@ -6,7 +6,7 @@
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>4.1.0</version>
-		<relativePath/> <!-- lookup parent from repository -->
+		<relativePath/> 
 	</parent>
 	<groupId>com.capstone</groupId>
 	<artifactId>rebyu</artifactId>
@@ -131,31 +131,31 @@
 			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
 
-		<!-- LangChain4j core -->
+		
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j</artifactId>
 		</dependency>
 
-		<!-- Groq via OpenAI-compatible API -->
+		
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j-open-ai</artifactId>
 		</dependency>
 
-		<!-- RAG: pgvector store backed by PostgreSQL -->
+		
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j-pgvector</artifactId>
 		</dependency>
 
-		<!-- RAG: in-process embedding model (no external API needed) -->
+		
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j-embeddings-bge-small-en-v15-q</artifactId>
 		</dependency>
 
-		<!-- Document parsers -->
+		
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j-document-parser-apache-pdfbox</artifactId>
@@ -177,7 +177,7 @@
 			<dependency>
 				<groupId>software.amazon.awssdk</groupId>
 				<artifactId>bom</artifactId>
-				<version>2.25.15</version> <!-- Use the latest 2.x version -->
+				<version>2.25.15</version> 
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -226,7 +226,7 @@
 									<artifactId>mapstruct-processor</artifactId>
 									<version>${org.mapstruct.version}</version>
 								</path>
-								<!-- Binding to allow Lombok and MapStruct to work together -->
+								
 								<path>
 									<groupId>org.projectlombok</groupId>
 									<artifactId>lombok-mapstruct-binding</artifactId>
@@ -252,7 +252,7 @@
 									<artifactId>mapstruct-processor</artifactId>
 									<version>${org.mapstruct.version}</version>
 								</path>
-								<!-- Binding to allow Lombok and MapStruct to work together -->
+								
 								<path>
 									<groupId>org.projectlombok</groupId>
 									<artifactId>lombok-mapstruct-binding</artifactId>

@@ -38,15 +38,23 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class CurriculumGenerationService {
 
-    private static final Set<String> MEDIA_TYPES = Set.of("image", "video", "image-left-text", "image-right-text");
+    private static final List<String> VALID_TOOL_TYPES = List.of(
+            "heading", "subheading", "description",
+            "unordered-list", "ordered-list",
+            "tabs", "accordion", "flip-grid",
+            "image", "video", "image-left-text", "image-right-text"
+    );
+    private static final List<String> MEDIA_TYPES = List.of("image", "video", "image-left-text", "image-right-text");
     private static final int MAX_DOC_CHARS = 10_000;
+    private static final int MAX_MAJOR_CATEGORIES = 2;
+    private static final int MAX_MIDDLE_CATEGORIES = 2;
+    private static final int MAX_LESSONS = 1;
 
     record LessonCtx(Long lessonId, String lessonTitle, String midTitle, String majorTitle, String certTitle) {}
 
@@ -91,17 +99,17 @@ public class CurriculumGenerationService {
         this.lessonEmbeddingService = lessonEmbeddingService;
     }
 
-    // Not @Transactional — AI HTTP calls must not hold a DB connection
+    
     public CertificationDto generateCurriculum(
             Long certificationId,
             List<MultipartFile> files,
             String additionalInstructions
     ) throws IOException {
-        // 1. Validate certification exists and load basic info
+        
         String certTitle = self.fetchCertificationTitle(certificationId);
         String certDescription = self.fetchCertificationDescription(certificationId);
 
-        // 2. Extract raw text from uploaded files + ingest into lesson embeddings
+
         StringBuilder rawText = new StringBuilder();
         if (files != null) {
             for (MultipartFile file : files) {
@@ -117,7 +125,7 @@ public class CurriculumGenerationService {
                 ? "No document provided. Generate a complete curriculum based on:\nTitle: " + certTitle + "\nDescription: " + certDescription
                 : truncate(rawText.toString(), MAX_DOC_CHARS);
 
-        // 3. Plan the curriculum structure via AI
+
         Map<String, Object> planRequest = new LinkedHashMap<>();
         planRequest.put("certificationTitle", certTitle);
         planRequest.put("certificationDescription", certDescription);
@@ -129,19 +137,18 @@ public class CurriculumGenerationService {
         log.info("Calling CurriculumPlanningAssistant for '{}'", certTitle);
         String planJson = curriculumPlanningAssistant.planCurriculum(planRequestJson, documentContent);
 
-        // 4. Parse the curriculum structure
         CurriculumPlanDTO plan = parseCurriculumPlan(planJson);
         if (plan.getMajorCategories() == null || plan.getMajorCategories().isEmpty()) {
             throw new IllegalStateException("AI returned an empty curriculum plan");
         }
 
-        // 5. Persist skeleton entities; collect full lesson context while inside the transaction
+
         List<LessonCtx> lessons = self.createSkeletonStructure(certificationId, certTitle, plan);
         log.info("Created {} lesson skeletons for certification {}", lessons.size(), certificationId);
 
-        // 6. Generate, save, and embed content for each lesson.
-        // Groq free tier: 12,000 TPM limit. Each lesson call uses ~1,200 tokens.
-        // Sleeping 7s between calls keeps us at ~8 req/min (~9,600 tokens/min).
+
+
+
         for (int i = 0; i < lessons.size(); i++) {
             LessonCtx ctx = lessons.get(i);
             try {
@@ -160,8 +167,6 @@ public class CurriculumGenerationService {
                 log.warn("Content generation failed for lesson '{}' id={}: {}", ctx.lessonTitle(), ctx.lessonId(), e.getMessage());
             }
         }
-
-        // 7. Return the fully populated certification DTO
         return self.fetchCertificationDto(certificationId);
     }
 
@@ -184,21 +189,27 @@ public class CurriculumGenerationService {
         Certification cert = certificationRepository.findById(certificationId).orElseThrow();
         List<LessonCtx> lessonContexts = new ArrayList<>();
 
-        for (CurriculumMajorCategoryDTO majorDto : plan.getMajorCategories()) {
+        List<CurriculumMajorCategoryDTO> majorList = plan.getMajorCategories().stream()
+                .limit(MAX_MAJOR_CATEGORIES).toList();
+        for (CurriculumMajorCategoryDTO majorDto : majorList) {
             MajorCategory major = new MajorCategory();
             major.setCertification(cert);
             major.setTitle(majorDto.getTitle());
             major = majorCategoryRepository.save(major);
 
             if (majorDto.getMiddleCategories() == null) continue;
-            for (CurriculumMiddleCategoryDTO midDto : majorDto.getMiddleCategories()) {
+            List<CurriculumMiddleCategoryDTO> middleList = majorDto.getMiddleCategories().stream()
+                    .limit(MAX_MIDDLE_CATEGORIES).toList();
+            for (CurriculumMiddleCategoryDTO midDto : middleList) {
                 MiddleCategory middle = new MiddleCategory();
                 middle.setMajorCategory(major);
                 middle.setTitle(midDto.getTitle());
                 middle = middleCategoryRepository.save(middle);
 
                 if (midDto.getLessons() == null) continue;
-                for (CurriculumLessonDTO lessonDto : midDto.getLessons()) {
+                List<CurriculumLessonDTO> lessonList = midDto.getLessons().stream()
+                        .limit(MAX_LESSONS).toList();
+                for (CurriculumLessonDTO lessonDto : lessonList) {
                     Lesson lesson = new Lesson();
                     lesson.setMiddleCategory(middle);
                     lesson.setName(lessonDto.getTitle());
@@ -256,19 +267,19 @@ public class CurriculumGenerationService {
 
         AILessonStructureDTO structure = lessonGenerationAssistant.generateLesson(requestJson, referenceContext);
         AILessonStructureDTO clean = stripMediaTools(structure);
-        return objectMapper.writeValueAsString(clean);
+        return objectMapper.writeValueAsString(clean.getSections());
     }
 
     private CurriculumPlanDTO parseCurriculumPlan(String raw) {
         try {
             String json = raw.trim();
-            // Strip markdown code fences
+            
             if (json.startsWith("```")) {
                 int start = json.indexOf('\n') + 1;
                 int end = json.lastIndexOf("```");
                 json = end > start ? json.substring(start, end).trim() : json.substring(start).trim();
             }
-            // Extract JSON object even when the AI prefixes/appends natural-language text
+            
             int objStart = json.indexOf('{');
             int objEnd = json.lastIndexOf('}');
             if (objStart != -1 && objEnd > objStart) {
@@ -289,12 +300,13 @@ public class CurriculumGenerationService {
                 .map(section -> {
                     List<LessonToolDTO> tools = section.getContent() == null ? List.of()
                             : section.getContent().stream()
-                                    .filter(t -> t.getType() != null && !MEDIA_TYPES.contains(t.getType()))
+                                    .filter(t -> t.getType() != null && VALID_TOOL_TYPES.contains(t.getType()))
                                     .map(t -> {
-                                        if (t.getData() == null) return t;
+                                        if (!MEDIA_TYPES.contains(t.getType()) || t.getData() == null) return t;
                                         Map<String, Object> data = new LinkedHashMap<>(t.getData());
-                                        data.remove("imageKey");
-                                        data.remove("videoKey");
+                                        data.remove("file");
+                                        data.put("imageKey", "");
+                                        data.put("videoKey", "");
                                         return new LessonToolDTO(t.getId(), t.getType(), data);
                                     })
                                     .toList();

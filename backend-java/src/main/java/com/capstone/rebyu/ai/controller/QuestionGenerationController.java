@@ -23,18 +23,18 @@ public class QuestionGenerationController {
     private final QuestionGenerationService questionGenerationService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Generate questions and save them to the lesson's question bank.
-     *
-     * Form params:
-     *   certificationId         (required) — the certification this lesson belongs to
-     *   lessonId                (required) — the lesson whose question bank receives the questions
-     *   questionTypesJson       (required) — JSON array of QuestionTypeRequest objects, e.g.:
-     *                           [{"questionType":"MCQ","count":5,"difficulty":"easy"},
-     *                            {"questionType":"PROGRAMMING","count":1,"difficulty":"hard"}]
-     *   files                   (optional) — PDF/DOCX/TXT reference documents for RAG context
-     *   additionalInstructions  (optional) — extra guidance for the AI
-     */
+    
+
+
+
+
+
+
+
+
+
+
+
     @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public List<QuestionDto> generate(

@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Set;
+import java.util.List;
 
 @Entity
 @Table(name = "challenge_modes")
@@ -29,5 +29,5 @@ public class ChallengeMode {
     private boolean isTimed = false;
 
     @OneToMany(mappedBy = "challengeMode", fetch = FetchType.LAZY)
-    private Set<ChallengeSession> challengeSessions;
+    private List<ChallengeSession> challengeSessions;
 }

@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Set;
+import java.util.List;
 
 @Entity
 @Table(name ="activity_types")
@@ -23,5 +23,5 @@ public class ActivityType {
     private String activityTypeName;
 
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "activityType")
-    private Set<ActivityLog> activityLogs;
+    private List<ActivityLog> activityLogs;
 }

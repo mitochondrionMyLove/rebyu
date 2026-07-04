@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,7 +32,13 @@ import java.util.stream.Collectors;
 @Transactional
 public class LessonGenerationService {
 
-    private static final Set<String> MEDIA_TOOL_TYPES = Set.of("image", "video", "image-left-text", "image-right-text");
+    private static final List<String> VALID_TOOL_TYPES = List.of(
+            "heading", "subheading", "description",
+            "unordered-list", "ordered-list",
+            "tabs", "accordion", "flip-grid",
+            "image", "video", "image-left-text", "image-right-text"
+    );
+    private static final List<String> MEDIA_TOOL_TYPES = List.of("image", "video", "image-left-text", "image-right-text");
 
     private final LessonRepository lessonRepository;
     private final DocumentIngestionService documentIngestionService;
@@ -66,13 +71,13 @@ public class LessonGenerationService {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + lessonId));
 
-        // Navigate lazy chain within transaction to get certification context
+        
         MiddleCategory mid = lesson.getMiddleCategory();
         MajorCategory major = mid.getMajorCategory();
         String certTitle = major.getCertification() != null ? major.getCertification().getTitle() : "";
         Long certId = major.getCertification() != null ? major.getCertification().getCertificationId() : null;
 
-        // Ingest uploaded files into the lesson embedding store
+        
         if (files != null) {
             for (MultipartFile file : files) {
                 if (file != null && !file.isEmpty()) {
@@ -82,7 +87,7 @@ public class LessonGenerationService {
             }
         }
 
-        // Retrieve relevant context from lesson embeddings
+        
         String queryText = String.join(" ", certTitle, major.getTitle(), mid.getTitle(), lesson.getName());
         List<Content> contents = lessonContentRetriever.retrieve(Query.from(queryText));
         String referenceContext = contents.stream()
@@ -93,7 +98,7 @@ public class LessonGenerationService {
             referenceContext = "No uploaded reference documents available. Generate based on the topic and your knowledge.";
         }
 
-        // Build the generation request
+        
         Map<String, Object> requestData = new LinkedHashMap<>();
         requestData.put("lessonId", lessonId);
         requestData.put("lessonTitle", lesson.getName());
@@ -108,9 +113,9 @@ public class LessonGenerationService {
         log.info("Generating lesson structure for lessonId={} ({})", lessonId, lesson.getName());
         AILessonStructureDTO structure = lessonGenerationAssistant.generateLesson(requestJson, referenceContext);
 
-        // Strip any media tools the AI may have included despite instructions
+        
         AILessonStructureDTO clean = stripMediaTools(structure);
-        String structureJson = objectMapper.writeValueAsString(clean);
+        String structureJson = objectMapper.writeValueAsString(clean.getSections());
 
         lesson.setLessonComponentStructure(structureJson);
         lessonRepository.save(lesson);
@@ -119,7 +124,7 @@ public class LessonGenerationService {
 
         lessonEmbeddingService.embedLessonContent(lessonId, certId, lesson.getName(), structureJson);
 
-        // Images and videos are empty — user uploads them separately via /api/files/upload
+        
         return new LessonComponentResponseDto(structureJson, Map.of(), Map.of());
     }
 
@@ -132,12 +137,13 @@ public class LessonGenerationService {
                     List<LessonToolDTO> tools = section.getContent() == null
                             ? List.of()
                             : section.getContent().stream()
-                                    .filter(t -> t.getType() != null && !MEDIA_TOOL_TYPES.contains(t.getType()))
+                                    .filter(t -> t.getType() != null && VALID_TOOL_TYPES.contains(t.getType()))
                                     .map(t -> {
-                                        if (t.getData() == null) return t;
+                                        if (!MEDIA_TOOL_TYPES.contains(t.getType()) || t.getData() == null) return t;
                                         Map<String, Object> data = new LinkedHashMap<>(t.getData());
-                                        data.remove("imageKey");
-                                        data.remove("videoKey");
+                                        data.remove("file");
+                                        data.put("imageKey", "");
+                                        data.put("videoKey", "");
                                         data.values().removeIf(v -> v == null);
                                         return new LessonToolDTO(t.getId(), t.getType(), data);
                                     })

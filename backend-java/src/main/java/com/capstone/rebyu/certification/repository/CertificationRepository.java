@@ -12,10 +12,7 @@ import java.util.Optional;
 public interface CertificationRepository extends JpaRepository<Certification, Long> {
 
     @Query("""
-            SELECT DISTINCT c FROM Certification c
-            LEFT JOIN FETCH c.majorCategory mc
-            LEFT JOIN FETCH mc.middleCategory mid
-            LEFT JOIN FETCH mid.lessons
+            SELECT c FROM Certification c
             WHERE c.certificationId = :id
             """)
     Optional<Certification> findByIdWithFullTree(@Param("id") Long id);

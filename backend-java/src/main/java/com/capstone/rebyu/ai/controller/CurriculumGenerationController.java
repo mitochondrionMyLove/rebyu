@@ -22,14 +22,7 @@ public class CurriculumGenerationController {
 
     private final CurriculumGenerationService curriculumGenerationService;
 
-    /**
-     * Upload a certification document and let the AI generate the full curriculum:
-     * major categories → middle categories → lessons → lesson content.
-     *
-     * @param certificationId  the existing certification to build the curriculum under
-     * @param files            reviewer / coverage document(s) (optional but recommended)
-     * @param additionalInstructions  free-form prompt additions (optional)
-     */
+
     @PostMapping("/generate")
     public ResponseEntity<CertificationDto> generate(
             @RequestParam("certificationId") Long certificationId,

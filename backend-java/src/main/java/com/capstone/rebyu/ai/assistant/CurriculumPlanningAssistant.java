@@ -32,10 +32,10 @@ public interface CurriculumPlanningAssistant {
             - Each lesson object must have ONLY the "title" key. No description, no goals, no id, no other fields.
             - Each middle category must have ONLY "title" and "lessons". No other fields.
             - Each major category must have ONLY "title" and "middleCategories". No other fields.
-            - 3 to 6 major categories total
-            - 2 to 4 middle categories per major category
-            - 2 to 4 lessons per middle category
-            - Total lessons must not exceed 50
+            - Exactly 2 major categories total
+            - Exactly 2 middle categories per major category
+            - Exactly 1 lesson per middle category
+            - Total lessons must not exceed 4
             - Lesson titles must be specific (e.g. "SQL Joins and Subqueries" not "Databases")
             - Cover all major topics from the reference document
 

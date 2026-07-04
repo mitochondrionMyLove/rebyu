@@ -85,11 +85,11 @@ public class QuestionGenerationService {
         Lesson lesson = lessonRepository.findById(request.getLessonId())
                 .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + request.getLessonId()));
 
-        // Resolve certification title for context
+        
         String certTitle = resolveCertTitle(request.getCertificationId());
         String lessonTitle = lesson.getName();
 
-        // Ingest uploaded files into question embeddings
+        
         if (files != null) {
             for (MultipartFile file : files) {
                 if (file != null && !file.isEmpty()) {
@@ -100,7 +100,7 @@ public class QuestionGenerationService {
             }
         }
 
-        // Retrieve relevant context from question embeddings
+        
         String queryText = certTitle + " " + lessonTitle;
         List<Content> contents = questionContentRetriever.retrieve(Query.from(queryText));
         String referenceContext = contents.stream()
@@ -111,7 +111,7 @@ public class QuestionGenerationService {
             referenceContext = "No reference documents available. Generate based on the topic, lesson, and your knowledge.";
         }
 
-        // Build request JSON for the AI
+        
         Map<String, Object> requestData = new LinkedHashMap<>();
         requestData.put("certificationId", request.getCertificationId());
         requestData.put("certificationTitle", certTitle);
@@ -245,7 +245,7 @@ public class QuestionGenerationService {
                 .question(question)
                 .diagramType(diagramType != null ? diagramType : "OTHER")
                 .instructions(instructions != null ? instructions : "")
-                // Reference diagram is intentionally empty — instructor fills this in
+                
                 .referenceDiagramXml("")
                 .referenceDiagramJson("{}")
                 .build();
@@ -268,17 +268,17 @@ public class QuestionGenerationService {
     private List<Map<String, Object>> parseJsonArray(String json) {
         if (json == null || json.isBlank()) return List.of();
         try {
-            // Strip markdown code fences if the model wrapped the response
+            
             String cleaned = json.trim();
             if (cleaned.startsWith("```")) {
                 cleaned = cleaned.replaceFirst("```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
             }
-            // The AI might return a JSON object with a "questions" key instead of a bare array
+            
             if (cleaned.startsWith("{")) {
                 Map<String, Object> wrapper = objectMapper.readValue(cleaned, new TypeReference<>() {});
                 Object inner = wrapper.get("questions");
                 if (inner instanceof List) {
-                    //noinspection unchecked
+                    
                     return (List<Map<String, Object>>) inner;
                 }
             }

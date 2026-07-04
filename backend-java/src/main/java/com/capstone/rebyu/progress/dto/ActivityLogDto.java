@@ -24,5 +24,5 @@ public class ActivityLogDto {
     private LocalDateTime dateTime;
 
     @Min(0)
-    private Integer duration; // seconds
+    private Integer duration; 
 }

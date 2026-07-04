@@ -1,4 +1,4 @@
--- Enable pgvector extension (requires superuser on first run; run manually on Neon if needed)
+
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS public.knowledge_documents (

@@ -36,8 +36,8 @@ public class CertificationService {
 
     @Transactional(readOnly = true)
     public CertificationDto getById(Long id) {
-        Certification certification = findEntity(id);
-
+        Certification certification = certificationRepository.findByIdWithFullTree(id)
+                .orElseThrow(() -> new EntityNotFoundException("Certification not found with ID: " + id));
         return certificationMapper.toDto(certification);
     }
 
@@ -58,35 +58,37 @@ public class CertificationService {
                 savedCertification.getCertificationId()
         );
 
-        return certificationMapper.toDto(savedCertification);
+        return certificationMapper.toDto(
+                certificationRepository.findByIdWithFullTree(savedCertification.getCertificationId()).orElseThrow()
+        );
     }
 
     public CertificationDto update(Long id, CertificationDto dto) {
         Certification existingCertification = findEntity(id);
 
-        /*
-         * Convert the request DTO into an entity.
-         *
-         * Existing major/middle/lesson IDs from the request remain existing.
-         * Newly added major/middle/lesson items should have null IDs.
-         */
+        
+
+
+
+
+
         Certification updatedCertification = certificationMapper.toEntity(dto);
 
         updatedCertification.setCertificationId(
                 existingCertification.getCertificationId()
         );
 
-        /*
-         * Do not accidentally replace the original created date.
-         * Your frontend does not need to edit this field.
-         */
+        
+
+
+
         updatedCertification.setDateCreated(
                 existingCertification.getDateCreated()
         );
 
-        /*
-         * Keeps the existing image if the frontend does not send imageKey.
-         */
+        
+
+
         if (!StringUtils.hasText(updatedCertification.getImageKey())) {
             updatedCertification.setImageKey(
                     existingCertification.getImageKey()
@@ -105,7 +107,9 @@ public class CertificationService {
                 savedCertification.getCertificationId()
         );
 
-        return certificationMapper.toDto(savedCertification);
+        return certificationMapper.toDto(
+                certificationRepository.findByIdWithFullTree(savedCertification.getCertificationId()).orElseThrow()
+        );
     }
 
     public void delete(Long id) {
@@ -125,17 +129,17 @@ public class CertificationService {
                 );
     }
 
-    /*
-     * Connects:
-     *
-     * Certification
-     *   -> MajorCategory
-     *      -> MiddleCategory
-     *         -> Lesson
-     *
-     * This prevents null foreign-key values when saving newly added
-     * major categories, middle categories, or lessons.
-     */
+    
+
+
+
+
+
+
+
+
+
+
     private void connectChildEntities(Certification certification) {
         if (certification.getMajorCategory() == null) {
             return;

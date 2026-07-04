@@ -3,6 +3,7 @@ package com.capstone.rebyu.ai.service;
 import com.capstone.rebyu.ai.dto.AILessonStructureDTO;
 import com.capstone.rebyu.ai.dto.LessonSectionDTO;
 import com.capstone.rebyu.ai.dto.LessonToolDTO;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentSplitter;
@@ -40,14 +41,14 @@ public class LessonEmbeddingService {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Embed lesson content into the lesson vector store.
-     * Deletes any existing embeddings for this lessonId first so re-generation
-     * doesn't create duplicate vectors.
-     */
+    
+
+
+
+
     public void embedLessonContent(Long lessonId, Long certificationId, String lessonTitle, String structureJson) {
         try {
-            // Remove stale embeddings for this lesson
+            
             jdbcTemplate.update(
                     "DELETE FROM lesson_embeddings WHERE metadata->>'lessonId' = ?",
                     String.valueOf(lessonId)
@@ -84,8 +85,8 @@ public class LessonEmbeddingService {
 
     private String extractText(String structureJson, String lessonTitle) {
         try {
-            AILessonStructureDTO structure = objectMapper.readValue(structureJson, AILessonStructureDTO.class);
-            return buildPlainText(structure, lessonTitle);
+            List<LessonSectionDTO> sections = objectMapper.readValue(structureJson, new TypeReference<>() {});
+            return buildPlainText(new AILessonStructureDTO(sections), lessonTitle);
         } catch (Exception e) {
             log.warn("Could not parse lesson structure JSON for text extraction", e);
             return "";

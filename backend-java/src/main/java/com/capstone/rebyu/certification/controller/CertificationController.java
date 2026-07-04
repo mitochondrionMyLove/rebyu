@@ -33,25 +33,28 @@ public class CertificationController {
         return certificationService.getById(id);
     }
 
-    /**
-     * Create a certification. Optionally attach document files to let the AI
-     * generate the full curriculum (major categories → middle categories → lessons)
-     * automatically before returning.
-     *
-     * Send as multipart/form-data:
-     *   data  — JSON CertificationDto (Content-Type: application/json)
-     *   files — one or more reviewer/coverage documents (optional)
-     *   additionalInstructions — free-form AI guidance (optional)
-     */
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public CertificationDto create(
+    public CertificationDto create(@Valid @RequestBody CertificationDto dto) {
+        return certificationService.create(dto);
+    }
+
+    
+
+
+
+
+
+
+
+    @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public CertificationDto createWithAi(
             @RequestPart("data") @Valid CertificationDto dto,
             @RequestPart(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "additionalInstructions", required = false) String additionalInstructions
     ) throws IOException {
         CertificationDto saved = certificationService.create(dto);
-
         log.info("Triggering AI curriculum generation for certificationId={}", saved.getCertificationId());
         return curriculumGenerationService.generateCurriculum(
                 saved.getCertificationId(), files, additionalInstructions

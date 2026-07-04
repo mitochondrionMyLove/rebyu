@@ -9,19 +9,31 @@ import {
     ChevronsLeft,
     ChevronsRight,
     Code2,
+    Download,
     Eye,
+    FileArchive,
+    FileIcon,
     FileQuestion,
+    FileSpreadsheet,
     FileText,
+    Headphones,
+    Image,
     ListChecks,
     Maximize,
     Pencil,
     Plus,
     Search,
+    Sparkles,
     Trash2,
+    UploadCloud,
+    UploadIcon,
+    Video,
     Workflow,
+    XIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { formatBytes, useFileUpload } from "@/hooks/use-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -1621,6 +1633,469 @@ function Diagram({
     );
 }
 
+
+function getQuestionGenerationFileIcon(file) {
+    const fileType = file.file?.type ?? "";
+    const fileName = (file.file?.name ?? "").toLowerCase();
+
+    if (
+        fileType.includes("pdf") ||
+        fileName.endsWith(".pdf") ||
+        fileType.includes("word") ||
+        fileName.endsWith(".doc") ||
+        fileName.endsWith(".docx")
+    ) {
+        return <FileText className="h-4 w-4 opacity-60" />;
+    }
+
+    if (
+        fileType.includes("zip") ||
+        fileType.includes("archive") ||
+        fileName.endsWith(".zip") ||
+        fileName.endsWith(".rar")
+    ) {
+        return <FileArchive className="h-4 w-4 opacity-60" />;
+    }
+
+    if (
+        fileType.includes("csv") ||
+        fileType.includes("excel") ||
+        fileName.endsWith(".csv") ||
+        fileName.endsWith(".xls") ||
+        fileName.endsWith(".xlsx")
+    ) {
+        return <FileSpreadsheet className="h-4 w-4 opacity-60" />;
+    }
+
+    if (fileType.includes("video/")) {
+        return <Video className="h-4 w-4 opacity-60" />;
+    }
+
+    if (fileType.includes("audio/")) {
+        return <Headphones className="h-4 w-4 opacity-60" />;
+    }
+
+    if (fileType.startsWith("image/")) {
+        return <Image className="h-4 w-4 opacity-60" />;
+    }
+
+    return <FileIcon className="h-4 w-4 opacity-60" />;
+}
+
+function getQuestionGenerationFileType(file) {
+    const fileType = file.file?.type ?? "";
+    const fileName = (file.file?.name ?? "").toLowerCase();
+
+    if (fileType.includes("pdf") || fileName.endsWith(".pdf")) {
+        return "PDF";
+    }
+
+    if (
+        fileType.includes("word") ||
+        fileName.endsWith(".doc") ||
+        fileName.endsWith(".docx")
+    ) {
+        return "WORD";
+    }
+
+    if (fileType.includes("csv") || fileName.endsWith(".csv")) {
+        return "CSV";
+    }
+
+    return fileType.split("/")[1]?.toUpperCase() || "UNKNOWN";
+}
+
+function QuestionFileGeneratorDialog({
+                                         open,
+                                         onOpenChange,
+                                         onGenerate,
+                                         selectedCertification,
+                                     }) {
+    const maxFiles = 3;
+    const maxSizeMB = 10;
+    const maxSize = maxSizeMB * 1024 * 1024;
+    const maxQuestionsPerType = 50;
+
+    const initialQuestionCounts = {
+        MCQ: 10,
+        SHORT_ANSWER: 0,
+        DESCRIPTIVE: 0,
+        PROGRAMMING: 0,
+        DIAGRAM: 0,
+    };
+
+    const [questionCounts, setQuestionCounts] = useState(initialQuestionCounts);
+
+    const totalRequestedQuestions = Object.values(questionCounts).reduce(
+        (total, count) => total + count,
+        0,
+    );
+
+    const [
+        { files, isDragging, errors },
+        {
+            handleDragEnter,
+            handleDragLeave,
+            handleDragOver,
+            handleDrop,
+            openFileDialog,
+            removeFile,
+            clearFiles,
+            getInputProps,
+        },
+    ] = useFileUpload({
+        accept: [
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/csv",
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".csv",
+        ].join(","),
+        initialFiles: [],
+        maxFiles,
+        maxSize,
+        multiple: true,
+    });
+
+    function resetGeneratorForm() {
+        clearFiles();
+        setQuestionCounts(initialQuestionCounts);
+    }
+
+    function handleDialogOpenChange(nextOpen) {
+        if (!nextOpen) {
+            resetGeneratorForm();
+        }
+
+        onOpenChange(nextOpen);
+    }
+
+    function handleCancel() {
+        resetGeneratorForm();
+        onOpenChange(false);
+    }
+
+    function updateQuestionCount(questionTypeId, rawValue) {
+        const parsedValue = Number.parseInt(rawValue, 10);
+        const safeValue = Number.isNaN(parsedValue)
+            ? 0
+            : Math.min(Math.max(parsedValue, 0), maxQuestionsPerType);
+
+        setQuestionCounts((currentCounts) => ({
+            ...currentCounts,
+            [questionTypeId]: safeValue,
+        }));
+    }
+
+    function handleGenerate() {
+        const selectedDocuments = files.map((item) => item.file);
+
+        if (selectedDocuments.length === 0) {
+            window.alert(
+                "Please upload at least one document before generating questions.",
+            );
+            return;
+        }
+
+        if (totalRequestedQuestions === 0) {
+            window.alert(
+                "Enter at least one question for any question type before generating.",
+            );
+            return;
+        }
+
+        onGenerate?.(selectedDocuments, questionCounts);
+        resetGeneratorForm();
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+            <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-6xl">
+                <DialogHeader>
+                    <DialogTitle>Generate Questions from File</DialogTitle>
+
+                    <DialogDescription className="leading-6">
+                        Upload source material for{" "}
+                        <span className="font-medium text-foreground">
+                            {getCertificationTitle(selectedCertification)}
+                        </span>
+                        . Choose how many draft questions REBYU should create for
+                        each question type. You can assign the generated questions to
+                        lessons later.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5">
+                    <section className="rounded-lg border border-border bg-muted/20 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h3 className="text-sm font-semibold text-foreground">
+                                    Question quantities
+                                </h3>
+
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    Enter 0 for types you do not want to generate. Maximum {maxQuestionsPerType} questions per type.
+                                </p>
+                            </div>
+
+                            <div className="rounded-md border border-border bg-background px-3 py-2 text-right">
+                                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                                    Total requested
+                                </p>
+
+                                <p className="text-lg font-semibold text-foreground">
+                                    {totalRequestedQuestions}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            {questionTypes.map((questionType) => {
+                                const Icon = questionType.icon;
+                                const count = questionCounts[questionType.id] ?? 0;
+                                const inputId = `generate-${questionType.id.toLowerCase()}-count`;
+
+                                return (
+                                    <div
+                                        key={questionType.id}
+                                        className="flex items-center gap-3 rounded-lg border border-border bg-background p-3"
+                                    >
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                            <Icon className="h-4 w-4" />
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <Label
+                                                htmlFor={inputId}
+                                                className="block truncate text-sm font-medium text-foreground"
+                                            >
+                                                {questionType.title}
+                                            </Label>
+
+                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                                {questionType.description}
+                                            </p>
+                                        </div>
+
+                                        <Input
+                                            id={inputId}
+                                            type="number"
+                                            min="0"
+                                            max={maxQuestionsPerType}
+                                            inputMode="numeric"
+                                            value={count}
+                                            onChange={(event) =>
+                                                updateQuestionCount(
+                                                    questionType.id,
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="h-9 w-20 shrink-0 text-center"
+                                            aria-label={`${questionType.title} quantity`}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    <div className="flex flex-col gap-2">
+                        <div
+                            className="flex min-h-56 flex-col items-center overflow-hidden rounded-xl border border-input border-dashed p-4 transition-colors not-data-[files]:justify-center has-[input:focus]:border-ring has-[input:focus]:ring-[3px] has-[input:focus]:ring-ring/50 data-[files]:hidden data-[dragging=true]:bg-accent/50"
+                            data-dragging={isDragging || undefined}
+                            data-files={files.length > 0 || undefined}
+                            onDragEnter={handleDragEnter}
+                            onDragLeave={handleDragLeave}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                        >
+                            <input
+                                {...getInputProps()}
+                                aria-label="Upload source documents for question generation"
+                                className="sr-only"
+                            />
+
+                            <div className="flex flex-col items-center justify-center text-center">
+                                <div
+                                    aria-hidden="true"
+                                    className="mb-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-background"
+                                >
+                                    <FileIcon className="h-4 w-4 opacity-60" />
+                                </div>
+
+                                <p className="mb-1.5 text-sm font-medium">
+                                    Upload files
+                                </p>
+
+                                <p className="text-xs text-muted-foreground">
+                                    PDF, DOC, DOCX, or CSV · Max {maxFiles} files · Up to{" "}
+                                    {formatBytes(maxSize)}
+                                </p>
+
+                                <Button
+                                    type="button"
+                                    className="mt-4"
+                                    onClick={openFileDialog}
+                                    variant="outline"
+                                >
+                                    <UploadIcon
+                                        aria-hidden="true"
+                                        className="mr-2 h-4 w-4 opacity-60"
+                                    />
+                                    Select files
+                                </Button>
+                            </div>
+                        </div>
+
+                        {files.length > 0 && (
+                            <>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 className="text-sm font-medium">
+                                        Files ({files.length} of {maxFiles})
+                                    </h3>
+
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={openFileDialog}
+                                            size="sm"
+                                            variant="outline"
+                                        >
+                                            <UploadCloud
+                                                aria-hidden="true"
+                                                className="mr-1.5 h-3.5 w-3.5 opacity-60"
+                                            />
+                                            Add files
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            onClick={clearFiles}
+                                            size="sm"
+                                            variant="outline"
+                                        >
+                                            <Trash2
+                                                aria-hidden="true"
+                                                className="mr-1.5 h-3.5 w-3.5 opacity-60"
+                                            />
+                                            Remove all
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-hidden rounded-md border bg-background">
+                                    <Table>
+                                        <TableHeader className="text-xs">
+                                            <TableRow className="bg-muted/50">
+                                                <TableHead className="h-9 py-2">
+                                                    Name
+                                                </TableHead>
+
+                                                <TableHead className="h-9 py-2">
+                                                    Type
+                                                </TableHead>
+
+                                                <TableHead className="h-9 py-2">
+                                                    Size
+                                                </TableHead>
+
+                                                <TableHead className="h-9 w-0 py-2 text-right">
+                                                    Actions
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+
+                                        <TableBody className="text-[13px]">
+                                            {files.map((file) => (
+                                                <TableRow key={file.id}>
+                                                    <TableCell className="max-w-48 py-2 font-medium">
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="shrink-0">
+                                                                {getQuestionGenerationFileIcon(file)}
+                                                            </span>
+
+                                                            <span className="truncate">
+                                                                {file.file.name}
+                                                            </span>
+                                                        </span>
+                                                    </TableCell>
+
+                                                    <TableCell className="py-2 text-muted-foreground">
+                                                        {getQuestionGenerationFileType(file)}
+                                                    </TableCell>
+
+                                                    <TableCell className="py-2 text-muted-foreground">
+                                                        {formatBytes(file.file.size)}
+                                                    </TableCell>
+
+                                                    <TableCell className="whitespace-nowrap py-2 text-right">
+                                                        <Button
+                                                            type="button"
+                                                            aria-label={`Open ${file.file.name}`}
+                                                            className="h-8 w-8 text-muted-foreground/80 hover:bg-transparent hover:text-foreground"
+                                                            onClick={() =>
+                                                                window.open(
+                                                                    file.preview,
+                                                                    "_blank",
+                                                                    "noopener,noreferrer",
+                                                                )
+                                                            }
+                                                            size="icon"
+                                                            variant="ghost"
+                                                        >
+                                                            <Download className="h-4 w-4" />
+                                                        </Button>
+
+                                                        <Button
+                                                            type="button"
+                                                            aria-label={`Remove ${file.file.name}`}
+                                                            className="h-8 w-8 text-muted-foreground/80 hover:bg-transparent hover:text-foreground"
+                                                            onClick={() => removeFile(file.id)}
+                                                            size="icon"
+                                                            variant="ghost"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </>
+                        )}
+
+                        {errors.length > 0 && (
+                            <div
+                                className="flex items-center gap-1 text-xs text-destructive"
+                                role="alert"
+                            >
+                                <AlertCircle className="h-3 w-3 shrink-0" />
+                                <span>{errors[0]}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={handleCancel}>
+                        Cancel
+                    </Button>
+
+                    <Button type="button" onClick={handleGenerate}>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Generate Questions ({totalRequestedQuestions})
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 function QuestionTypeButton({ questionType, onAdd, disabled }) {
     const Icon = questionType.icon;
 
@@ -1725,6 +2200,10 @@ function getCertificationValue(certification) {
 }
 
 function getCertificationTitle(certification) {
+    if (!certification || typeof certification !== "object") {
+        return "Selected certification";
+    }
+
     return certification.title ?? certification.name ?? "Untitled Certification";
 }
 
@@ -1816,6 +2295,9 @@ function QuestionBank() {
     const [validationErrors, setValidationErrors] = useState({});
 
     const [isSavingQuestions, setIsSavingQuestions] = useState(false);
+
+    const [isQuestionFileGeneratorOpen, setIsQuestionFileGeneratorOpen] =
+        useState(false);
 
     // Prevents duplicate requests when saving changes to one existing question.
     const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false);
@@ -2395,6 +2877,60 @@ function QuestionBank() {
         }
     };
 
+    function handleGenerateQuestionsFromFiles(
+        selectedDocuments,
+        requestedQuestionCounts,
+    ) {
+        if (!selectedCertification) {
+            window.alert(
+                "Please select a certification before generating questions.",
+            );
+            return;
+        }
+
+        const certificationTitle = getCertificationTitle(selectedCertification);
+        const totalRequestedQuestions = Object.values(
+            requestedQuestionCounts,
+        ).reduce((total, count) => total + count, 0);
+
+        window.alert(
+            `Generate clicked successfully. ${selectedDocuments.length} document${
+                selectedDocuments.length === 1 ? "" : "s"
+            } selected for ${certificationTitle}. ${totalRequestedQuestions} question${
+                totalRequestedQuestions === 1 ? "" : "s"
+            } requested.`,
+        );
+
+        console.log("Certification:", selectedCertification);
+        console.log("Documents ready for question generation:", selectedDocuments);
+        console.log("Requested question counts:", requestedQuestionCounts);
+
+        /*
+         * Later, replace the alert with your AI generation API call.
+         *
+         * const formData = new FormData();
+         *
+         * selectedDocuments.forEach((file) => {
+         *     formData.append("files", file);
+         * });
+         *
+         * formData.append(
+         *     "certificationId",
+         *     selectedCertification.certificationId ?? selectedCertification.id,
+         * );
+         *
+         * formData.append(
+         *     "questionCounts",
+         *     JSON.stringify(requestedQuestionCounts),
+         * );
+         *
+         * const response = await generateQuestionsFromFile(formData);
+         * setQuestions(response.questions);
+         */
+
+        setIsQuestionFileGeneratorOpen(false);
+    }
+
     async function handleSave() {
         if (isSavingQuestions) {
             return;
@@ -2492,6 +3028,17 @@ function QuestionBank() {
 
                     {activeTab === "question-builder" && (
                         <div className="flex shrink-0 items-center gap-2 py-1.5">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={!selectedCertification || isSavingQuestions}
+                                onClick={() => setIsQuestionFileGeneratorOpen(true)}
+                            >
+                                <UploadIcon className="mr-2 h-4 w-4" />
+                                Upload File
+                            </Button>
+
                             <Button
                                 type="button"
                                 size="sm"
@@ -3478,6 +4025,13 @@ function QuestionBank() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            <QuestionFileGeneratorDialog
+                open={isQuestionFileGeneratorOpen}
+                onOpenChange={setIsQuestionFileGeneratorOpen}
+                onGenerate={handleGenerateQuestionsFromFiles}
+                selectedCertification={selectedCertification}
+            />
 
             <FeedbackDialog
                 open={feedbackDialog.open}

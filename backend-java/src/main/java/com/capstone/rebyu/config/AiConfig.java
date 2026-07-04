@@ -80,7 +80,7 @@ public class AiConfig {
 
     @Bean
     public EmbeddingModel embeddingModel() {
-        // In-process BGE-Small (384 dims) — no external API or key needed
+        
         return new BgeSmallEnV15QuantizedEmbeddingModel();
     }
 

@@ -17,15 +17,9 @@ public class LessonGenerationController {
 
     private final LessonGenerationService lessonGenerationService;
 
-    /**
-     * Regenerate content for a single existing lesson using AI.
-     * Use POST /api/ai/curriculum/generate to build an entire curriculum from scratch.
-     *
-     * Form params:
-     *   lessonId               (required) — the lesson to regenerate content for
-     *   files                  (optional) — PDF/DOCX/TXT reference documents
-     *   additionalInstructions (optional) — any extra guidance for the AI
-     */
+
+
+
     @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public LessonComponentResponseDto generate(
             @RequestParam("lessonId") Long lessonId,
