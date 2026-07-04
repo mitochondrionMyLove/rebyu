@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "major_categories")
@@ -38,5 +39,5 @@ public class MajorCategory {
     @OneToMany(mappedBy = "majorCategory", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    private List<MiddleCategory> middleCategory;
+    private Set<MiddleCategory> middleCategory = new LinkedHashSet<>();
 }

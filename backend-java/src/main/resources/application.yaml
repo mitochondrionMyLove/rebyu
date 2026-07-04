@@ -127,3 +127,17 @@ aws:
     region: us-east-1
     access-key: ${AWS_ACCESS_KEY_ID}
     secret-key: ${AWS_SECRET_ACCESS_KEY}
+
+# ─── LangChain4j / Groq ─────────────────────────────────────────
+langchain4j:
+  open-ai:
+    api-key: ${GROQ_API_KEY}
+    base-url: https://api.groq.com/openai/v1
+    chat-model:
+      model-name: ${GROQ_MODEL:meta-llama/llama-4-scout-17b-16e-instruct}
+      temperature: 0.7
+
+db:
+  host: ${HOST}
+  port: ${PORT}
+  database: ${DATABASE}

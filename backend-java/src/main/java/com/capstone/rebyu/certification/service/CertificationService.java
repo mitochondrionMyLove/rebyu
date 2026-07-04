@@ -45,6 +45,7 @@ public class CertificationService {
         Certification certification = certificationMapper.toEntity(dto);
 
         certification.setCertificationId(null);
+        certification.setDateCreated(LocalDateTime.now());
         certification.setDateUpdated(null);
 
         connectChildEntities(certification);

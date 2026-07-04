@@ -1,0 +1,2 @@
+ALTER TABLE public.knowledge_documents
+    ADD COLUMN IF NOT EXISTS use_case VARCHAR(20) NOT NULL DEFAULT 'LESSON';

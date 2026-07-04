@@ -3,6 +3,7 @@ package com.capstone.rebyu.certification.dto;
 
 import com.capstone.rebyu.certification.entity.Certification;
 import com.capstone.rebyu.certification.entity.MajorCategory;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,7 +33,6 @@ public class CertificationDto {
     @Size(max = 255)
     private String imageKey;
 
-    @NotNull
     private LocalDateTime dateCreated;
 
     @NotNull
@@ -45,6 +45,7 @@ public class CertificationDto {
 
     private LocalDateTime dateUpdated;
 
+    @JsonIgnore
     private MultipartFile file;
 
 }

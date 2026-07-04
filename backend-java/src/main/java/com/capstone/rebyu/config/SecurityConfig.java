@@ -43,6 +43,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/learner-diagram-answers/**").permitAll()
                         .requestMatchers("/api/learner-programming-answers/**").permitAll()
 
+                        // AI assistant & document RAG
+                        .requestMatchers("/api/ai/**").permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .build();

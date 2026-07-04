@@ -10,7 +10,8 @@ import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "certifications")
@@ -46,7 +47,7 @@ public class Certification {
     @OneToMany(mappedBy = "certification", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    private List<MajorCategory> majorCategory;
+    private Set<MajorCategory> majorCategory = new LinkedHashSet<>();
 
     private String industry;
 
