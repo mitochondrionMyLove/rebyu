@@ -2,33 +2,30 @@ package com.capstone.rebyu.ai.service;
 
 import com.capstone.rebyu.ai.assistant.QuestionGenerationAssistant;
 import com.capstone.rebyu.ai.dto.AiQuestionGenerationRequest;
+import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftDto;
 import com.capstone.rebyu.ai.entity.KnowledgeDocument;
-import com.capstone.rebyu.assessment.dto.QuestionDto;
-import com.capstone.rebyu.assessment.entity.*;
-import com.capstone.rebyu.assessment.mapper.QuestionMapper;
-import com.capstone.rebyu.assessment.repository.*;
 import com.capstone.rebyu.certification.entity.Certification;
 import com.capstone.rebyu.certification.entity.Lesson;
 import com.capstone.rebyu.certification.repository.CertificationRepository;
 import com.capstone.rebyu.certification.repository.LessonRepository;
-import com.capstone.rebyu.common.InvalidAiResponseException;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.capstone.rebyu.ai.common.InvalidAiGeneratedQuestionException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.query.Query;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -37,71 +34,50 @@ public class QuestionGenerationService {
 
     private static final int MAX_DOC_CHARS = 10_000;
     private static final int MAX_QUESTIONS_PER_TYPE = 50;
-
-    private static final Set<String> SUPPORTED_TYPES = Set.of(
+    private static final java.util.Set<String> SUPPORTED_TYPES = java.util.Set.of(
             "MCQ", "SHORT_ANSWER", "DESCRIPTIVE", "PROGRAMMING", "DIAGRAM"
     );
-    private static final Set<String> SUPPORTED_DIFFICULTIES = Set.of("easy", "average", "hard");
 
     record LessonRef(Long lessonId, String title) {}
     record CertContext(String certTitle, Map<Long, LessonRef> lessonsById) {}
 
-    private final QuestionRepository questionRepository;
-    private final TextQuestionConfigRepository textQuestionConfigRepository;
-    private final ProgrammingQuestionConfigRepository programmingQuestionConfigRepository;
-    private final ProgrammingTestCaseRepository programmingTestCaseRepository;
-    private final DiagramQuestionConfigRepository diagramQuestionConfigRepository;
     private final LessonRepository lessonRepository;
     private final CertificationRepository certificationRepository;
     private final DocumentIngestionService documentIngestionService;
     private final QuestionGenerationAssistant questionGenerationAssistant;
     private final ContentRetriever questionContentRetriever;
-    private final QuestionMapper questionMapper;
     private final AiUploadValidator aiUploadValidator;
+    private final GeneratedQuestionDraftValidator generatedQuestionDraftValidator;
     private final ObjectMapper objectMapper;
 
-    @Autowired @Lazy
-    private QuestionGenerationService self;
-
     public QuestionGenerationService(
-            QuestionRepository questionRepository,
-            TextQuestionConfigRepository textQuestionConfigRepository,
-            ProgrammingQuestionConfigRepository programmingQuestionConfigRepository,
-            ProgrammingTestCaseRepository programmingTestCaseRepository,
-            DiagramQuestionConfigRepository diagramQuestionConfigRepository,
             LessonRepository lessonRepository,
             CertificationRepository certificationRepository,
             DocumentIngestionService documentIngestionService,
             QuestionGenerationAssistant questionGenerationAssistant,
             @Qualifier("questionContentRetriever") ContentRetriever questionContentRetriever,
-            QuestionMapper questionMapper,
             AiUploadValidator aiUploadValidator,
+            GeneratedQuestionDraftValidator generatedQuestionDraftValidator,
             ObjectMapper objectMapper
     ) {
-        this.questionRepository = questionRepository;
-        this.textQuestionConfigRepository = textQuestionConfigRepository;
-        this.programmingQuestionConfigRepository = programmingQuestionConfigRepository;
-        this.programmingTestCaseRepository = programmingTestCaseRepository;
-        this.diagramQuestionConfigRepository = diagramQuestionConfigRepository;
         this.lessonRepository = lessonRepository;
         this.certificationRepository = certificationRepository;
         this.documentIngestionService = documentIngestionService;
         this.questionGenerationAssistant = questionGenerationAssistant;
         this.questionContentRetriever = questionContentRetriever;
-        this.questionMapper = questionMapper;
         this.aiUploadValidator = aiUploadValidator;
+        this.generatedQuestionDraftValidator = generatedQuestionDraftValidator;
         this.objectMapper = objectMapper;
     }
 
-
-    public List<QuestionDto> generateAndSave(
+    public List<GeneratedQuestionDraftDto> generateDrafts(
             AiQuestionGenerationRequest request,
             List<MultipartFile> files
     ) throws IOException {
         Map<String, Integer> requestedCounts = normalizeCounts(request.getQuestionCounts());
         aiUploadValidator.validate(files);
 
-        CertContext ctx = self.loadCertificationContext(request.getCertificationId());
+        CertContext ctx = loadCertificationContext(request.getCertificationId());
         if (ctx.lessonsById().isEmpty()) {
             throw new IllegalArgumentException(
                     "The selected certification has no lessons yet. Add lessons before generating questions."
@@ -118,32 +94,28 @@ public class QuestionGenerationService {
         aiUploadValidator.requireReadableText(rawText.toString());
 
         String referenceContext = buildReferenceContext(ctx, rawText.toString());
+        String requestJson = buildRequestJson(request, ctx, requestedCounts);
 
-        List<Map<String, Object>> availableLessons = ctx.lessonsById().values().stream()
-                .map(l -> Map.<String, Object>of("lessonId", l.lessonId(), "lessonTitle", l.title()))
-                .toList();
-
-        Map<String, Object> requestData = new LinkedHashMap<>();
-        requestData.put("certificationId", request.getCertificationId());
-        requestData.put("certificationTitle", ctx.certTitle());
-        requestData.put("availableLessons", availableLessons);
-        requestData.put("questionCounts", requestedCounts);
-        if (request.getAdditionalInstructions() != null && !request.getAdditionalInstructions().isBlank()) {
-            requestData.put("additionalInstructions", request.getAdditionalInstructions());
-        }
-        String requestJson = objectMapper.writeValueAsString(requestData);
-
-        log.info("Generating questions for certificationId={} with counts {}",
+        log.info("Generating question drafts for certificationId={} with counts {}",
                 request.getCertificationId(), requestedCounts);
-        String aiResponse = questionGenerationAssistant.generateQuestions(requestJson, referenceContext);
 
-        List<Map<String, Object>> generatedQuestions = parseJsonArray(aiResponse);
-        validateBatch(generatedQuestions, requestedCounts, ctx);
+        List<GeneratedQuestionDraftDto> generatedDrafts;
+        try {
+            generatedDrafts = questionGenerationAssistant.generateQuestions(requestJson, referenceContext);
+        } catch (Exception e) {
+            log.error("Failed to deserialize AI question draft response for certificationId={}. Error: {}",
+                    request.getCertificationId(), e.getMessage(), e);
+            throw new InvalidAiGeneratedQuestionException(
+                    "The AI returned invalid question drafts. Please check the format and try again.",
+                    e
+            );
+        }
 
-        List<QuestionDto> saved = self.persistBatch(generatedQuestions);
-        log.info("Saved {} generated questions for certificationId={}",
-                saved.size(), request.getCertificationId());
-        return saved;
+        generatedQuestionDraftValidator.validate(generatedDrafts, requestedCounts, ctx.lessonsById());
+
+        log.info("Generated {} question draft(s) for certificationId={}",
+                generatedDrafts.size(), request.getCertificationId());
+        return generatedDrafts;
     }
 
     @Transactional(readOnly = true)
@@ -157,16 +129,6 @@ public class QuestionGenerationService {
             lessons.put(lesson.getLessonId(), new LessonRef(lesson.getLessonId(), lesson.getName()));
         }
         return new CertContext(cert.getTitle(), lessons);
-    }
-
-
-    @Transactional
-    public List<QuestionDto> persistBatch(List<Map<String, Object>> generatedQuestions) {
-        List<QuestionDto> saved = new ArrayList<>();
-        for (Map<String, Object> qData : generatedQuestions) {
-            saved.add(persistQuestion(qData));
-        }
-        return saved;
     }
 
     private Map<String, Integer> normalizeCounts(Map<String, Integer> counts) {
@@ -199,209 +161,24 @@ public class QuestionGenerationService {
         return normalized;
     }
 
-    private void validateBatch(
-            List<Map<String, Object>> generatedQuestions,
-            Map<String, Integer> requestedCounts,
-            CertContext ctx
-    ) {
-        if (generatedQuestions.isEmpty()) {
-            throw new InvalidAiResponseException("The AI returned no questions. Please try again.");
-        }
-
-        Map<String, Integer> returnedCounts = new LinkedHashMap<>();
-
-        for (Map<String, Object> data : generatedQuestions) {
-            String type = getNormalizedQuestionType(data);
-            String questionText = str(data, "question");
-            String difficulty = getNormalizedDifficulty(data);
-            Long suggestedLessonId = longOf(data.get("suggestedLessonId"));
-
-            if (type == null || !SUPPORTED_TYPES.contains(type)) {
-                throw new InvalidAiResponseException(
-                        "The AI returned a question with an unsupported type: " + type
-                );
-            }
-            if (questionText == null || questionText.isBlank()) {
-                throw new InvalidAiResponseException("The AI returned a question without a prompt.");
-            }
-            if (difficulty == null || !SUPPORTED_DIFFICULTIES.contains(difficulty)) {
-                throw new InvalidAiResponseException(
-                        "The AI returned an invalid difficulty '" + difficulty + "' (allowed: easy, average, hard)."
-                );
-            }
-            if (suggestedLessonId == null || !ctx.lessonsById().containsKey(suggestedLessonId)) {
-                throw new InvalidAiResponseException(
-                        "The AI suggested a lesson that does not belong to the selected certification "
-                                + "(suggestedLessonId=" + suggestedLessonId + ")."
-                );
-            }
-
-            validateAnswerData(type, data);
-            returnedCounts.merge(type, 1, Integer::sum);
-        }
-
-        if (!returnedCounts.equals(requestedCounts)) {
-            throw new InvalidAiResponseException(
-                    "The AI did not return the requested number of questions per type. "
-                            + "Requested " + requestedCounts + " but received " + returnedCounts + "."
-            );
-        }
-    }
-
-    private void validateAnswerData(String type, Map<String, Object> data) {
-        switch (type) {
-            case "MCQ" -> {
-                List<Map<String, Object>> choices = listOfMaps(data.get("choices"));
-                if (choices == null || choices.size() < 2) {
-                    throw new InvalidAiResponseException("The AI returned an MCQ without enough answer choices.");
-                }
-                long correctCount = choices.stream()
-                        .filter(c -> Boolean.TRUE.equals(c.get("isCorrect")))
-                        .count();
-                if (correctCount != 1) {
-                    throw new InvalidAiResponseException(
-                            "The AI returned an MCQ without exactly one correct choice."
-                    );
-                }
-                for (Map<String, Object> choice : choices) {
-                    String text = str(choice, "choiceText");
-                    if (text == null || text.isBlank()) {
-                        throw new InvalidAiResponseException("The AI returned an MCQ with an empty choice.");
-                    }
-                }
-            }
-            case "SHORT_ANSWER" -> {
-                String answer = str(data, "correctAnswer");
-                if (answer == null || answer.isBlank()) {
-                    throw new InvalidAiResponseException(
-                            "The AI returned a short-answer question without a correct answer."
-                    );
-                }
-            }
-            case "DESCRIPTIVE" -> {
-                String rubric = str(data, "rubricBasedAnswer");
-                if (rubric == null || rubric.isBlank()) {
-                    throw new InvalidAiResponseException(
-                            "The AI returned a descriptive question without a model answer or rubric."
-                    );
-                }
-            }
-            case "PROGRAMMING" -> {
-                List<Map<String, Object>> testCases = listOfMaps(data.get("testCases"));
-                if (testCases == null || testCases.isEmpty()) {
-                    throw new InvalidAiResponseException(
-                            "The AI returned a programming question without test cases."
-                    );
-                }
-                for (Map<String, Object> testCase : testCases) {
-                    String expected = str(testCase, "expectedOutput");
-                    if (expected == null || expected.isBlank()) {
-                        throw new InvalidAiResponseException(
-                                "The AI returned a programming test case without an expected output."
-                        );
-                    }
-                }
-            }
-            case "DIAGRAM" -> {
-                String instructions = str(data, "instructions");
-                if (instructions == null || instructions.isBlank()) {
-                    throw new InvalidAiResponseException(
-                            "The AI returned a diagram question without instructions."
-                    );
-                }
-            }
-            default -> throw new InvalidAiResponseException("Unsupported question type: " + type);
-        }
-    }
-
-    private QuestionDto persistQuestion(Map<String, Object> data) {
-        String aiType = getNormalizedQuestionType(data);
-        Long lessonId = longOf(data.get("suggestedLessonId"));
-
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + lessonId));
-
-        Question question = new Question();
-
-        question.setQuestionType(toStoredQuestionType(aiType));
-        question.setDifficultyLevel(getNormalizedDifficulty(data));
-        question.setQuestionText(str(data, "question"));
-        question.setLesson(lesson);
-        question.setImageKey(null);
-        question.setTotalPoints(BigDecimal.ONE);
-
-        if ("MCQ".equals(aiType)) {
-            for (Map<String, Object> choiceData : listOfMaps(data.get("choices"))) {
-                Choice choice = Choice.builder()
-                        .question(question)
-                        .choiceText(str(choiceData, "choiceText"))
-                        .correct(Boolean.TRUE.equals(choiceData.get("isCorrect")))
-                        .explanation(str(choiceData, "explanation"))
-                        .imageKey(null)
-                        .build();
-                question.getChoices().add(choice);
-            }
-        }
-
-        question = questionRepository.save(question);
-
-        switch (aiType) {
-            case "SHORT_ANSWER" -> saveTextConfig(question, str(data, "correctAnswer"), "EXACT_MATCH");
-            case "DESCRIPTIVE" -> saveTextConfig(question, str(data, "rubricBasedAnswer"), "AI_SEMANTIC");
-            case "PROGRAMMING" -> saveProgrammingConfig(data, question);
-            case "DIAGRAM" -> saveDiagramConfig(data, question);
-            default -> {  }
-        }
-
-        return questionMapper.toDto(question);
-    }
-
-    private String toStoredQuestionType(String aiType) {
-        return switch (aiType) {
-            case "PROGRAMMING", "DIAGRAM" -> "CRITICAL_THINKING";
-            default -> aiType;
-        };
-    }
-
-    private void saveTextConfig(Question question, String answer, String checkingMethod) {
-        TextQuestionConfig config = TextQuestionConfig.builder()
-                .question(question)
-                .correctAnswer(answer != null ? answer : "")
-                .checkingMethod(checkingMethod)
-                .build();
-        textQuestionConfigRepository.save(config);
-    }
-
-    private void saveProgrammingConfig(Map<String, Object> data, Question question) {
-        String starterCode = str(data, "starterCode");
-        ProgrammingQuestionConfig config = ProgrammingQuestionConfig.builder()
-                .question(question)
-                .starterCode(starterCode != null ? starterCode : "")
-                .build();
-        config = programmingQuestionConfigRepository.save(config);
-
-        ProgrammingQuestionConfig finalConfig = config;
-        List<ProgrammingTestCase> testCases = listOfMaps(data.get("testCases")).stream()
-                .map(tc -> ProgrammingTestCase.builder()
-                        .programmingQuestionConfig(finalConfig)
-                        .inputData(str(tc, "inputData") != null ? str(tc, "inputData") : "")
-                        .expectedOutput(str(tc, "expectedOutput"))
-                        .build())
+    private String buildRequestJson(
+            AiQuestionGenerationRequest request,
+            CertContext ctx,
+            Map<String, Integer> requestedCounts
+    ) throws IOException {
+        List<Map<String, Object>> availableLessons = ctx.lessonsById().values().stream()
+                .map(l -> Map.<String, Object>of("lessonId", l.lessonId(), "lessonTitle", l.title()))
                 .toList();
-        programmingTestCaseRepository.saveAll(testCases);
-    }
 
-    private void saveDiagramConfig(Map<String, Object> data, Question question) {
-        String diagramType = str(data, "diagramType");
-        DiagramQuestionConfig config = DiagramQuestionConfig.builder()
-                .question(question)
-                .diagramType(diagramType != null ? diagramType : "OTHER")
-                .instructions(str(data, "instructions"))
-
-                .referenceDiagramXml("")
-                .referenceDiagramJson("{}")
-                .build();
-        diagramQuestionConfigRepository.save(config);
+        Map<String, Object> requestData = new LinkedHashMap<>();
+        requestData.put("certificationId", request.getCertificationId());
+        requestData.put("certificationTitle", ctx.certTitle());
+        requestData.put("availableLessons", availableLessons);
+        requestData.put("questionCounts", requestedCounts);
+        if (request.getAdditionalInstructions() != null && !request.getAdditionalInstructions().isBlank()) {
+            requestData.put("additionalInstructions", request.getAdditionalInstructions());
+        }
+        return objectMapper.writeValueAsString(requestData);
     }
 
     private String buildReferenceContext(CertContext ctx, String extractedText) {
@@ -425,87 +202,4 @@ public class QuestionGenerationService {
         return documentText + "\n\n--- Related reference material ---\n\n" + retrieved;
     }
 
-    private List<Map<String, Object>> parseJsonArray(String json) {
-        if (json == null || json.isBlank()) {
-            throw new InvalidAiResponseException("The AI returned an empty response.");
-        }
-        try {
-            String cleaned = json.trim();
-            if (cleaned.startsWith("```")) {
-                cleaned = cleaned.replaceFirst("```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
-            }
-            if (cleaned.startsWith("{")) {
-                Map<String, Object> wrapper = objectMapper.readValue(cleaned, new TypeReference<>() {});
-                Object inner = wrapper.get("questions");
-                if (inner instanceof List) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> questions = (List<Map<String, Object>>) inner;
-                    return questions;
-                }
-            }
-            return objectMapper.readValue(cleaned, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.error("Failed to parse AI question response as JSON array", e);
-            throw new InvalidAiResponseException("The AI returned malformed question JSON. Please try again.", e);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> listOfMaps(Object value) {
-        if (value instanceof List<?> list) {
-            return (List<Map<String, Object>>) list;
-        }
-        return null;
-    }
-
-    private static Long longOf(Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        if (value instanceof String text) {
-            try {
-                return Long.parseLong(text.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private static String str(Map<String, Object> map, String key) {
-        Object v = map.get(key);
-        return v != null ? v.toString() : null;
-    }
-
-    /**
-     * Extracts and normalizes the questionType from AI response maps.
-     * Supports both "questionType" and the older/alternate "type" key,
-     * and trims/upper-cases the value for robust validation.
-     */
-    private static String getNormalizedQuestionType(Map<String, Object> map) {
-        Object v = map.get("questionType");
-        if (v == null) v = map.get("type");
-        if (v == null) return null;
-        return v.toString().trim().toUpperCase(Locale.ROOT);
-    }
-
-    /**
-     * Extracts and normalizes difficulty values from AI responses.
-     * Accepts several key names and maps common synonyms to the
-     * canonical values: easy, average, hard.
-     */
-    private static String getNormalizedDifficulty(Map<String, Object> map) {
-        Object v = map.get("difficulty");
-        if (v == null) v = map.get("difficultyLevel");
-        if (v == null) v = map.get("difficulty_level");
-        if (v == null) v = map.get("level");
-        if (v == null) return null;
-        String s = v.toString().trim().toLowerCase(Locale.ROOT);
-        return switch (s) {
-            case "easy" -> "easy";
-            case "average", "avg", "medium", "moderate" -> "average";
-            case "hard", "difficult" -> "hard";
-            default -> null;
-        };
-    }
 }

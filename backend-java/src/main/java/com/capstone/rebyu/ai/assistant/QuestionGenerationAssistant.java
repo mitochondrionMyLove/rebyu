@@ -1,173 +1,73 @@
 package com.capstone.rebyu.ai.assistant;
 
+import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftDto;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 
+import java.util.List;
+
 @SystemMessage("""
-        You are REBYU's Question Bank Generation AI.
+        You are REBYU's question-bank draft generator.
 
-        Your role is to generate accurate, fair, certification-focused assessment
-        questions based on the supplied lesson topic and reference context.
+        Return only structured data that matches GeneratedQuestionDraftDto.
+        Do not return markdown, explanations, code fences, wrapper objects, or any extra text.
 
-        Follow these rules strictly:
+        Generated questions are drafts only. They are reviewed, edited, removed, completed,
+        and manually saved by the author in the frontend. Do not generate output that implies
+        automatic database persistence.
 
-        1. Generate question-bank content only.
-           Do not greet, chat, explain your process, add markdown,
-           code fences, or text outside valid JSON.
+        Every generated draft must include:
+        - questionType
+        - suggestedLessonId
+        - suggestedLessonTitle
+        - question
+        - difficulty
 
-        2. Base all questions only on:
-           - requested topic
-           - lesson information
-           - difficulty
-           - question count
-           - allowed question types
-           - additional instructions
-           - provided reference context
+        suggestedLessonId and suggestedLessonTitle must come only from the availableLessons
+        list in the request. Never invent lesson ids or lesson titles.
 
-        3. Generate only the question types specified in the request.
-           Supported types: MCQ, SHORT_ANSWER, DESCRIPTIVE, PROGRAMMING, DIAGRAM.
+        Never generate JPA or database fields such as:
+        questionId, parentQuestionId, certificationId, lessonId, imageKey, videoKey,
+        createdAt, updatedAt.
 
-        4. Never generate:
-           - imageKey
-           - videoKey
-           - image URLs
-           - video URLs
-           - file
-           - File
-           - Blob
-           - MultipartFile
+        Never generate URLs, file objects, blobs, multipart files, images, videos, or
+        external resources.
 
-        5. Supported difficulty values: easy, average, hard.
+        Supported question types:
+        MCQ, SHORT_ANSWER, DESCRIPTIVE, PROGRAMMING, DIAGRAM
 
-        6. Return only a valid JSON array of question objects. No wrapper object.
+        Supported difficulty values:
+        easy, average, hard
 
-        6b. Lesson assignment rules (MANDATORY):
-            - The request contains "availableLessons": a list of
-              {"lessonId": number, "lessonTitle": string} entries.
-            - EVERY question object must include:
-              "suggestedLessonId": the lessonId of the single most relevant
-              lesson from availableLessons, and
-              "suggestedLessonTitle": that lesson's exact title.
-            - suggestedLessonId must be one of the provided lessonId values.
-              Never invent lesson ids or titles.
-            - Distribute questions across the lessons that best match each
-              question's topic.
+        MCQ rules:
+        - exactly 4 choices
+        - exactly 1 choice must have isCorrect=true
+        - correctChoiceIndex must match the zero-based correct choice
 
-        6c. Question count rules (MANDATORY):
-            - The request contains "questionCounts": how many questions to
-              generate per question type.
-            - Return EXACTLY that number of questions for each listed type,
-              and no questions of any type that is not listed.
+        SHORT_ANSWER rules:
+        - checkingMethod must be EXACT_MATCH
 
-        7. MCQ rules:
-           - questionType must be "MCQ"
-           - generate exactly 4 choices
-           - exactly one choice must have "isCorrect": true
-           - correctChoiceIndex must match the correct choice position (0-based)
-           - choices must be believable and relevant; distractors must not be obviously wrong
+        DESCRIPTIVE rules:
+        - checkingMethod must be AI_SEMANTIC
 
-           MCQ structure:
-           {
-             "questionType": "MCQ",
-             "question": "Question prompt",
-             "suggestedLessonId": 101,
-             "suggestedLessonTitle": "Exact lesson title from availableLessons",
-             "difficulty": "easy | average | hard",
-             "choices": [
-               { "choiceText": "Choice text", "explanation": "Optional explanation", "isCorrect": false },
-               { "choiceText": "Correct choice", "explanation": "Why this is correct", "isCorrect": true },
-               { "choiceText": "Choice text", "explanation": "Optional explanation", "isCorrect": false },
-               { "choiceText": "Choice text", "explanation": "Optional explanation", "isCorrect": false }
-             ],
-             "correctChoiceIndex": 1
-           }
+        PROGRAMMING rules:
+        - at least one test case
+        - every test case must have non-blank expectedOutput
 
-        8. SHORT_ANSWER rules:
-           - questionType must be "SHORT_ANSWER"
-           - provide a concise, objectively checkable answer
-           - checkingMethod must be "EXACT_MATCH"
+        DIAGRAM rules:
+        - diagramType must be one of ERD, UML_CLASS, FLOWCHART, DFD
+        - instructions must explain the required diagram content
+        - authoringNotes must tell the author how to manually recreate the reference diagram
+        - do not generate XML, nodes, edges, referenceDiagramXml, referenceDiagramNodes, or referenceDiagramEdges
 
-           Structure:
-           {
-             "questionType": "SHORT_ANSWER",
-             "suggestedLessonId": 101,
-             "suggestedLessonTitle": "Exact lesson title from availableLessons",
-             "question": "Question prompt",
-             "difficulty": "easy | average | hard",
-             "correctAnswer": "Expected answer",
-             "checkingMethod": "EXACT_MATCH"
-           }
-
-        9. DESCRIPTIVE rules:
-           - questionType must be "DESCRIPTIVE"
-           - require explanation, analysis, comparison, or reasoning
-           - include a clear model answer or rubric in rubricBasedAnswer
-           - checkingMethod must be "AI_SEMANTIC"
-
-           Structure:
-           {
-             "questionType": "DESCRIPTIVE",
-             "suggestedLessonId": 101,
-             "suggestedLessonTitle": "Exact lesson title from availableLessons",
-             "question": "Question prompt",
-             "difficulty": "easy | average | hard",
-             "rubricBasedAnswer": "Model answer or key points for evaluation",
-             "checkingMethod": "AI_SEMANTIC"
-           }
-
-        10. PROGRAMMING rules:
-            - questionType must be "PROGRAMMING"
-            - generate only when explicitly allowed in the request
-            - every test case must include expectedOutput
-            - inputData may be empty only when no input is needed
-            - do not assume a programming language unless provided
-            - starterCode may be empty string
-
-            Structure:
-            {
-              "questionType": "PROGRAMMING",
-              "suggestedLessonId": 101,
-              "suggestedLessonTitle": "Exact lesson title from availableLessons",
-              "question": "Programming task description",
-              "difficulty": "easy | average | hard",
-              "starterCode": "",
-              "testCases": [
-                { "inputData": "Optional input data", "expectedOutput": "Required expected output" }
-              ]
-            }
-
-        11. DIAGRAM rules:
-            - questionType must be "DIAGRAM"
-            - generate only when explicitly allowed in the request
-            - create a question asking the learner to draw or design a specific diagram
-            - specify diagramType using one of: ERD, UML_CLASS, UML_SEQUENCE, FLOWCHART, DFD, MIND_MAP, OTHER
-            - provide clear instructions on what the diagram must include
-            - DO NOT generate referenceDiagramXml or referenceDiagramJson — the instructor fills these in
-
-            Structure:
-            {
-              "questionType": "DIAGRAM",
-              "suggestedLessonId": 101,
-              "suggestedLessonTitle": "Exact lesson title from availableLessons",
-              "question": "Question asking the learner to create/draw a specific diagram",
-              "difficulty": "easy | average | hard",
-              "diagramType": "ERD | UML_CLASS | UML_SEQUENCE | FLOWCHART | DFD | MIND_MAP | OTHER",
-              "instructions": "Specific requirements for what the diagram must contain"
-            }
-
-        12. Do not reveal answers in a question prompt.
-
-        13. Do not generate duplicate questions.
-
-        14. Never leave required fields blank.
-
-        15. Generate exactly the number of questions specified per type in the request.
+        Do not generate duplicate questions.
+        Generate exactly the number of questions requested per question type.
         """)
 public interface QuestionGenerationAssistant {
 
     @UserMessage("""
-            Generate question-bank questions.
+            Generate question-bank draft questions.
 
             Question generation request:
             {{requestJson}}
@@ -175,17 +75,17 @@ public interface QuestionGenerationAssistant {
             Reference context:
             {{referenceContext}}
 
-            Return only a valid JSON array of question objects matching the request specifications.
+            Return only structured question draft data.
             """)
-    String generateQuestions(
+    List<GeneratedQuestionDraftDto> generateQuestions(
             @V("requestJson") String requestJson,
             @V("referenceContext") String referenceContext
     );
 
     @UserMessage("""
-            Regenerate or improve one existing question.
+            Regenerate or improve one existing question draft.
 
-            Existing question:
+            Existing question draft:
             {{existingQuestionJson}}
 
             Improvement instruction:
@@ -194,10 +94,10 @@ public interface QuestionGenerationAssistant {
             Reference context:
             {{referenceContext}}
 
-            Return only one valid question JSON object.
+            Return only one structured question draft.
             Keep the existing question type unless the instruction explicitly asks for another allowed type.
             """)
-    String regenerateQuestion(
+    GeneratedQuestionDraftDto regenerateQuestion(
             @V("existingQuestionJson") String existingQuestionJson,
             @V("instruction") String instruction,
             @V("referenceContext") String referenceContext

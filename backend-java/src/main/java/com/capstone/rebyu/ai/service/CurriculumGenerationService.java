@@ -324,11 +324,10 @@ public class CurriculumGenerationService {
         String planRequestJson = objectMapper.writeValueAsString(planRequest);
 
         log.info("Calling CurriculumPlanningAssistant for '{}'", certTitle);
-        String planJson = curriculumPlanningAssistant.planCurriculum(
+        CurriculumPlanDTO plan = curriculumPlanningAssistant.planCurriculum(
                 planRequestJson, truncate(documentContent, MAX_DOC_CHARS)
         );
 
-        CurriculumPlanDTO plan = parseCurriculumPlan(planJson);
         validatePlan(plan);
         return plan;
     }
@@ -458,28 +457,6 @@ public class CurriculumGenerationService {
         }
 
         throw lastError;
-    }
-
-    private CurriculumPlanDTO parseCurriculumPlan(String raw) {
-        try {
-            String json = raw.trim();
-
-            if (json.startsWith("```")) {
-                int start = json.indexOf('\n') + 1;
-                int end = json.lastIndexOf("```");
-                json = end > start ? json.substring(start, end).trim() : json.substring(start).trim();
-            }
-
-            int objStart = json.indexOf('{');
-            int objEnd = json.lastIndexOf('}');
-            if (objStart != -1 && objEnd > objStart) {
-                json = json.substring(objStart, objEnd + 1);
-            }
-            return objectMapper.readValue(json, CurriculumPlanDTO.class);
-        } catch (Exception e) {
-            log.error("Failed to parse curriculum plan JSON", e);
-            throw new InvalidAiResponseException("The AI returned an invalid curriculum plan. Please try again.", e);
-        }
     }
 
     private static String truncate(String text, int maxChars) {

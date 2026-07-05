@@ -116,7 +116,9 @@ langchain4j:
     api-key: ${GROQ_API_KEY}
     base-url: https://api.groq.com/openai/v1
     chat-model:
-      model-name: ${GROQ_MODEL:llama-3.3-70b-versatile}
+      # Groq rate limits are model-specific. Use a lower-cost default so draft generation
+      # is less likely to hit the daily token cap during normal authoring workflows.
+      model-name: ${GROQ_MODEL:llama-3.1-8b-instant}
       temperature: 0.7
 
 db:

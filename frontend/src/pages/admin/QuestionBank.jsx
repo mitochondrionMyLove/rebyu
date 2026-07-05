@@ -9,7 +9,6 @@ import {
     ChevronsLeft,
     ChevronsRight,
     Code2,
-    Download,
     Eye,
     FileArchive,
     FileIcon,
@@ -83,6 +82,9 @@ import {
     saveTextQuestion,
     updateQuestion,
 } from "../../services/questionService.js";
+import {
+    mapGeneratedQuestionDraftsToQuestionTypes,
+} from "../../utils/generated-question-draft-mapper.js";
 
 function getBackendErrorMessage(error, fallbackMessage) {
     const responseData = error?.response?.data;
@@ -680,6 +682,14 @@ function DiagramTypeSelect({ questionKey, value, onValueChange }) {
 function QuestionMetaFields({ questionKey, data, onFieldChange }) {
     return (
         <div className="border-t border-border pt-4">
+            {(data.suggestedLessonTitle || data.lessonId) && (
+                <p className="mb-3 text-xs leading-5 text-muted-foreground">
+                    {data.suggestedLessonTitle
+                        ? `Suggested lesson: ${data.suggestedLessonTitle}`
+                        : `Lesson ID: ${data.lessonId}`}
+                </p>
+            )}
+
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <p className="text-sm font-medium text-foreground">
@@ -1562,6 +1572,13 @@ function Diagram({
                 </div>
             </div>
 
+            {data.authoringNotes && (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs leading-5 text-muted-foreground">
+                    <p className="font-medium text-foreground">Authoring notes</p>
+                    <p className="mt-1">{data.authoringNotes}</p>
+                </div>
+            )}
+
             <section
                 className={`overflow-hidden rounded-xl border bg-background ${
                     errors.referenceDiagramXml ? "border-destructive/70" : "border-border"
@@ -1728,23 +1745,8 @@ function QuestionFileGeneratorDialog({
     const maxFiles = 3;
     const maxSizeMB = 10;
     const maxSize = maxSizeMB * 1024 * 1024;
-    const maxQuestionsPerType = 50;
 
-    const initialQuestionCounts = {
-        MCQ: 10,
-        SHORT_ANSWER: 0,
-        DESCRIPTIVE: 0,
-        PROGRAMMING: 0,
-        DIAGRAM: 0,
-    };
-
-    const [questionCounts, setQuestionCounts] = useState(initialQuestionCounts);
     const [submitError, setSubmitError] = useState("");
-
-    const totalRequestedQuestions = Object.values(questionCounts).reduce(
-        (total, count) => total + count,
-        0,
-    );
 
     const [
         { files, isDragging, errors },
@@ -1777,7 +1779,6 @@ function QuestionFileGeneratorDialog({
 
     function resetGeneratorForm() {
         clearFiles();
-        setQuestionCounts(initialQuestionCounts);
         setSubmitError("");
     }
 
@@ -1802,31 +1803,12 @@ function QuestionFileGeneratorDialog({
         onOpenChange(false);
     }
 
-    function updateQuestionCount(questionTypeId, rawValue) {
-        const parsedValue = Number.parseInt(rawValue, 10);
-        const safeValue = Number.isNaN(parsedValue)
-            ? 0
-            : Math.min(Math.max(parsedValue, 0), maxQuestionsPerType);
-
-        setQuestionCounts((currentCounts) => ({
-            ...currentCounts,
-            [questionTypeId]: safeValue,
-        }));
-    }
-
     async function handleGenerate() {
         const selectedDocuments = files.map((item) => item.file);
 
         if (selectedDocuments.length === 0) {
             setSubmitError(
-                "Please upload at least one document before generating questions.",
-            );
-            return;
-        }
-
-        if (totalRequestedQuestions === 0) {
-            setSubmitError(
-                "Enter at least one question for any question type before generating.",
+                "Upload at least one source document before generating drafts.",
             );
             return;
         }
@@ -1834,13 +1816,13 @@ function QuestionFileGeneratorDialog({
         setSubmitError("");
 
         try {
-            await onGenerate?.(selectedDocuments, questionCounts);
+            await onGenerate(selectedDocuments);
             resetGeneratorForm();
         } catch (error) {
             setSubmitError(
                 getBackendErrorMessage(
                     error,
-                    "Question generation failed. Please try again.",
+                    "REBYU could not analyze the uploaded files. Please try again.",
                 ),
             );
         }
@@ -1848,98 +1830,115 @@ function QuestionFileGeneratorDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-            <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-6xl">
+            <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-5xl">
                 <DialogHeader>
-                    <DialogTitle>Generate Questions from File</DialogTitle>
+                    <DialogTitle>Generate Questions from Files</DialogTitle>
 
                     <DialogDescription className="leading-6">
-                        Upload source material for{" "}
+                        Upload learning materials for{" "}
                         <span className="font-medium text-foreground">
                             {getCertificationTitle(selectedCertification)}
                         </span>
-                        . Choose how many draft questions REBYU should create for
-                        each question type. You can assign the generated questions to
-                        lessons later.
+                        . REBYU will read the files, identify topics, and choose
+                        the most suitable question types automatically.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-5">
-                    <section className="rounded-lg border border-border bg-muted/20 p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground">
-                                    Question quantities
-                                </h3>
-
-                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                    Enter 0 for types you do not want to generate. Maximum {maxQuestionsPerType} questions per type.
-                                </p>
+                    <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <Sparkles className="h-5 w-5" />
                             </div>
 
-                            <div className="rounded-md border border-border bg-background px-3 py-2 text-right">
-                                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                                    Total requested
-                                </p>
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-semibold text-foreground">
+                                    AI-selected question types
+                                </h3>
 
-                                <p className="text-lg font-semibold text-foreground">
-                                    {totalRequestedQuestions}
+                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                    You do not need to choose MCQ, short answer,
+                                    descriptive, programming, or diagram manually.
+                                    REBYU analyzes the uploaded content first and creates
+                                    only the question types supported by the material.
                                 </p>
                             </div>
                         </div>
 
                         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            {questionTypes.map((questionType) => {
-                                const Icon = questionType.icon;
-                                const count = questionCounts[questionType.id] ?? 0;
-                                const inputId = `generate-${questionType.id.toLowerCase()}-count`;
+                            <div className="rounded-lg border border-border bg-background p-3">
+                                <div className="flex items-center gap-2">
+                                    <ListChecks className="h-4 w-4 text-primary" />
+                                    <p className="text-sm font-medium text-foreground">
+                                        Concepts and terminology
+                                    </p>
+                                </div>
 
-                                return (
-                                    <div
-                                        key={questionType.id}
-                                        className="flex items-center gap-3 rounded-lg border border-border bg-background p-3"
-                                    >
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                                            <Icon className="h-4 w-4" />
-                                        </div>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    Definitions, processes, classifications, and rules may
+                                    become MCQ, short-answer, or descriptive drafts.
+                                </p>
+                            </div>
 
-                                        <div className="min-w-0 flex-1">
-                                            <Label
-                                                htmlFor={inputId}
-                                                className="block truncate text-sm font-medium text-foreground"
-                                            >
-                                                {questionType.title}
-                                            </Label>
+                            <div className="rounded-lg border border-border bg-background p-3">
+                                <div className="flex items-center gap-2">
+                                    <Code2 className="h-4 w-4 text-primary" />
+                                    <p className="text-sm font-medium text-foreground">
+                                        Programming material
+                                    </p>
+                                </div>
 
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                                {questionType.description}
-                                            </p>
-                                        </div>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    Programming questions appear only when REBYU detects
+                                    code, algorithms, pseudocode, or coding lessons.
+                                </p>
+                            </div>
 
-                                        <Input
-                                            id={inputId}
-                                            type="number"
-                                            min="0"
-                                            max={maxQuestionsPerType}
-                                            inputMode="numeric"
-                                            value={count}
-                                            onChange={(event) =>
-                                                updateQuestionCount(
-                                                    questionType.id,
-                                                    event.target.value,
-                                                )
-                                            }
-                                            className="h-9 w-20 shrink-0 text-center"
-                                            aria-label={`${questionType.title} quantity`}
-                                        />
-                                    </div>
-                                );
-                            })}
+                            <div className="rounded-lg border border-border bg-background p-3">
+                                <div className="flex items-center gap-2">
+                                    <Workflow className="h-4 w-4 text-primary" />
+                                    <p className="text-sm font-medium text-foreground">
+                                        Diagram material
+                                    </p>
+                                </div>
+
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    Diagram questions appear only when the material supports
+                                    ERD, UML class, flowchart, or DFD activities.
+                                </p>
+                            </div>
+
+                            <div className="rounded-lg border border-border bg-background p-3">
+                                <div className="flex items-center gap-2">
+                                    <Pencil className="h-4 w-4 text-primary" />
+                                    <p className="text-sm font-medium text-foreground">
+                                        Author review
+                                    </p>
+                                </div>
+
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    Questions are editable drafts. Authors still create
+                                    reference diagrams manually before saving.
+                                </p>
+                            </div>
                         </div>
                     </section>
 
-                    <div className="flex flex-col gap-2">
+                    <section className="space-y-3">
+                        <div>
+                            <h3 className="text-sm font-semibold text-foreground">
+                                Source files
+                            </h3>
+
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                Upload modules, reviewer notes, lesson files, or structured
+                                reference documents. REBYU uses the uploaded material as
+                                the basis for its drafts.
+                            </p>
+                        </div>
+
                         <div
-                            className="flex min-h-56 flex-col items-center overflow-hidden rounded-xl border border-input border-dashed p-4 transition-colors not-data-[files]:justify-center has-[input:focus]:border-ring has-[input:focus]:ring-[3px] has-[input:focus]:ring-ring/50 data-[files]:hidden data-[dragging=true]:bg-accent/50"
+                            className="flex min-h-64 flex-col items-center overflow-hidden rounded-xl border border-input border-dashed p-5 transition-colors not-data-[files]:justify-center has-[input:focus]:border-ring has-[input:focus]:ring-[3px] has-[input:focus]:ring-ring/50 data-[dragging=true]:bg-accent/50"
                             data-dragging={isDragging || undefined}
                             data-files={files.length > 0 || undefined}
                             onDragEnter={handleDragEnter}
@@ -1949,25 +1948,22 @@ function QuestionFileGeneratorDialog({
                         >
                             <input
                                 {...getInputProps()}
-                                aria-label="Upload source documents for question generation"
+                                aria-label="Upload source documents for AI question generation"
                                 className="sr-only"
                             />
 
                             <div className="flex flex-col items-center justify-center text-center">
-                                <div
-                                    aria-hidden="true"
-                                    className="mb-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-background"
-                                >
-                                    <FileIcon className="h-4 w-4 opacity-60" />
+                                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border bg-background">
+                                    <UploadCloud className="h-5 w-5 text-muted-foreground" />
                                 </div>
 
-                                <p className="mb-1.5 text-sm font-medium">
-                                    Upload files
+                                <p className="text-sm font-semibold text-foreground">
+                                    Upload learning materials
                                 </p>
 
-                                <p className="text-xs text-muted-foreground">
-                                    PDF, DOC, DOCX, or CSV · Max {maxFiles} files · Up to{" "}
-                                    {formatBytes(maxSize)}
+                                <p className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
+                                    PDF, DOC, DOCX, or CSV · Maximum {maxFiles} files · Up
+                                    to {formatBytes(maxSize)} each
                                 </p>
 
                                 <Button
@@ -1975,12 +1971,10 @@ function QuestionFileGeneratorDialog({
                                     className="mt-4"
                                     onClick={openFileDialog}
                                     variant="outline"
+                                    disabled={isGenerating}
                                 >
-                                    <UploadIcon
-                                        aria-hidden="true"
-                                        className="mr-2 h-4 w-4 opacity-60"
-                                    />
-                                    Select files
+                                    <UploadIcon className="mr-2 h-4 w-4" />
+                                    Select Files
                                 </Button>
                             </div>
                         </div>
@@ -1988,9 +1982,16 @@ function QuestionFileGeneratorDialog({
                         {files.length > 0 && (
                             <>
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <h3 className="text-sm font-medium">
-                                        Files ({files.length} of {maxFiles})
-                                    </h3>
+                                    <div>
+                                        <h4 className="text-sm font-medium text-foreground">
+                                            Ready for AI analysis
+                                        </h4>
+
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {files.length} of {maxFiles} file
+                                            {files.length === 1 ? "" : "s"} selected
+                                        </p>
+                                    </div>
 
                                     <div className="flex gap-2">
                                         <Button
@@ -1998,12 +1999,10 @@ function QuestionFileGeneratorDialog({
                                             onClick={openFileDialog}
                                             size="sm"
                                             variant="outline"
+                                            disabled={isGenerating}
                                         >
-                                            <UploadCloud
-                                                aria-hidden="true"
-                                                className="mr-1.5 h-3.5 w-3.5 opacity-60"
-                                            />
-                                            Add files
+                                            <UploadCloud className="mr-1.5 h-3.5 w-3.5" />
+                                            Add Files
                                         </Button>
 
                                         <Button
@@ -2011,22 +2010,20 @@ function QuestionFileGeneratorDialog({
                                             onClick={clearFiles}
                                             size="sm"
                                             variant="outline"
+                                            disabled={isGenerating}
                                         >
-                                            <Trash2
-                                                aria-hidden="true"
-                                                className="mr-1.5 h-3.5 w-3.5 opacity-60"
-                                            />
-                                            Remove all
+                                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                            Remove All
                                         </Button>
                                     </div>
                                 </div>
 
-                                <div className="overflow-hidden rounded-md border bg-background">
+                                <div className="overflow-hidden rounded-lg border bg-background">
                                     <Table>
                                         <TableHeader className="text-xs">
                                             <TableRow className="bg-muted/50">
                                                 <TableHead className="h-9 py-2">
-                                                    Name
+                                                    File
                                                 </TableHead>
 
                                                 <TableHead className="h-9 py-2">
@@ -2046,7 +2043,7 @@ function QuestionFileGeneratorDialog({
                                         <TableBody className="text-[13px]">
                                             {files.map((file) => (
                                                 <TableRow key={file.id}>
-                                                    <TableCell className="max-w-48 py-2 font-medium">
+                                                    <TableCell className="max-w-56 py-2 font-medium">
                                                         <span className="flex items-center gap-2">
                                                             <span className="shrink-0">
                                                                 {getQuestionGenerationFileIcon(file)}
@@ -2080,8 +2077,9 @@ function QuestionFileGeneratorDialog({
                                                             }
                                                             size="icon"
                                                             variant="ghost"
+                                                            disabled={isGenerating}
                                                         >
-                                                            <Download className="h-4 w-4" />
+                                                            <Eye className="h-4 w-4" />
                                                         </Button>
 
                                                         <Button
@@ -2091,6 +2089,7 @@ function QuestionFileGeneratorDialog({
                                                             onClick={() => removeFile(file.id)}
                                                             size="icon"
                                                             variant="ghost"
+                                                            disabled={isGenerating}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -2105,17 +2104,17 @@ function QuestionFileGeneratorDialog({
 
                         {(submitError || errors.length > 0) && (
                             <div
-                                className="flex items-center gap-1 text-xs text-destructive"
+                                className="flex items-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
                                 role="alert"
                             >
-                                <AlertCircle className="h-3 w-3 shrink-0" />
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                                 <span>{submitError || errors[0]}</span>
                             </div>
                         )}
-                    </div>
+                    </section>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
                     <Button
                         type="button"
                         variant="outline"
@@ -2128,12 +2127,12 @@ function QuestionFileGeneratorDialog({
                     <Button
                         type="button"
                         onClick={handleGenerate}
-                        disabled={isGenerating}
+                        disabled={isGenerating || files.length === 0}
                     >
                         <Sparkles className="mr-2 h-4 w-4" />
                         {isGenerating
-                            ? "Generating..."
-                            : `Generate Questions (${totalRequestedQuestions})`}
+                            ? "Analyzing Files..."
+                            : "Analyze Files and Generate Drafts"}
                     </Button>
                 </div>
             </DialogContent>
@@ -2401,6 +2400,11 @@ function QuestionBank() {
     const filterLessons = useMemo(
         () => getCertificationLessons(selectedFilterCertification),
         [selectedFilterCertification],
+    );
+
+    const builderLessons = useMemo(
+        () => getCertificationLessons(selectedCertification),
+        [selectedCertification],
     );
 
     const filterLessonMap = useMemo(
@@ -2760,7 +2764,10 @@ function QuestionBank() {
                 id: createLocalId(),
                 typeId: questionType.id,
                 questionTypeName: questionType.title,
-                data: cloneQuestionData(questionType.data),
+                data: {
+                    ...cloneQuestionData(questionType.data),
+                    lessonId: selectedLesson?.id ?? "",
+                },
             },
         ]);
     }
@@ -2795,6 +2802,11 @@ function QuestionBank() {
 
     const submitQuestions = async () => {
         for (const question of questions) {
+            const lessonId = question.data.lessonId || selectedLesson?.id;
+            if (!lessonId) {
+                throw new Error("Each draft needs a lesson before it can be saved.");
+            }
+
             switch (question.typeId) {
                 case "MCQ": {
                     const savedMCQ = await saveQuestion({
@@ -2802,7 +2814,7 @@ function QuestionBank() {
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
                         imageKey: null,
-                        lessonId: Number(selectedLesson.id),
+                        lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
 
@@ -2823,7 +2835,7 @@ function QuestionBank() {
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
                         imageKey: null,
-                        lessonId: Number(selectedLesson.id),
+                        lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
                     await saveTextQuestion({
@@ -2839,7 +2851,7 @@ function QuestionBank() {
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
                         imageKey: null,
-                        lessonId: Number(selectedLesson.id),
+                        lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
                     await saveTextQuestion({
@@ -2855,7 +2867,7 @@ function QuestionBank() {
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
                         imageKey: null,
-                        lessonId: Number(selectedLesson.id),
+                        lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
                     await saveProgrammingQuestion({
@@ -2873,7 +2885,7 @@ function QuestionBank() {
                             questionType: question.data.questionType,
                             difficultyLevel: question.data.difficulty,
                             questionText: subQuestion.question,
-                            lessonId: Number(selectedLesson.id),
+                            lessonId: Number(lessonId),
                             totalPoints: 1,
                         });
                         await saveTextQuestion({
@@ -2890,7 +2902,7 @@ function QuestionBank() {
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
                         imageKey: null,
-                        lessonId: Number(selectedLesson.id),
+                        lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
                     await saveDiagramQuestion({
@@ -2910,7 +2922,7 @@ function QuestionBank() {
                             questionType: question.data.questionType,
                             difficultyLevel: question.data.difficulty,
                             questionText: subQuestion.question,
-                            lessonId: Number(selectedLesson.id),
+                            lessonId: Number(lessonId),
                             totalPoints: 1,
                         });
                         await saveTextQuestion({
@@ -2925,10 +2937,7 @@ function QuestionBank() {
         }
     };
 
-    async function handleGenerateQuestionsFromFiles(
-        selectedDocuments,
-        requestedQuestionCounts,
-    ) {
+    async function handleGenerateQuestionsFromFiles(selectedDocuments) {
         if (!selectedCertification) {
             throw new Error(
                 "Please select a certification before generating questions.",
@@ -2941,26 +2950,71 @@ function QuestionBank() {
         try {
             setIsGeneratingQuestions(true);
 
-            const savedQuestions = await generateQuestionsFromFiles(
+            /*
+             * The backend reads the uploaded documents, detects the topics, chooses
+             * appropriate question types, and returns editable draft DTOs only.
+             * It must not save any question to the database during generation.
+             */
+            const generationResponse = await generateQuestionsFromFiles(
                 certificationId,
                 selectedDocuments,
-                requestedQuestionCounts,
             );
 
-            const savedCount = Array.isArray(savedQuestions)
-                ? savedQuestions.length
-                : 0;
+            const generatedDrafts = Array.isArray(generationResponse)
+                ? generationResponse
+                : generationResponse?.questions ?? [];
+
+            const warnings = Array.isArray(generationResponse?.warnings)
+                ? generationResponse.warnings
+                : [];
+
+            const mappedDrafts = mapGeneratedQuestionDraftsToQuestionTypes(
+                generatedDrafts,
+            );
+
+            if (mappedDrafts.length === 0) {
+                throw new Error(
+                    warnings[0] ||
+                    "No safe question drafts could be generated from the uploaded files.",
+                );
+            }
+
+            const draftsForBuilder = mappedDrafts.map((draft) => ({
+                id: createLocalId(),
+                typeId: draft.typeId,
+                questionTypeName: draft.questionTypeName,
+                data: draft.data,
+            }));
+
+            setQuestions((currentQuestions) => [
+                ...currentQuestions,
+                ...draftsForBuilder,
+            ]);
+
+            const firstDraft = draftsForBuilder[0];
+
+            const firstLesson = builderLessons.find(
+                (lesson) =>
+                    String(lesson.numericId ?? lesson.id) ===
+                    String(firstDraft.data.lessonId),
+            );
+
+            if (!selectedLesson && firstLesson) {
+                setSelectedLesson(firstLesson);
+            }
 
             setIsQuestionFileGeneratorOpen(false);
 
-
-
-            await refetchQuestions();
-
             showFeedbackDialog({
                 type: "success",
-                title: "Questions Generated",
-                description: `${savedCount} question(s) were generated and saved successfully.`,
+                title: "Draft Questions Ready",
+                description:
+                    `${draftsForBuilder.length} editable draft question${
+                        draftsForBuilder.length === 1 ? "" : "s"
+                    } were added to the builder. ` +
+                    (warnings.length > 0
+                        ? `Note: ${warnings[0]}`
+                        : "Review each draft before saving."),
             });
         } finally {
             setIsGeneratingQuestions(false);
@@ -3359,7 +3413,7 @@ function QuestionBank() {
 
 
 
-}
+                                    }
                                 </div>
                             </CardContent>
                         </Card>
@@ -4076,15 +4130,16 @@ function QuestionBank() {
 
             <AiGenerationProgress
                 open={isGeneratingQuestions}
-                title="Generating questions"
+                title="Analyzing files and generating drafts"
                 description={getCertificationTitle(selectedCertification)}
                 stepDurationMs={6000}
                 steps={[
-                    "Reading your documents",
-                    "Matching topics to lessons",
-                    "Writing the questions",
-                    "Checking answers and difficulty",
-                    "Saving to the question bank",
+                    "Reading uploaded documents",
+                    "Identifying topics and lesson coverage",
+                    "Choosing suitable question types",
+                    "Generating editable question drafts",
+                    "Checking answers, difficulty, and duplicates",
+                    "Preparing drafts for author review",
                 ]}
             />
 

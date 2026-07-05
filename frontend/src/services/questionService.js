@@ -1,5 +1,13 @@
 import { base } from "./base"
 
+const DEFAULT_GENERATION_COUNTS = {
+    MCQ: 1,
+    SHORT_ANSWER: 1,
+    DESCRIPTIVE: 1,
+    PROGRAMMING: 1,
+    DIAGRAM: 1,
+}
+
 export async function saveQuestion(question) {
     return await base("questions", {
         method: "POST",
@@ -38,12 +46,16 @@ export async function generateQuestionsFromFiles(
     questionCounts
 ) {
     const formData = new FormData()
+    const countsToSend =
+        questionCounts && typeof questionCounts === "object"
+            ? questionCounts
+            : DEFAULT_GENERATION_COUNTS
 
     formData.append("certificationId", String(certificationId))
 
     formData.append(
         "questionCountsJson",
-        JSON.stringify(questionCounts)
+        JSON.stringify(countsToSend)
     )
 
     files.forEach((file) => {

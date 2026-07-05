@@ -1,6 +1,7 @@
 package com.capstone.rebyu.common;
 
 import jakarta.persistence.EntityNotFoundException;
+import com.capstone.rebyu.ai.common.InvalidAiGeneratedQuestionException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -65,6 +66,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidAiResponseException.class)
     public ResponseEntity<ErrorResponse> handleInvalidAiResponse(InvalidAiResponseException ex) {
         log.warn("Invalid AI response: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(new ErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(InvalidAiGeneratedQuestionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidAiGeneratedQuestion(InvalidAiGeneratedQuestionException ex) {
+        log.warn("Invalid generated question draft: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(new ErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage(), null));
     }

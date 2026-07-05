@@ -68,6 +68,10 @@ public class AiConfig {
 
     @Bean
     public ChatModel chatModel() {
+        // Groq's OpenAI-compatible endpoint does not support `response_format=json_schema`.
+        // LangChain4j can still parse typed POJO/collection return values from plain text when
+        // the prompt asks for strict JSON, so we keep the model compatible and validate output
+        // in service code instead of forcing an unsupported provider feature.
         return OpenAiChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
@@ -181,10 +185,6 @@ public class AiConfig {
     public CurriculumPlanningAssistant curriculumPlanningAssistant(ChatModel chatModel) {
         return AiServices.builder(CurriculumPlanningAssistant.class)
                 .chatModel(chatModel)
-                .systemMessageProvider(id ->
-                        "You are a curriculum planning AI. Output only valid JSON. " +
-                        "Never include text outside the JSON object. " +
-                        "Start with { and end with }. No markdown, no explanations.")
                 .build();
     }
 }
