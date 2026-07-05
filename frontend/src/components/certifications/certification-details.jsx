@@ -50,7 +50,7 @@ function CertificationDetails({ value, onChange, errors = {} }) {
   return (
       <FieldSet className="w-full">
         <FieldGroup className="gap-5">
-          {/* Certification Name */}
+          {}
           <Field>
             <FieldLabel htmlFor="certification-title">
               Certification Name
@@ -87,7 +87,7 @@ function CertificationDetails({ value, onChange, errors = {} }) {
           </Field>
 
           <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {/* Price */}
+            {}
             <Field>
               <FieldLabel htmlFor="certification-price">
                 Price
@@ -122,7 +122,7 @@ function CertificationDetails({ value, onChange, errors = {} }) {
               )}
             </Field>
 
-            {/* Industry */}
+            {}
             <Field>
               <FieldLabel htmlFor="certification-industry">
                 Industry
@@ -205,7 +205,7 @@ function CertificationDetails({ value, onChange, errors = {} }) {
             )}
           </Field>
 
-          {/* Cover Image */}
+          {}
           <Field>
             <FieldLabel>Certification Cover Image</FieldLabel>
 
@@ -226,7 +226,7 @@ function CertificationDetails({ value, onChange, errors = {} }) {
               Upload a JPG, JPEG, PNG, or WEBP image. Maximum file size: 5 MB.
             </FieldDescription>
 
-            {/* Remove this FieldError if FileUploadComponent already displays error text itself. */}
+            {}
             {errors.imageFile && (
                 <FieldError>{errors.imageFile}</FieldError>
             )}

@@ -66,13 +66,6 @@ function getCellLabel(cell) {
         return cleanLabel(directValue)
     }
 
-    /*
-      Some Draw.io elements are wrapped like this:
-
-      <object label="Student">
-        <mxCell vertex="1" />
-      </object>
-    */
     const parent = cell.parentElement
 
     return cleanLabel(
@@ -176,10 +169,6 @@ function getGraphModelDocument(xml) {
         return directGraphModel
     }
 
-    /*
-      Supports an uncompressed <mxfile><diagram>...</diagram></mxfile>
-      where the mxGraphModel is stored as text inside <diagram>.
-    */
     const diagramElement =
         document.getElementsByTagName("diagram")[0]
 
@@ -255,37 +244,6 @@ function resolveNodeId(
     return null
 }
 
-/*
-  Output example:
-
-  {
-    nodes: [
-      {
-        id: "student-id",
-        label: "Student",
-        labelKey: "student",
-        nodeType: "shape",
-        style: "...",
-        geometry: { x, y, width, height }
-      }
-    ],
-
-    edges: [
-      {
-        id: "edge-id",
-        sourceId: "student-id",
-        targetId: "course-id",
-        sourceLabel: "Student",
-        targetLabel: "Course",
-        sourceLabelKey: "student",
-        targetLabelKey: "course",
-        label: "enrolls",
-        labelKey: "enrolls",
-        style: "..."
-      }
-    ]
-  }
-*/
 export function extractDiagramData(xml) {
     if (typeof xml !== "string" || !xml.trim()) {
         return {

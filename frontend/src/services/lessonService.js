@@ -20,3 +20,18 @@ export async function getAllLessons(){
     method: "GET",
   })
 }
+
+export async function generateLessonFromFiles(lessonId, files) {
+  const formData = new FormData()
+
+  formData.append("lessonId", String(lessonId))
+
+  files.forEach((file) => {
+    formData.append("files", file)
+  })
+
+  return await base("ai/lessons/generate", {
+    method: "POST",
+    data: formData,
+  })
+}

@@ -59,11 +59,24 @@ import {
 } from "@/components/ui/tooltip"
 
 import Section from "../../components/certifications/section"
+import AiGenerationProgress from "../../components/commons/ai-generation-progress.jsx"
 import {
+  generateLessonFromFiles,
   getLessonComponent,
   setLessonComponent,
 } from "../../services/lessonService.js"
 import { saveFile as MediaFileUpload } from "../../services/fileService.js"
+
+function getBackendErrorMessage(error, fallbackMessage) {
+  const responseData = error?.response?.data
+
+  return (
+      (typeof responseData === "string" && responseData) ||
+      responseData?.message ||
+      error?.message ||
+      fallbackMessage
+  )
+}
 
 const actions = [
   {
@@ -383,6 +396,7 @@ function GenerateLessonFromFileDialog({
                                         onOpenChange,
                                         onGenerate,
                                         lessonName,
+                                        isGenerating = false,
                                       }) {
   const maxFiles = 3
   const maxSizeMB = 10
@@ -431,6 +445,10 @@ function GenerateLessonFromFileDialog({
   }
 
   function handleOpenChange(nextOpen) {
+    if (isGenerating) {
+      return
+    }
+
     if (!nextOpen) {
       resetForm()
     }
@@ -439,11 +457,15 @@ function GenerateLessonFromFileDialog({
   }
 
   function handleCancel() {
+    if (isGenerating) {
+      return
+    }
+
     resetForm()
     onOpenChange(false)
   }
 
-  function handleGenerate() {
+  async function handleGenerate() {
     const selectedDocuments = files.map((item) => item.file)
 
     if (selectedDocuments.length === 0) {
@@ -457,8 +479,21 @@ function GenerateLessonFromFileDialog({
     }
 
     setSubmitError("")
-    onGenerate?.(selectedDocuments)
-    resetForm()
+
+    try {
+      await onGenerate?.(selectedDocuments)
+
+
+
+      resetForm()
+    } catch (error) {
+      setSubmitError(
+          getBackendErrorMessage(
+              error,
+              "Lesson generation failed. Please try again."
+          )
+      )
+    }
   }
 
   const hasUploadError = Boolean(submitError || errors.length > 0)
@@ -528,7 +563,7 @@ function GenerateLessonFromFileDialog({
                     className="flex items-start gap-1.5 text-xs leading-5 text-destructive"
                     role="alert"
                 >
-                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>{submitError || errors[0]}</span>
                 </div>
             )}
@@ -636,13 +671,22 @@ function GenerateLessonFromFileDialog({
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={handleCancel}>
+            <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isGenerating}
+            >
               Cancel
             </Button>
 
-            <Button type="button" onClick={handleGenerate}>
+            <Button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isGenerating}
+            >
               <Sparkles className="mr-2 h-4 w-4" />
-              Generate Lesson
+              {isGenerating ? "Generating..." : "Generate Lesson"}
             </Button>
           </div>
         </DialogContent>
@@ -665,6 +709,7 @@ function CreateLessons() {
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingLesson, setIsLoadingLesson] = useState(true)
+  const [isGeneratingLesson, setIsGeneratingLesson] = useState(false)
   const [isLessonFileGeneratorOpen, setIsLessonFileGeneratorOpen] =
       useState(false)
 
@@ -801,23 +846,40 @@ function CreateLessons() {
   }
 
   function handleGenerateLesson() {
-    if (isLoadingLesson) {
+    if (isLoadingLesson || isGeneratingLesson) {
       return
     }
 
     setIsLessonFileGeneratorOpen(true)
   }
 
-  function handleGenerateLessonFromFiles(selectedDocuments) {
-    window.alert(
-        `Generate clicked for "${lessonName}". ${selectedDocuments.length} source file${
-            selectedDocuments.length === 1 ? "" : "s"
-        } selected. AI lesson generation will be connected here later.`
-    )
+  async function handleGenerateLessonFromFiles(selectedDocuments) {
+    if (!lessonId) {
+      throw new Error(
+          "This lesson has no saved ID yet. Open the lesson from its certification page first."
+      )
+    }
 
-    console.log("Lesson generation source files:", selectedDocuments)
+    try {
+      setIsGeneratingLesson(true)
 
-    setIsLessonFileGeneratorOpen(false)
+      const response = await generateLessonFromFiles(
+          lessonId,
+          selectedDocuments
+      )
+
+      const generatedSections = parseLessonComponent(response)
+
+      setSections(generatedSections)
+      setSectionIndex(0)
+      setIsLessonFileGeneratorOpen(false)
+
+      toast.success("Lesson generated", {
+        description: `${lessonName} content was generated and saved.`,
+      })
+    } finally {
+      setIsGeneratingLesson(false)
+    }
   }
 
   function handleAddSection() {
@@ -1258,11 +1320,11 @@ function CreateLessons() {
                   type="button"
                   variant="outline"
                   onClick={handleGenerateLesson}
-                  disabled={isLoadingLesson}
+                  disabled={isLoadingLesson || isGeneratingLesson}
                   className="hidden gap-2 sm:inline-flex"
               >
                 <Sparkles className="h-4 w-4" />
-                Generate
+                {isGeneratingLesson ? "Generating..." : "Generate"}
               </Button>
 
               <Button
@@ -1297,6 +1359,21 @@ function CreateLessons() {
               onOpenChange={setIsLessonFileGeneratorOpen}
               onGenerate={handleGenerateLessonFromFiles}
               lessonName={lessonName}
+              isGenerating={isGeneratingLesson}
+          />
+
+          <AiGenerationProgress
+              open={isGeneratingLesson}
+              title="Generating your lesson"
+              description={lessonName}
+              stepDurationMs={5000}
+              steps={[
+                "Reading your documents",
+                "Extracting the key topics",
+                "Writing lesson sections",
+                "Building lists and review activities",
+                "Saving the lesson",
+              ]}
           />
 
           <LessonFeedbackDialog

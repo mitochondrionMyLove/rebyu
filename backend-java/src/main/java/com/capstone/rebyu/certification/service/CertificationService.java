@@ -48,6 +48,7 @@ public class CertificationService {
         certification.setDateCreated(LocalDateTime.now());
         certification.setDateUpdated(null);
 
+        addDefaultHierarchyIfEmpty(certification);
         connectChildEntities(certification);
 
         Certification savedCertification =
@@ -66,7 +67,7 @@ public class CertificationService {
     public CertificationDto update(Long id, CertificationDto dto) {
         Certification existingCertification = findEntity(id);
 
-        
+
 
 
 
@@ -78,7 +79,7 @@ public class CertificationService {
                 existingCertification.getCertificationId()
         );
 
-        
+
 
 
 
@@ -86,7 +87,7 @@ public class CertificationService {
                 existingCertification.getDateCreated()
         );
 
-        
+
 
 
         if (!StringUtils.hasText(updatedCertification.getImageKey())) {
@@ -129,7 +130,6 @@ public class CertificationService {
                 );
     }
 
-    
 
 
 
@@ -139,6 +139,31 @@ public class CertificationService {
 
 
 
+
+
+    private void addDefaultHierarchyIfEmpty(Certification certification) {
+        if (certification.getMajorCategory() != null
+                && !certification.getMajorCategory().isEmpty()) {
+            return;
+        }
+
+        Lesson lesson = new Lesson();
+        lesson.setName("Untitled Lesson");
+        lesson.setLessonComponentStructure("[]");
+
+        MiddleCategory middleCategory = new MiddleCategory();
+        middleCategory.setTitle("Untitled Middle Category");
+        middleCategory.getLessons().add(lesson);
+
+        MajorCategory majorCategory = new MajorCategory();
+        majorCategory.setTitle("Untitled Major Category");
+        majorCategory.getMiddleCategory().add(middleCategory);
+
+        if (certification.getMajorCategory() == null) {
+            certification.setMajorCategory(new java.util.ArrayList<>());
+        }
+        certification.getMajorCategory().add(majorCategory);
+    }
 
     private void connectChildEntities(Certification certification) {
         if (certification.getMajorCategory() == null) {

@@ -154,7 +154,7 @@ function CertificationCard({ item, certification }) {
             }}
             className="group flex h-[380px] w-full cursor-pointer flex-col overflow-hidden rounded-[32px] border border-border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         >
-          {/* Certification cover */}
+          {}
           <figure className="relative h-52 shrink-0 overflow-hidden border-b border-border bg-muted/40">
             <img
                 src={imageUrl}
@@ -170,7 +170,7 @@ function CertificationCard({ item, certification }) {
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
           </figure>
 
-          {/* Card details */}
+          {}
           <div className="flex min-h-0 flex-1 flex-col p-5 pb-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -215,9 +215,9 @@ function CertificationCard({ item, certification }) {
 
             <div className="mt-3 h-1 w-10 shrink-0 rounded-full bg-primary" />
 
-            {/*<p className="mt-3 line-clamp-3 flex-1 text-sm leading-5 text-muted-foreground">*/}
-            {/*  {certificationDescription}*/}
-            {/*</p>*/}
+            {}
+            {}
+            {}
           </div>
         </div>
 

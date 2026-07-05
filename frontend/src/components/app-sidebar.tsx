@@ -22,12 +22,18 @@ import {
   Building2Icon,
   UsersIcon,
   ChartNoAxesCombinedIcon,
+  LayoutDashboardIcon,
 } from "lucide-react"
 
 const data = {
   content: {
     name: "Content",
     items: [
+      {
+        name: "Dashboard",
+        url: "/admin/dashboard",
+        icon: LayoutDashboardIcon,
+      },
       {
         name: "Certifications",
         url: "/admin",

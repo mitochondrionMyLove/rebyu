@@ -83,23 +83,23 @@ export default function CreateQuestionDialog({
     const [questionText, setQuestionText] = useState("")
     const [questionImage, setQuestionImage] = useState(null)
 
-    // Multiple choice
+
     const [choices, setChoices] = useState([
         createEmptyChoice(),
         createEmptyChoice(),
     ])
     const [correctChoiceId, setCorrectChoiceId] = useState("")
 
-    // Short answer
+
     const [expectedAnswer, setExpectedAnswer] = useState("")
     const [explanation, setExplanation] = useState("")
 
-    // Descriptive
+
     const [referenceAnswer, setReferenceAnswer] = useState("")
     const [evaluationRubric, setEvaluationRubric] = useState("")
     const [maxScore, setMaxScore] = useState("")
 
-    // Critical thinking
+
     const [criticalThinkingFormat, setCriticalThinkingFormat] =
         useState("CODING")
     const [programmingLanguage, setProgrammingLanguage] = useState("Java")

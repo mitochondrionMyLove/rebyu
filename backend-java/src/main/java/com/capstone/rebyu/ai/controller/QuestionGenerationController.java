@@ -1,7 +1,6 @@
 package com.capstone.rebyu.ai.controller;
 
 import com.capstone.rebyu.ai.dto.AiQuestionGenerationRequest;
-import com.capstone.rebyu.ai.dto.QuestionTypeRequest;
 import com.capstone.rebyu.ai.service.QuestionGenerationService;
 import com.capstone.rebyu.assessment.dto.QuestionDto;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -14,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai/questions")
@@ -22,10 +22,6 @@ public class QuestionGenerationController {
 
     private final QuestionGenerationService questionGenerationService;
     private final ObjectMapper objectMapper;
-
-    
-
-
 
 
 
@@ -39,18 +35,24 @@ public class QuestionGenerationController {
     @ResponseStatus(HttpStatus.CREATED)
     public List<QuestionDto> generate(
             @RequestParam("certificationId") Long certificationId,
-            @RequestParam("lessonId") Long lessonId,
-            @RequestParam("questionTypesJson") String questionTypesJson,
+            @RequestParam("questionCountsJson") String questionCountsJson,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "additionalInstructions", required = false) String additionalInstructions
     ) throws IOException {
-        String cleanedJson = questionTypesJson.replaceAll("[\\r\\n\\t]", " ").trim();
-        List<QuestionTypeRequest> questionTypes = objectMapper.readValue(
-                cleanedJson, new TypeReference<>() {}
-        );
+        Map<String, Integer> questionCounts;
+        try {
+            questionCounts = objectMapper.readValue(
+                    questionCountsJson.replaceAll("[\\r\\n\\t]", " ").trim(),
+                    new TypeReference<>() {}
+            );
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "questionCountsJson must be a JSON object mapping question types to counts."
+            );
+        }
 
         AiQuestionGenerationRequest request = new AiQuestionGenerationRequest(
-                certificationId, lessonId, questionTypes, additionalInstructions
+                certificationId, questionCounts, additionalInstructions
         );
 
         return questionGenerationService.generateAndSave(request, files);

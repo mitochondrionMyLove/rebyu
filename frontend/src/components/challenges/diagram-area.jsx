@@ -34,10 +34,10 @@ export default function DiagramArea({
     const onChangeRef = useRef(onChange)
     const autosaveTimerRef = useRef(null)
 
-    /*
-      Prevents Draw.io from reloading every time
-      onAutoSave updates the QuestionBank state.
-    */
+
+
+
+
     const startingXmlRef = useRef(
         typeof initialXml === "string" && initialXml.trim()
             ? initialXml
@@ -122,10 +122,10 @@ export default function DiagramArea({
                     splash: 0,
                 }}
                 configuration={{
-                    /*
-                      Important for node extraction:
-                      save readable XML rather than compressed XML.
-                    */
+
+
+
+
                     compressXml: false,
                     compact: true,
 

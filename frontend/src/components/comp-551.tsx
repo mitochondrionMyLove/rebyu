@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Create some dummy initial files
+
 const initialFiles = [
   {
     id: "document.pdf-1744638436563-8u5xuls",
@@ -95,7 +95,7 @@ const getFileIcon = (file: { file: File | { type: string; name: string } }) => {
 };
 
 export default function Component() {
-  const maxSize = 10 * 1024 * 1024; // 10MB default
+  const maxSize = 10 * 1024 * 1024;
   const maxFiles = 10;
 
   const [
@@ -119,7 +119,7 @@ export default function Component() {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Drop area */}
+      {}
       <div
         className="flex min-h-56 flex-col items-center not-data-[files]:justify-center rounded-xl border border-input border-dashed p-4 transition-colors has-[input:focus]:border-ring has-[input:focus]:ring-[3px] has-[input:focus]:ring-ring/50 data-[files]:hidden data-[dragging=true]:bg-accent/50"
         data-dragging={isDragging || undefined}
@@ -153,7 +153,7 @@ export default function Component() {
       </div>
       {files.length > 0 && (
         <>
-          {/* Table with files */}
+          {}
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-medium text-sm">Files ({files.length})</h3>
             <div className="flex gap-2">

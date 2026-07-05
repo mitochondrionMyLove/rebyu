@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import DemoRoleSwitcher from "@/components/development/demo-role-switcher"
 
 export default function DashboardLayout() {
   return (
@@ -45,6 +46,7 @@ export default function DashboardLayout() {
             />
           </div>
           <div className="flex items-center gap-2 px-4">
+            <DemoRoleSwitcher />
             <Bell />
             <DropdownMenu className="w-48 p-2">
               <DropdownMenuTrigger asChild>

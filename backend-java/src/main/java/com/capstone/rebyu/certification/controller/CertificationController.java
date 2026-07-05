@@ -39,13 +39,6 @@ public class CertificationController {
         return certificationService.create(dto);
     }
 
-    
-
-
-
-
-
-
 
     @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -54,10 +47,9 @@ public class CertificationController {
             @RequestPart(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "additionalInstructions", required = false) String additionalInstructions
     ) throws IOException {
-        CertificationDto saved = certificationService.create(dto);
-        log.info("Triggering AI curriculum generation for certificationId={}", saved.getCertificationId());
-        return curriculumGenerationService.generateCurriculum(
-                saved.getCertificationId(), files, additionalInstructions
+        log.info("AI certification creation requested for '{}'", dto.getTitle());
+        return curriculumGenerationService.generateForNewCertification(
+                dto, files, additionalInstructions
         );
     }
 

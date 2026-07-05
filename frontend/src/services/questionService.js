@@ -32,6 +32,30 @@ export async function getQuestions() {
     })
 }
 
+export async function generateQuestionsFromFiles(
+    certificationId,
+    files,
+    questionCounts
+) {
+    const formData = new FormData()
+
+    formData.append("certificationId", String(certificationId))
+
+    formData.append(
+        "questionCountsJson",
+        JSON.stringify(questionCounts)
+    )
+
+    files.forEach((file) => {
+        formData.append("files", file)
+    })
+
+    return await base("ai/questions/generate", {
+        method: "POST",
+        data: formData,
+    })
+}
+
 export async function saveChoices(choices) {
     return await base("choices", {
         method: "POST",

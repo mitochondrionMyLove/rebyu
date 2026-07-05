@@ -42,6 +42,24 @@ import dev.langchain4j.service.V;
 
         6. Return only a valid JSON array of question objects. No wrapper object.
 
+        6b. Lesson assignment rules (MANDATORY):
+            - The request contains "availableLessons": a list of
+              {"lessonId": number, "lessonTitle": string} entries.
+            - EVERY question object must include:
+              "suggestedLessonId": the lessonId of the single most relevant
+              lesson from availableLessons, and
+              "suggestedLessonTitle": that lesson's exact title.
+            - suggestedLessonId must be one of the provided lessonId values.
+              Never invent lesson ids or titles.
+            - Distribute questions across the lessons that best match each
+              question's topic.
+
+        6c. Question count rules (MANDATORY):
+            - The request contains "questionCounts": how many questions to
+              generate per question type.
+            - Return EXACTLY that number of questions for each listed type,
+              and no questions of any type that is not listed.
+
         7. MCQ rules:
            - questionType must be "MCQ"
            - generate exactly 4 choices
@@ -53,6 +71,8 @@ import dev.langchain4j.service.V;
            {
              "questionType": "MCQ",
              "question": "Question prompt",
+             "suggestedLessonId": 101,
+             "suggestedLessonTitle": "Exact lesson title from availableLessons",
              "difficulty": "easy | average | hard",
              "choices": [
                { "choiceText": "Choice text", "explanation": "Optional explanation", "isCorrect": false },
@@ -71,6 +91,8 @@ import dev.langchain4j.service.V;
            Structure:
            {
              "questionType": "SHORT_ANSWER",
+             "suggestedLessonId": 101,
+             "suggestedLessonTitle": "Exact lesson title from availableLessons",
              "question": "Question prompt",
              "difficulty": "easy | average | hard",
              "correctAnswer": "Expected answer",
@@ -86,6 +108,8 @@ import dev.langchain4j.service.V;
            Structure:
            {
              "questionType": "DESCRIPTIVE",
+             "suggestedLessonId": 101,
+             "suggestedLessonTitle": "Exact lesson title from availableLessons",
              "question": "Question prompt",
              "difficulty": "easy | average | hard",
              "rubricBasedAnswer": "Model answer or key points for evaluation",
@@ -103,6 +127,8 @@ import dev.langchain4j.service.V;
             Structure:
             {
               "questionType": "PROGRAMMING",
+              "suggestedLessonId": 101,
+              "suggestedLessonTitle": "Exact lesson title from availableLessons",
               "question": "Programming task description",
               "difficulty": "easy | average | hard",
               "starterCode": "",
@@ -122,6 +148,8 @@ import dev.langchain4j.service.V;
             Structure:
             {
               "questionType": "DIAGRAM",
+              "suggestedLessonId": 101,
+              "suggestedLessonTitle": "Exact lesson title from availableLessons",
               "question": "Question asking the learner to create/draw a specific diagram",
               "difficulty": "easy | average | hard",
               "diagramType": "ERD | UML_CLASS | UML_SEQUENCE | FLOWCHART | DFD | MIND_MAP | OTHER",

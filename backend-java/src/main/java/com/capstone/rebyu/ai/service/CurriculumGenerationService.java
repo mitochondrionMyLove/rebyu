@@ -7,8 +7,6 @@ import com.capstone.rebyu.ai.dto.CurriculumLessonDTO;
 import com.capstone.rebyu.ai.dto.CurriculumMajorCategoryDTO;
 import com.capstone.rebyu.ai.dto.CurriculumMiddleCategoryDTO;
 import com.capstone.rebyu.ai.dto.CurriculumPlanDTO;
-import com.capstone.rebyu.ai.dto.LessonSectionDTO;
-import com.capstone.rebyu.ai.dto.LessonToolDTO;
 import com.capstone.rebyu.ai.entity.KnowledgeDocument;
 import com.capstone.rebyu.certification.dto.CertificationDto;
 import com.capstone.rebyu.certification.entity.Certification;
@@ -20,6 +18,7 @@ import com.capstone.rebyu.certification.repository.CertificationRepository;
 import com.capstone.rebyu.certification.repository.LessonRepository;
 import com.capstone.rebyu.certification.repository.MajorCategoryRepository;
 import com.capstone.rebyu.certification.repository.MiddleCategoryRepository;
+import com.capstone.rebyu.common.InvalidAiResponseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
@@ -34,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,13 +44,6 @@ import java.util.stream.Collectors;
 @Service
 public class CurriculumGenerationService {
 
-    private static final List<String> VALID_TOOL_TYPES = List.of(
-            "heading", "subheading", "description",
-            "unordered-list", "ordered-list",
-            "tabs", "accordion", "flip-grid",
-            "image", "video", "image-left-text", "image-right-text"
-    );
-    private static final List<String> MEDIA_TYPES = List.of("image", "video", "image-left-text", "image-right-text");
     private static final int MAX_DOC_CHARS = 10_000;
     private static final int MAX_MAJOR_CATEGORIES = 2;
     private static final int MAX_MIDDLE_CATEGORIES = 2;
@@ -69,6 +62,8 @@ public class CurriculumGenerationService {
     private final CertificationMapper certificationMapper;
     private final ObjectMapper objectMapper;
     private final LessonEmbeddingService lessonEmbeddingService;
+    private final AiUploadValidator aiUploadValidator;
+    private final LessonContentValidator lessonContentValidator;
 
     @Autowired @Lazy
     private CurriculumGenerationService self;
@@ -84,7 +79,9 @@ public class CurriculumGenerationService {
             @Qualifier("lessonContentRetriever") ContentRetriever lessonContentRetriever,
             CertificationMapper certificationMapper,
             ObjectMapper objectMapper,
-            LessonEmbeddingService lessonEmbeddingService
+            LessonEmbeddingService lessonEmbeddingService,
+            AiUploadValidator aiUploadValidator,
+            LessonContentValidator lessonContentValidator
     ) {
         this.certificationRepository = certificationRepository;
         this.majorCategoryRepository = majorCategoryRepository;
@@ -97,35 +94,227 @@ public class CurriculumGenerationService {
         this.certificationMapper = certificationMapper;
         this.objectMapper = objectMapper;
         this.lessonEmbeddingService = lessonEmbeddingService;
+        this.aiUploadValidator = aiUploadValidator;
+        this.lessonContentValidator = lessonContentValidator;
     }
 
-    
-    public CertificationDto generateCurriculum(
+
+    public CertificationDto generateForNewCertification(
+            CertificationDto dto,
+            List<MultipartFile> files,
+            String additionalInstructions
+    ) throws IOException {
+        aiUploadValidator.validate(files);
+
+        String documentContent = extractText(files);
+        aiUploadValidator.requireReadableText(documentContent);
+
+        CurriculumPlanDTO plan = planCurriculum(
+                dto.getTitle(), dto.getDescription(), additionalInstructions, documentContent
+        );
+
+        Long certificationId = self.createCertificationWithPlan(dto, plan);
+        log.info("Created certification {} with AI-generated structure", certificationId);
+
+        ingestFiles(files, certificationId);
+        generateLessonContents(certificationId, additionalInstructions);
+
+        return self.fetchCertificationDto(certificationId);
+    }
+
+
+
+
+
+
+
+
+    public CertificationDto generateForExistingCertification(
             Long certificationId,
             List<MultipartFile> files,
             String additionalInstructions
     ) throws IOException {
-        
+        aiUploadValidator.validate(files);
+
         String certTitle = self.fetchCertificationTitle(certificationId);
         String certDescription = self.fetchCertificationDescription(certificationId);
+        self.assertStructureReplaceable(certificationId);
+
+        String documentContent = extractText(files);
+        aiUploadValidator.requireReadableText(documentContent);
+
+        CurriculumPlanDTO plan = planCurriculum(
+                certTitle, certDescription, additionalInstructions, documentContent
+        );
+
+        self.replaceStructureWithPlan(certificationId, plan);
+        log.info("Replaced structure of certification {} with AI-generated plan", certificationId);
+
+        ingestFiles(files, certificationId);
+        generateLessonContents(certificationId, additionalInstructions);
+
+        return self.fetchCertificationDto(certificationId);
+    }
 
 
-        StringBuilder rawText = new StringBuilder();
-        if (files != null) {
-            for (MultipartFile file : files) {
-                if (file != null && !file.isEmpty()) {
-                    log.info("Extracting text from '{}'", file.getOriginalFilename());
-                    rawText.append(documentIngestionService.extractDocumentText(file)).append("\n\n");
-                    documentIngestionService.ingest(file, certificationId, KnowledgeDocument.UseCase.LESSON);
+
+
+
+    @Transactional(readOnly = true)
+    public String fetchCertificationTitle(Long certificationId) {
+        return certificationRepository.findById(certificationId)
+                .map(Certification::getTitle)
+                .orElseThrow(() -> new EntityNotFoundException("Certification not found: " + certificationId));
+    }
+
+    @Transactional(readOnly = true)
+    public String fetchCertificationDescription(Long certificationId) {
+        return certificationRepository.findById(certificationId)
+                .map(Certification::getDescription)
+                .orElse("");
+    }
+
+
+
+
+
+
+    @Transactional(readOnly = true)
+    public void assertStructureReplaceable(Long certificationId) {
+        List<Lesson> lessons = lessonRepository
+                .findByMiddleCategory_MajorCategory_Certification_CertificationId(certificationId);
+
+        for (Lesson lesson : lessons) {
+            String structure = lesson.getLessonComponentStructure();
+            boolean hasContent = structure != null && !structure.isBlank() && !"[]".equals(structure.trim());
+            boolean hasQuestions = lesson.getQuestionSet() != null && !lesson.getQuestionSet().isEmpty();
+
+            if (hasContent || hasQuestions) {
+                throw new IllegalStateException(
+                        "This certification already has lesson content or questions. "
+                                + "Generating a new structure would destroy existing data. "
+                                + "Edit the structure manually instead."
+                );
+            }
+        }
+    }
+
+    @Transactional
+    public Long createCertificationWithPlan(CertificationDto dto, CurriculumPlanDTO plan) {
+        Certification certification = certificationMapper.toEntity(dto);
+        certification.setCertificationId(null);
+        certification.setDateCreated(LocalDateTime.now());
+        certification.setDateUpdated(null);
+
+
+        if (certification.getMajorCategory() == null) {
+            certification.setMajorCategory(new ArrayList<>());
+        } else {
+            certification.getMajorCategory().clear();
+        }
+
+        Certification saved = certificationRepository.save(certification);
+        appendPlanStructure(saved, plan);
+        return saved.getCertificationId();
+    }
+
+    @Transactional
+    public void replaceStructureWithPlan(Long certificationId, CurriculumPlanDTO plan) {
+        Certification cert = certificationRepository.findById(certificationId)
+                .orElseThrow(() -> new EntityNotFoundException("Certification not found: " + certificationId));
+
+
+        cert.getMajorCategory().clear();
+        certificationRepository.saveAndFlush(cert);
+
+        appendPlanStructure(cert, plan);
+        cert.setDateUpdated(LocalDateTime.now());
+        certificationRepository.save(cert);
+    }
+
+    @Transactional
+    public void saveLessonContent(Long lessonId, String contentJson) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + lessonId));
+        lesson.setLessonComponentStructure(contentJson);
+        lessonRepository.save(lesson);
+    }
+
+    @Transactional(readOnly = true)
+    public CertificationDto fetchCertificationDto(Long certificationId) {
+        Certification cert = certificationRepository.findByIdWithFullTree(certificationId)
+                .orElseThrow(() -> new EntityNotFoundException("Certification not found: " + certificationId));
+        return certificationMapper.toDto(cert);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LessonCtx> loadLessonContexts(Long certificationId) {
+        List<LessonCtx> contexts = new ArrayList<>();
+        for (Lesson lesson : lessonRepository
+                .findByMiddleCategory_MajorCategory_Certification_CertificationId(certificationId)) {
+            String structure = lesson.getLessonComponentStructure();
+            boolean isEmpty = structure == null || structure.isBlank() || "[]".equals(structure.trim());
+            if (!isEmpty) {
+                continue;
+            }
+            MiddleCategory mid = lesson.getMiddleCategory();
+            MajorCategory major = mid.getMajorCategory();
+            contexts.add(new LessonCtx(
+                    lesson.getLessonId(),
+                    lesson.getName(),
+                    mid.getTitle(),
+                    major.getTitle(),
+                    major.getCertification() != null ? major.getCertification().getTitle() : ""
+            ));
+        }
+        return contexts;
+    }
+
+
+
+
+
+    private void appendPlanStructure(Certification cert, CurriculumPlanDTO plan) {
+        List<CurriculumMajorCategoryDTO> majorList = plan.getMajorCategories().stream()
+                .limit(MAX_MAJOR_CATEGORIES).toList();
+
+        for (CurriculumMajorCategoryDTO majorDto : majorList) {
+            MajorCategory major = new MajorCategory();
+            major.setCertification(cert);
+            major.setTitle(majorDto.getTitle());
+            major = majorCategoryRepository.save(major);
+
+            if (majorDto.getMiddleCategories() == null) continue;
+            List<CurriculumMiddleCategoryDTO> middleList = majorDto.getMiddleCategories().stream()
+                    .limit(MAX_MIDDLE_CATEGORIES).toList();
+
+            for (CurriculumMiddleCategoryDTO midDto : middleList) {
+                MiddleCategory middle = new MiddleCategory();
+                middle.setMajorCategory(major);
+                middle.setTitle(midDto.getTitle());
+                middle = middleCategoryRepository.save(middle);
+
+                if (midDto.getLessons() == null) continue;
+                List<CurriculumLessonDTO> lessonList = midDto.getLessons().stream()
+                        .limit(MAX_LESSONS).toList();
+
+                for (CurriculumLessonDTO lessonDto : lessonList) {
+                    Lesson lesson = new Lesson();
+                    lesson.setMiddleCategory(middle);
+                    lesson.setName(lessonDto.getTitle());
+                    lesson.setLessonComponentStructure("[]");
+                    lessonRepository.save(lesson);
                 }
             }
         }
+    }
 
-        String documentContent = rawText.isEmpty()
-                ? "No document provided. Generate a complete curriculum based on:\nTitle: " + certTitle + "\nDescription: " + certDescription
-                : truncate(rawText.toString(), MAX_DOC_CHARS);
-
-
+    private CurriculumPlanDTO planCurriculum(
+            String certTitle,
+            String certDescription,
+            String additionalInstructions,
+            String documentContent
+    ) throws IOException {
         Map<String, Object> planRequest = new LinkedHashMap<>();
         planRequest.put("certificationTitle", certTitle);
         planRequest.put("certificationDescription", certDescription);
@@ -135,19 +324,75 @@ public class CurriculumGenerationService {
         String planRequestJson = objectMapper.writeValueAsString(planRequest);
 
         log.info("Calling CurriculumPlanningAssistant for '{}'", certTitle);
-        String planJson = curriculumPlanningAssistant.planCurriculum(planRequestJson, documentContent);
+        String planJson = curriculumPlanningAssistant.planCurriculum(
+                planRequestJson, truncate(documentContent, MAX_DOC_CHARS)
+        );
 
         CurriculumPlanDTO plan = parseCurriculumPlan(planJson);
+        validatePlan(plan);
+        return plan;
+    }
+
+    private void validatePlan(CurriculumPlanDTO plan) {
         if (plan.getMajorCategories() == null || plan.getMajorCategories().isEmpty()) {
-            throw new IllegalStateException("AI returned an empty curriculum plan");
+            throw new InvalidAiResponseException("The AI returned an empty curriculum plan. Please try again.");
         }
+        for (CurriculumMajorCategoryDTO major : plan.getMajorCategories()) {
+            if (major.getTitle() == null || major.getTitle().isBlank()) {
+                throw new InvalidAiResponseException("The AI returned a major category without a title.");
+            }
+            if (major.getMiddleCategories() == null || major.getMiddleCategories().isEmpty()) {
+                throw new InvalidAiResponseException(
+                        "The AI returned a major category without middle categories."
+                );
+            }
+            for (CurriculumMiddleCategoryDTO middle : major.getMiddleCategories()) {
+                if (middle.getTitle() == null || middle.getTitle().isBlank()) {
+                    throw new InvalidAiResponseException("The AI returned a middle category without a title.");
+                }
+                if (middle.getLessons() == null || middle.getLessons().isEmpty()) {
+                    throw new InvalidAiResponseException("The AI returned a middle category without lessons.");
+                }
+                for (CurriculumLessonDTO lesson : middle.getLessons()) {
+                    if (lesson.getTitle() == null || lesson.getTitle().isBlank()) {
+                        throw new InvalidAiResponseException("The AI returned a lesson without a title.");
+                    }
+                }
+            }
+        }
+    }
+
+    private String extractText(List<MultipartFile> files) throws IOException {
+        StringBuilder rawText = new StringBuilder();
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty()) {
+                log.info("Extracting text from '{}'", file.getOriginalFilename());
+                rawText.append(documentIngestionService.extractDocumentText(file)).append("\n\n");
+            }
+        }
+        return rawText.toString();
+    }
+
+    private void ingestFiles(List<MultipartFile> files, Long certificationId) {
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty()) {
+                try {
+                    documentIngestionService.ingest(file, certificationId, KnowledgeDocument.UseCase.LESSON);
+                } catch (Exception e) {
+                    log.warn("Failed to ingest '{}' for RAG: {}", file.getOriginalFilename(), e.getMessage());
+                }
+            }
+        }
+    }
 
 
-        List<LessonCtx> lessons = self.createSkeletonStructure(certificationId, certTitle, plan);
-        log.info("Created {} lesson skeletons for certification {}", lessons.size(), certificationId);
 
 
 
+
+    private void generateLessonContents(Long certificationId, String additionalInstructions) {
+        List<LessonCtx> lessons = self.loadLessonContexts(certificationId);
+        log.info("Generating content for {} lessons of certification {}", lessons.size(), certificationId);
 
         for (int i = 0; i < lessons.size(); i++) {
             LessonCtx ctx = lessons.get(i);
@@ -164,83 +409,10 @@ public class CurriculumGenerationService {
                 log.warn("Lesson generation interrupted at lesson {}", ctx.lessonTitle());
                 break;
             } catch (Exception e) {
-                log.warn("Content generation failed for lesson '{}' id={}: {}", ctx.lessonTitle(), ctx.lessonId(), e.getMessage());
+                log.warn("Content generation failed for lesson '{}' id={}: {}",
+                        ctx.lessonTitle(), ctx.lessonId(), e.getMessage());
             }
         }
-        return self.fetchCertificationDto(certificationId);
-    }
-
-    @Transactional(readOnly = true)
-    public String fetchCertificationTitle(Long certificationId) {
-        return certificationRepository.findById(certificationId)
-                .map(Certification::getTitle)
-                .orElseThrow(() -> new EntityNotFoundException("Certification not found: " + certificationId));
-    }
-
-    @Transactional(readOnly = true)
-    public String fetchCertificationDescription(Long certificationId) {
-        return certificationRepository.findById(certificationId)
-                .map(Certification::getDescription)
-                .orElse("");
-    }
-
-    @Transactional
-    public List<LessonCtx> createSkeletonStructure(Long certificationId, String certTitle, CurriculumPlanDTO plan) {
-        Certification cert = certificationRepository.findById(certificationId).orElseThrow();
-        List<LessonCtx> lessonContexts = new ArrayList<>();
-
-        List<CurriculumMajorCategoryDTO> majorList = plan.getMajorCategories().stream()
-                .limit(MAX_MAJOR_CATEGORIES).toList();
-        for (CurriculumMajorCategoryDTO majorDto : majorList) {
-            MajorCategory major = new MajorCategory();
-            major.setCertification(cert);
-            major.setTitle(majorDto.getTitle());
-            major = majorCategoryRepository.save(major);
-
-            if (majorDto.getMiddleCategories() == null) continue;
-            List<CurriculumMiddleCategoryDTO> middleList = majorDto.getMiddleCategories().stream()
-                    .limit(MAX_MIDDLE_CATEGORIES).toList();
-            for (CurriculumMiddleCategoryDTO midDto : middleList) {
-                MiddleCategory middle = new MiddleCategory();
-                middle.setMajorCategory(major);
-                middle.setTitle(midDto.getTitle());
-                middle = middleCategoryRepository.save(middle);
-
-                if (midDto.getLessons() == null) continue;
-                List<CurriculumLessonDTO> lessonList = midDto.getLessons().stream()
-                        .limit(MAX_LESSONS).toList();
-                for (CurriculumLessonDTO lessonDto : lessonList) {
-                    Lesson lesson = new Lesson();
-                    lesson.setMiddleCategory(middle);
-                    lesson.setName(lessonDto.getTitle());
-                    lesson.setLessonComponentStructure("[]");
-                    lesson = lessonRepository.save(lesson);
-
-                    lessonContexts.add(new LessonCtx(
-                            lesson.getLessonId(),
-                            lesson.getName(),
-                            middle.getTitle(),
-                            major.getTitle(),
-                            certTitle
-                    ));
-                }
-            }
-        }
-        return lessonContexts;
-    }
-
-    @Transactional
-    public void saveLessonContent(Long lessonId, String contentJson) {
-        Lesson lesson = lessonRepository.findById(lessonId).orElseThrow();
-        lesson.setLessonComponentStructure(contentJson);
-        lessonRepository.save(lesson);
-    }
-
-    @Transactional(readOnly = true)
-    public CertificationDto fetchCertificationDto(Long certificationId) {
-        Certification cert = certificationRepository.findByIdWithFullTree(certificationId)
-                .orElseThrow(() -> new EntityNotFoundException("Certification not found: " + certificationId));
-        return certificationMapper.toDto(cert);
     }
 
     private String generateLessonContent(LessonCtx ctx, String additionalInstructions) throws Exception {
@@ -265,21 +437,39 @@ public class CurriculumGenerationService {
         }
         String requestJson = objectMapper.writeValueAsString(req);
 
-        AILessonStructureDTO structure = lessonGenerationAssistant.generateLesson(requestJson, referenceContext);
-        AILessonStructureDTO clean = stripMediaTools(structure);
-        return objectMapper.writeValueAsString(clean.getSections());
+        InvalidAiResponseException lastError = null;
+
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            AILessonStructureDTO structure =
+                    lessonGenerationAssistant.generateLesson(requestJson, referenceContext);
+            AILessonStructureDTO clean = lessonContentValidator.ensureRequiredTools(
+                    lessonContentValidator.sanitize(structure)
+            );
+
+            try {
+                lessonContentValidator.validate(clean);
+                return objectMapper.writeValueAsString(clean.getSections());
+            } catch (InvalidAiResponseException e) {
+                lastError = e;
+                log.warn("Attempt {}/2 for lesson '{}' rejected: {} — returned shape: {}",
+                        attempt, ctx.lessonTitle(), e.getMessage(),
+                        lessonContentValidator.describeStructure(structure));
+            }
+        }
+
+        throw lastError;
     }
 
     private CurriculumPlanDTO parseCurriculumPlan(String raw) {
         try {
             String json = raw.trim();
-            
+
             if (json.startsWith("```")) {
                 int start = json.indexOf('\n') + 1;
                 int end = json.lastIndexOf("```");
                 json = end > start ? json.substring(start, end).trim() : json.substring(start).trim();
             }
-            
+
             int objStart = json.indexOf('{');
             int objEnd = json.lastIndexOf('}');
             if (objStart != -1 && objEnd > objStart) {
@@ -287,33 +477,9 @@ public class CurriculumGenerationService {
             }
             return objectMapper.readValue(json, CurriculumPlanDTO.class);
         } catch (Exception e) {
-            log.error("Failed to parse curriculum plan JSON. Raw response: {}", raw, e);
-            throw new IllegalStateException("AI returned invalid curriculum plan JSON", e);
+            log.error("Failed to parse curriculum plan JSON", e);
+            throw new InvalidAiResponseException("The AI returned an invalid curriculum plan. Please try again.", e);
         }
-    }
-
-    private AILessonStructureDTO stripMediaTools(AILessonStructureDTO structure) {
-        if (structure == null || structure.getSections() == null) {
-            return new AILessonStructureDTO(List.of());
-        }
-        List<LessonSectionDTO> cleaned = structure.getSections().stream()
-                .map(section -> {
-                    List<LessonToolDTO> tools = section.getContent() == null ? List.of()
-                            : section.getContent().stream()
-                                    .filter(t -> t.getType() != null && VALID_TOOL_TYPES.contains(t.getType()))
-                                    .map(t -> {
-                                        if (!MEDIA_TYPES.contains(t.getType()) || t.getData() == null) return t;
-                                        Map<String, Object> data = new LinkedHashMap<>(t.getData());
-                                        data.remove("file");
-                                        data.put("imageKey", "");
-                                        data.put("videoKey", "");
-                                        return new LessonToolDTO(t.getId(), t.getType(), data);
-                                    })
-                                    .toList();
-                    return new LessonSectionDTO(section.getId(), section.getSectionName(), tools);
-                })
-                .toList();
-        return new AILessonStructureDTO(cleaned);
     }
 
     private static String truncate(String text, int maxChars) {

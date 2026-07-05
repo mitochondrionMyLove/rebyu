@@ -41,14 +41,14 @@ public class LessonEmbeddingService {
         this.objectMapper = objectMapper;
     }
 
-    
+
 
 
 
 
     public void embedLessonContent(Long lessonId, Long certificationId, String lessonTitle, String structureJson) {
         try {
-            
+
             jdbcTemplate.update(
                     "DELETE FROM lesson_embeddings WHERE metadata->>'lessonId' = ?",
                     String.valueOf(lessonId)

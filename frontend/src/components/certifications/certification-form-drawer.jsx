@@ -12,9 +12,14 @@ import { toast } from "sonner"
 
 import {
     addCertification,
+    addCertificationWithAi,
     updateCertification,
 } from "@/services/certificationService"
 import { savePhotoCertification } from "@/services/fileService"
+import {
+    getCertificationId,
+    mapCertificationToModuleStructure,
+} from "@/utils/certification-structure"
 
 import CertificationDetails from "@/components/certifications/certification-details"
 import CertificationModules from "@/components/certifications/certification-modules"
@@ -55,7 +60,7 @@ const MAX_TITLE_LENGTH = 150
 const MIN_DESCRIPTION_LENGTH = 20
 const MAX_DESCRIPTION_LENGTH = 2000
 
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 
 const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
@@ -79,23 +84,6 @@ const emptySubmissionDialog = {
     open: false,
     title: "",
     description: "",
-}
-
-let uiIdCounter = 0
-
-function createUiId(prefix) {
-    uiIdCounter += 1
-
-    return `${prefix}-${Date.now()}-${uiIdCounter}`
-}
-
-function getCertificationId(certification) {
-    return (
-        certification?.certificationId ??
-        certification?.id ??
-        certification?.certification?.certificationId ??
-        null
-    )
 }
 
 function getEmptyDetails() {
@@ -129,18 +117,6 @@ function hasMeaningfulText(value) {
     return /[\p{L}\p{N}]/u.test(value)
 }
 
-function getLessonComponentStructure(lesson) {
-    if (!lesson?.lessonComponentStructure) {
-        return "[]"
-    }
-
-    if (typeof lesson.lessonComponentStructure === "string") {
-        return lesson.lessonComponentStructure
-    }
-
-    return JSON.stringify(lesson.lessonComponentStructure)
-}
-
 function toDetails(certification) {
     if (!certification) {
         return getEmptyDetails()
@@ -156,52 +132,6 @@ function toDetails(certification) {
     }
 }
 
-function toEditableModuleCategories(certification) {
-    const majorCategories =
-        certification?.majorCategory ??
-        certification?.majorCategories ??
-        []
-
-    if (!Array.isArray(majorCategories)) {
-        return []
-    }
-
-    return majorCategories.map((majorCategory) => {
-        const middleCategories =
-            majorCategory.middleCategory ??
-            majorCategory.middleCategories ??
-            []
-
-        return {
-            id: createUiId("major"),
-            majorCategoryId:
-                majorCategory.majorCategoryId ?? majorCategory.id ?? null,
-            title: majorCategory.title ?? "",
-
-            middleCategories: middleCategories.map((middleCategory) => {
-                const lessons = middleCategory.lessons ?? []
-
-                return {
-                    id: createUiId("middle"),
-                    middleCategoryId:
-                        middleCategory.middleCategoryId ??
-                        middleCategory.id ??
-                        null,
-                    title: middleCategory.title ?? "",
-
-                    lessons: lessons.map((lesson) => ({
-                        id: createUiId("lesson"),
-                        lessonId: lesson.lessonId ?? lesson.id ?? null,
-                        name: lesson.name ?? lesson.title ?? "",
-                        lessonComponentStructure:
-                            getLessonComponentStructure(lesson),
-                    })),
-                }
-            }),
-        }
-    })
-}
-
 function validateCertificationDetails(details) {
     const errors = {}
 
@@ -215,9 +145,9 @@ function validateCertificationDetails(details) {
         String(details?.existingImageKey ?? "").trim()
     )
 
-    // -----------------------------
-    // Certification name validation
-    // -----------------------------
+
+
+
     if (!title) {
         errors.title = "Certification name is required."
     } else if (title.length < MIN_TITLE_LENGTH) {
@@ -229,20 +159,20 @@ function validateCertificationDetails(details) {
             "Certification name must contain letters or numbers, not symbols only."
     }
 
-    // -----------------------------
-    // Price validation
-    //
-    // Allowed:
-    // 99
-    // 99.50
-    // 1000
-    // 2500.00
-    //
-    // Rejected:
-    // abc, ₱99, $99, -99, +99,
-    // 1e3, 99.999, .99, 99.,
-    // 1,000, 1 000
-    // -----------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     const validPricePattern = /^\d+(?:\.\d{1,2})?$/
 
     if (!rawPrice) {
@@ -275,18 +205,18 @@ function validateCertificationDetails(details) {
         }
     }
 
-    // -----------------------------
-    // Industry validation
-    // -----------------------------
+
+
+
     if (INVALID_INDUSTRY_VALUES.has(industry.toLowerCase())) {
         errors.industry = "Please select an industry."
     } else if (industry.length > 100) {
         errors.industry = "Industry must not exceed 100 characters."
     }
 
-    // -----------------------------
-    // Description validation
-    // -----------------------------
+
+
+
     if (!description) {
         errors.description = "Description is required."
     } else if (description.length < MIN_DESCRIPTION_LENGTH) {
@@ -300,12 +230,12 @@ function validateCertificationDetails(details) {
             "Description must contain meaningful text, not symbols only."
     }
 
-    // -----------------------------
-    // Image validation
-    //
-    // Existing image is allowed in Edit mode.
-    // A new selected image is required in Create mode.
-    // -----------------------------
+
+
+
+
+
+
     if (!imageFile && !hasExistingImage) {
         errors.imageFile = "Please select a certification cover image."
     }
@@ -510,7 +440,7 @@ export default function CertificationFormDrawer({
         )
 
         setModuleCategories(
-            isEditing ? toEditableModuleCategories(certification) : []
+            isEditing ? mapCertificationToModuleStructure(certification) : []
         )
 
         setDetailsErrors({})
@@ -681,6 +611,62 @@ export default function CertificationFormDrawer({
         }
     }
 
+
+
+
+
+
+
+    async function handleGenerateForNewCertification(selectedDocuments) {
+        const errors = validateCertificationDetails(certificationDetails)
+
+        if (Object.keys(errors).length > 0) {
+            setDetailsErrors(errors)
+            setPage(1)
+
+            throw new Error(
+                "Complete the certification details on step 1 before generating with AI."
+            )
+        }
+
+        let imageKey = certificationDetails.existingImageKey
+
+        if (certificationDetails.imageFile) {
+            imageKey = await uploadCoverImage(certificationDetails.imageFile)
+        }
+
+        if (!imageKey) {
+            throw new Error("Certification cover image is required.")
+        }
+
+        const payload = {
+            title: certificationDetails.title.trim(),
+            description: certificationDetails.description.trim(),
+            price: Number(certificationDetails.price),
+            industry: certificationDetails.industry.trim(),
+            imageKey,
+            dateCreated: formatLocalDateTime(),
+        }
+
+        const savedCertification = await addCertificationWithAi(
+            payload,
+            selectedDocuments
+        )
+
+        await onSaved?.(savedCertification)
+
+        setModuleCategories(
+            mapCertificationToModuleStructure(savedCertification)
+        )
+
+        setSubmissionDialog({
+            open: true,
+            title: "Certification created successfully",
+            description:
+                "The certification and its AI-generated categories, modules, and lessons were saved.",
+        })
+    }
+
     function handleMainAction() {
         if (isLastStep) {
             handleSubmit()
@@ -740,9 +726,15 @@ export default function CertificationFormDrawer({
                             />
                         ) : (
                             <CertificationModules
+                                certificationId={certificationId}
                                 value={moduleCategories}
                                 onChange={handleModulesChange}
                                 onCreateMiddleExam={() => {}}
+                                onGenerateForNewCertification={
+                                    isEditing
+                                        ? undefined
+                                        : handleGenerateForNewCertification
+                                }
                             />
                         )}
                     </div>

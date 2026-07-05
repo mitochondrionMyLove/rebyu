@@ -14,12 +14,28 @@ import {
     XIcon,
 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { formatBytes, useFileUpload } from "@/hooks/use-file-upload"
 import { Button } from "@/components/ui/button"
+import AiGenerationProgress from "@/components/commons/ai-generation-progress.jsx"
+import { generateCertificationStructure } from "@/services/certificationService"
+import { mapCertificationToModuleStructure } from "@/utils/certification-structure"
 
 const createId = () =>
     globalThis.crypto?.randomUUID?.() ??
     `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+function getBackendErrorMessage(error, fallbackMessage) {
+    const responseData = error?.response?.data
+
+    return (
+        (typeof responseData === "string" && responseData) ||
+        responseData?.message ||
+        error?.message ||
+        fallbackMessage
+    )
+}
 
 function IconButton({
                         children,
@@ -91,6 +107,7 @@ function DocumentIcon({ fileName }) {
 function GenerateCertificationStructure({
                                             onCancel,
                                             onGenerate,
+                                            isGenerating = false,
                                         }) {
     const maxSizeMB = 10
     const maxSize = maxSizeMB * 1024 * 1024
@@ -133,7 +150,7 @@ function GenerateCertificationStructure({
         }
     }, [files.length, submitError])
 
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
         const selectedDocuments = files.map((item) => item.file)
 
         if (selectedDocuments.length === 0) {
@@ -151,7 +168,19 @@ function GenerateCertificationStructure({
         }
 
         setSubmitError("")
-        onGenerate?.(selectedDocuments)
+
+        try {
+            await onGenerate?.(selectedDocuments)
+        } catch (error) {
+
+
+            setSubmitError(
+                getBackendErrorMessage(
+                    error,
+                    "Structure generation failed. Please try again."
+                )
+            )
+        }
     }
 
     const handleClearFiles = () => {
@@ -310,6 +339,7 @@ function GenerateCertificationStructure({
                         type="button"
                         onClick={onCancel}
                         variant="outline"
+                        disabled={isGenerating}
                     >
                         Cancel
                     </Button>
@@ -318,9 +348,10 @@ function GenerateCertificationStructure({
                         type="button"
                         onClick={handleGenerate}
                         className="gap-2"
+                        disabled={isGenerating}
                     >
                         <Sparkles size={16} />
-                        Generate
+                        {isGenerating ? "Generating..." : "Generate"}
                     </Button>
                 </div>
             </div>
@@ -329,12 +360,15 @@ function GenerateCertificationStructure({
 }
 
 function CertificationModules({
+                                  certificationId = null,
                                   value,
                                   onChange,
                                   onCreateMiddleExam,
+                                  onGenerateForNewCertification,
                               }) {
     const [localCategories, setLocalCategories] = useState([])
     const [currentPage, setCurrentPage] = useState("default")
+    const [isGeneratingStructure, setIsGeneratingStructure] = useState(false)
 
     const categories = Array.isArray(value) ? value : localCategories
 
@@ -587,31 +621,46 @@ function CertificationModules({
         onCreateMiddleExam?.(examContext)
     }
 
-    const handleGenerateDocuments = (selectedDocuments) => {
-        alert(
-            `Generate clicked successfully. ${
-                selectedDocuments.length
-            } document${selectedDocuments.length === 1 ? "" : "s"} selected.`
-        )
+    const handleGenerateDocuments = async (selectedDocuments) => {
+        try {
+            setIsGeneratingStructure(true)
 
-        console.log("Documents ready for generation:", selectedDocuments)
+            if (certificationId != null) {
 
-        /*
-          Later, replace the alert with your AI generation API request.
 
-          Example:
+                const savedCertification =
+                    await generateCertificationStructure(
+                        certificationId,
+                        selectedDocuments
+                    )
 
-          const formData = new FormData()
+                updateCategories(
+                    mapCertificationToModuleStructure(savedCertification)
+                )
 
-          selectedDocuments.forEach((file) => {
-            formData.append("files", file)
-          })
+                setCurrentPage("default")
 
-          const response = await generateCertificationStructure(formData)
+                toast.success("Certification structure generated", {
+                    description:
+                        "The generated categories and lessons were saved.",
+                })
 
-          updateCategories(response.categories)
-          setCurrentPage("default")
-        */
+                return
+            }
+
+            if (onGenerateForNewCertification) {
+
+
+                await onGenerateForNewCertification(selectedDocuments)
+                return
+            }
+
+            throw new Error(
+                "Save the certification first before generating its structure."
+            )
+        } finally {
+            setIsGeneratingStructure(false)
+        }
     }
 
     const totalMiddleCategories = categories.reduce(
@@ -632,10 +681,35 @@ function CertificationModules({
 
     if (currentPage === "generate") {
         return (
-            <GenerateCertificationStructure
-                onCancel={() => setCurrentPage("default")}
-                onGenerate={handleGenerateDocuments}
-            />
+            <>
+                <GenerateCertificationStructure
+                    onCancel={() => setCurrentPage("default")}
+                    onGenerate={handleGenerateDocuments}
+                    isGenerating={isGeneratingStructure}
+                />
+
+                <AiGenerationProgress
+                    open={isGeneratingStructure}
+                    title="Generating certification structure"
+                    description="Building categories, lessons, and starter content"
+                    stepDurationMs={18000}
+                    steps={[
+                        "Reading your documents",
+                        "Planning major categories",
+                        "Creating middle categories and lessons",
+                        "Writing starter lesson content",
+                        "Saving everything",
+                    ]}
+                    sentences={[
+                        "This is the longest AI task — it writes content for every lesson.",
+                        "Planning a curriculum that covers your documents...",
+                        "Each lesson gets its own generated content.",
+                        "Still working — this can take a few minutes.",
+                        "Structuring categories so learners progress logically...",
+                        "Hang tight, the finish line is close.",
+                    ]}
+                />
+            </>
         )
     }
 

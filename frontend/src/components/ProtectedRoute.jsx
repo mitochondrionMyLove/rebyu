@@ -1,14 +1,14 @@
 import { Navigate, Outlet } from "react-router-dom"
 
-function ProtectedRoute({ allowedRoles }) {
-  const role = localStorage.getItem("role")
+import { getDemoRole, getDemoRoleHome } from "@/lib/demo-role"
 
-  if (!role) {
-    return <Navigate to="/" replace />
-  }
+// Preview-mode route guard: routes render only for the selected demo role.
+// Entering another role's route redirects to the selected role's dashboard.
+function ProtectedRoute({ allowedRoles }) {
+  const role = getDemoRole()
 
   if (!allowedRoles.includes(role)) {
-    return <Navigate to="/" replace />
+    return <Navigate to={getDemoRoleHome(role)} replace />
   }
 
   return <Outlet />

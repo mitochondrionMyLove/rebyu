@@ -23,6 +23,11 @@ public class CurriculumGenerationController {
     private final CurriculumGenerationService curriculumGenerationService;
 
 
+
+
+
+
+
     @PostMapping("/generate")
     public ResponseEntity<CertificationDto> generate(
             @RequestParam("certificationId") Long certificationId,
@@ -30,7 +35,7 @@ public class CurriculumGenerationController {
             @RequestParam(value = "additionalInstructions", required = false) String additionalInstructions
     ) throws IOException {
         log.info("Curriculum generation requested for certificationId={}", certificationId);
-        CertificationDto result = curriculumGenerationService.generateCurriculum(
+        CertificationDto result = curriculumGenerationService.generateForExistingCertification(
                 certificationId, files, additionalInstructions
         );
         return ResponseEntity.ok(result);

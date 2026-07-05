@@ -13,8 +13,10 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getFileViewUrl } from "@/services/fileService.js"
 import CertificationFormDrawer from "@/components/certifications/certification-form-drawer"
+import AssessmentsTab from "@/components/assessments/admin/assessments-tab.jsx"
 import { useQueryClient } from "@tanstack/react-query"
 
 
@@ -40,6 +42,8 @@ function ViewCertificationAdmin() {
   )
 
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("curriculum")
+  const [assessmentCreateRequest, setAssessmentCreateRequest] = useState(null)
 
   useEffect(() => {
     pageRef.current?.scrollIntoView({
@@ -126,7 +130,16 @@ function ViewCertificationAdmin() {
       : null
 
   function handleAddMockExam() {
-    alert("Mock exam builder is not available yet.")
+    setActiveTab("assessments")
+    setAssessmentCreateRequest({ type: "MOCK_EXAM", middleCategoryId: null })
+  }
+
+  function handleCreateQuizFor(middleCategory) {
+    setActiveTab("assessments")
+    setAssessmentCreateRequest({
+      type: "QUIZ",
+      middleCategoryId: middleCategory.middleCategoryId ?? null,
+    })
   }
 
   return (
@@ -236,33 +249,53 @@ function ViewCertificationAdmin() {
               </div>
             </div>
 
-            {majorCategories.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center shadow-sm">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Layers3 className="h-7 w-7" />
-                  </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="mb-6">
+                <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+                <TabsTrigger value="assessments">Assessments</TabsTrigger>
+              </TabsList>
 
-                  <h3 className="mt-5 font-heading text-lg font-bold text-foreground">
-                    No major categories yet
-                  </h3>
+              <TabsContent value="curriculum">
+                {majorCategories.length === 0 ? (
+                    <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center shadow-sm">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Layers3 className="h-7 w-7" />
+                      </div>
 
-                  <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-                    Add a major category to start building this certification
-                    curriculum.
-                  </p>
-                </div>
-            ) : (
-                <div className="space-y-10">
-                  {majorCategories.map((majorCategory, majorIndex) => (
-                      <MajorCategorySection
-                          key={majorCategory.majorCategoryId ?? majorIndex}
-                          certification={certification}
-                          majorCategory={majorCategory}
-                          majorIndex={majorIndex}
-                      />
-                  ))}
-                </div>
-            )}
+                      <h3 className="mt-5 font-heading text-lg font-bold text-foreground">
+                        No major categories yet
+                      </h3>
+
+                      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+                        Add a major category to start building this certification
+                        curriculum.
+                      </p>
+                    </div>
+                ) : (
+                    <div className="space-y-10">
+                      {majorCategories.map((majorCategory, majorIndex) => (
+                          <MajorCategorySection
+                              key={majorCategory.majorCategoryId ?? majorIndex}
+                              certification={certification}
+                              majorCategory={majorCategory}
+                              majorIndex={majorIndex}
+                              onCreateQuiz={handleCreateQuizFor}
+                          />
+                      ))}
+                    </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="assessments">
+                <AssessmentsTab
+                    certification={certification}
+                    createRequest={assessmentCreateRequest}
+                    onCreateRequestHandled={() =>
+                        setAssessmentCreateRequest(null)
+                    }
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </section>
@@ -273,6 +306,7 @@ function MajorCategorySection({
                                 certification,
                                 majorCategory,
                                 majorIndex,
+                                onCreateQuiz,
                               }) {
   const middleCategories = majorCategory.middleCategory ?? []
 
@@ -308,6 +342,7 @@ function MajorCategorySection({
                       certification={certification}
                       majorCategory={majorCategory}
                       middleCategory={middleCategory}
+                      onCreateQuiz={onCreateQuiz}
                   />
               ))}
             </div>
@@ -320,6 +355,7 @@ function MiddleCategoryCard({
                               certification,
                               majorCategory,
                               middleCategory,
+                              onCreateQuiz,
                             }) {
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
@@ -345,7 +381,7 @@ function MiddleCategoryCard({
   function handleCreateQuiz(event) {
     event.stopPropagation()
 
-    alert("Quiz creation is still in progress.")
+    onCreateQuiz?.(middleCategory)
   }
 
   return (

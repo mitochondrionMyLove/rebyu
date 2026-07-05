@@ -8,7 +8,7 @@ import {
 } from "@/hooks/use-file-upload";
 import { Button } from "@/components/ui/button";
 
-// Create some dummy initial files
+
 const initialFiles = [
   {
     id: "image-01-123456789",
@@ -35,7 +35,7 @@ const initialFiles = [
 
 export default function Component() {
   const maxSizeMB = 5;
-  const maxSize = maxSizeMB * 1024 * 1024; // 5MB default
+  const maxSize = maxSizeMB * 1024 * 1024;
   const maxFiles = 6;
 
   const [
@@ -60,7 +60,7 @@ export default function Component() {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Drop area */}
+      {}
       <div
         className="relative flex min-h-52 flex-col items-center not-data-[files]:justify-center overflow-hidden rounded-xl border border-input border-dashed p-4 transition-colors has-[input:focus]:border-ring has-[input:focus]:ring-[3px] has-[input:focus]:ring-ring/50 data-[dragging=true]:bg-accent/50"
         data-dragging={isDragging || undefined}
@@ -103,7 +103,7 @@ export default function Component() {
         </div>
       )}
 
-      {/* File list */}
+      {}
       {files.length > 0 && (
         <div className="space-y-2">
           {files.map((file) => (
@@ -141,7 +141,7 @@ export default function Component() {
             </div>
           ))}
 
-          {/* Remove all files button */}
+          {}
           {files.length > 1 && (
             <div>
               <Button onClick={clearFiles} size="sm" variant="outline">

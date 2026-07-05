@@ -295,7 +295,7 @@ export default function AdminViewLesson() {
   return (
     <section className="min-h-screen bg-zinc-100">
       <div className="grid min-h-screen lg:grid-cols-[minmax(340px,470px)_1fr]">
-        {/* LEFT SIDEBAR */}
+        {}
         <aside
           className={`min-h-screen border-r border-zinc-200 bg-white lg:block ${
             isSidebarOpen ? "block" : "hidden"
@@ -334,7 +334,7 @@ export default function AdminViewLesson() {
                   key={module.id}
                   className="border-b border-zinc-200 last:border-b-0"
                 >
-                  {/* MODULE */}
+                  {}
                   <button
                     type="button"
                     onClick={() => toggleModule(module.id)}
@@ -363,7 +363,7 @@ export default function AdminViewLesson() {
 
                       return (
                         <div key={section.id}>
-                          {/* SECTION */}
+                          {}
                           <button
                             type="button"
                             onClick={() => toggleSection(section.id)}
@@ -412,7 +412,7 @@ export default function AdminViewLesson() {
                             </div>
                           </button>
 
-                          {/* TOPICS */}
+                          {}
                           {isSectionOpen && (
                             <div className="bg-[#f8fcf8] px-4 py-2">
                               <div className="ml-3 border-l border-dashed border-lime-400 pl-5">
@@ -473,7 +473,7 @@ export default function AdminViewLesson() {
           </div>
         </aside>
 
-        {/* RIGHT CONTENT */}
+        {}
         <main className="min-w-0 overflow-x-hidden">
           <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-7">
             <button

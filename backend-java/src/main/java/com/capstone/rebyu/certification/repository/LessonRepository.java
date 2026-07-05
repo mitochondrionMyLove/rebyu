@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface LessonRepository extends JpaRepository<Lesson, Long> {
     List<Lesson> findByMiddleCategory_MiddleCategoryId(Long middleCategoryId);
+
+    List<Lesson> findByMiddleCategory_MajorCategory_Certification_CertificationId(Long certificationId);
 }

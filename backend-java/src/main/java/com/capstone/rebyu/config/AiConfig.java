@@ -73,14 +73,16 @@ public class AiConfig {
                 .baseUrl(baseUrl)
                 .modelName(chatModelName)
                 .temperature(temperature)
-                .logRequests(true)
-                .logResponses(true)
+
+                .timeout(java.time.Duration.ofSeconds(180))
+                .logRequests(false)
+                .logResponses(false)
                 .build();
     }
 
     @Bean
     public EmbeddingModel embeddingModel() {
-        
+
         return new BgeSmallEnV15QuantizedEmbeddingModel();
     }
 

@@ -70,9 +70,11 @@ import { useQuery } from "@tanstack/react-query";
 import { getAllCertifications } from "../../services/certificationService.js";
 import DiagramArea from "../../components/challenges/diagram-area.jsx";
 import BigDialog from "../../components/commons/dialog.jsx";
+import AiGenerationProgress from "../../components/commons/ai-generation-progress.jsx";
 import { extractDiagramData } from "../../utils/diagram-graph.js";
 import {
     deleteQuestion,
+    generateQuestionsFromFiles,
     getQuestions,
     saveChoices,
     saveDiagramQuestion,
@@ -81,6 +83,17 @@ import {
     saveTextQuestion,
     updateQuestion,
 } from "../../services/questionService.js";
+
+function getBackendErrorMessage(error, fallbackMessage) {
+    const responseData = error?.response?.data;
+
+    return (
+        (typeof responseData === "string" && responseData) ||
+        responseData?.message ||
+        error?.message ||
+        fallbackMessage
+    );
+}
 
 const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
@@ -218,11 +231,11 @@ const questionTypes = [
 
             referenceDiagramXml: "",
 
-            /*
-                    Automatically filled from the XML.
-                    These are the fields you will compare with
-                    the learner's diagram later.
-                  */
+
+
+
+
+
             referenceDiagramNodes: [],
             referenceDiagramEdges: [],
 
@@ -1710,6 +1723,7 @@ function QuestionFileGeneratorDialog({
                                          onOpenChange,
                                          onGenerate,
                                          selectedCertification,
+                                         isGenerating = false,
                                      }) {
     const maxFiles = 3;
     const maxSizeMB = 10;
@@ -1725,6 +1739,7 @@ function QuestionFileGeneratorDialog({
     };
 
     const [questionCounts, setQuestionCounts] = useState(initialQuestionCounts);
+    const [submitError, setSubmitError] = useState("");
 
     const totalRequestedQuestions = Object.values(questionCounts).reduce(
         (total, count) => total + count,
@@ -1763,9 +1778,14 @@ function QuestionFileGeneratorDialog({
     function resetGeneratorForm() {
         clearFiles();
         setQuestionCounts(initialQuestionCounts);
+        setSubmitError("");
     }
 
     function handleDialogOpenChange(nextOpen) {
+        if (isGenerating) {
+            return;
+        }
+
         if (!nextOpen) {
             resetGeneratorForm();
         }
@@ -1774,6 +1794,10 @@ function QuestionFileGeneratorDialog({
     }
 
     function handleCancel() {
+        if (isGenerating) {
+            return;
+        }
+
         resetGeneratorForm();
         onOpenChange(false);
     }
@@ -1790,25 +1814,39 @@ function QuestionFileGeneratorDialog({
         }));
     }
 
-    function handleGenerate() {
+    async function handleGenerate() {
         const selectedDocuments = files.map((item) => item.file);
 
         if (selectedDocuments.length === 0) {
-            window.alert(
+            setSubmitError(
                 "Please upload at least one document before generating questions.",
             );
             return;
         }
 
         if (totalRequestedQuestions === 0) {
-            window.alert(
+            setSubmitError(
                 "Enter at least one question for any question type before generating.",
             );
             return;
         }
 
-        onGenerate?.(selectedDocuments, questionCounts);
-        resetGeneratorForm();
+        setSubmitError("");
+
+        try {
+            await onGenerate?.(selectedDocuments, questionCounts);
+
+
+
+            resetGeneratorForm();
+        } catch (error) {
+            setSubmitError(
+                getBackendErrorMessage(
+                    error,
+                    "Question generation failed. Please try again.",
+                ),
+            );
+        }
     }
 
     return (
@@ -2068,26 +2106,37 @@ function QuestionFileGeneratorDialog({
                             </>
                         )}
 
-                        {errors.length > 0 && (
+                        {(submitError || errors.length > 0) && (
                             <div
                                 className="flex items-center gap-1 text-xs text-destructive"
                                 role="alert"
                             >
                                 <AlertCircle className="h-3 w-3 shrink-0" />
-                                <span>{errors[0]}</span>
+                                <span>{submitError || errors[0]}</span>
                             </div>
                         )}
                     </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={handleCancel}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancel}
+                        disabled={isGenerating}
+                    >
                         Cancel
                     </Button>
 
-                    <Button type="button" onClick={handleGenerate}>
+                    <Button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={isGenerating}
+                    >
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Generate Questions ({totalRequestedQuestions})
+                        {isGenerating
+                            ? "Generating..."
+                            : `Generate Questions (${totalRequestedQuestions})`}
                     </Button>
                 </div>
             </DialogContent>
@@ -2278,9 +2327,9 @@ function QuestionBank() {
 
     const [filterDifficulty, setFilterDifficulty] = useState(ALL_FILTER_VALUE);
 
-    // Built-in question search is disabled.
-    // Keep this commented while using your own search implementation.
-    // const [questionSearch, setQuestionSearch] = useState("");
+
+
+
 
     const [questionPage, setQuestionPage] = useState(1);
 
@@ -2299,7 +2348,9 @@ function QuestionBank() {
     const [isQuestionFileGeneratorOpen, setIsQuestionFileGeneratorOpen] =
         useState(false);
 
-    // Prevents duplicate requests when saving changes to one existing question.
+    const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+
+
     const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false);
 
     const [feedbackDialog, setFeedbackDialog] = useState({
@@ -2375,10 +2426,10 @@ function QuestionBank() {
             filterLessons.map((lesson) => String(lesson.numericId ?? lesson.id)),
         );
 
-        /*
-         * Built-in keyword search is disabled.
-         * Add your own search logic here when ready.
-         */
+
+
+
+
 
         return allQuestions.filter((question) => {
             const questionLessonId = String(question.lessonId ?? "");
@@ -2408,10 +2459,10 @@ function QuestionBank() {
                 return false;
             }
 
-            /*
-             * Built-in keyword-search filtering is disabled.
-             * Your custom search implementation can add a condition here.
-             */
+
+
+
+
             return true;
         });
     }, [
@@ -2502,8 +2553,8 @@ function QuestionBank() {
         setFilterQuestionType(ALL_FILTER_VALUE);
         setFilterDifficulty(ALL_FILTER_VALUE);
 
-        // Built-in question-search reset is disabled.
-        // setQuestionSearch("");
+
+
 
         setQuestionPage(1);
     }, [filterCertificationId]);
@@ -2877,58 +2928,46 @@ function QuestionBank() {
         }
     };
 
-    function handleGenerateQuestionsFromFiles(
+    async function handleGenerateQuestionsFromFiles(
         selectedDocuments,
         requestedQuestionCounts,
     ) {
         if (!selectedCertification) {
-            window.alert(
+            throw new Error(
                 "Please select a certification before generating questions.",
             );
-            return;
         }
 
-        const certificationTitle = getCertificationTitle(selectedCertification);
-        const totalRequestedQuestions = Object.values(
-            requestedQuestionCounts,
-        ).reduce((total, count) => total + count, 0);
+        const certificationId =
+            selectedCertification.certificationId ?? selectedCertification.id;
 
-        window.alert(
-            `Generate clicked successfully. ${selectedDocuments.length} document${
-                selectedDocuments.length === 1 ? "" : "s"
-            } selected for ${certificationTitle}. ${totalRequestedQuestions} question${
-                totalRequestedQuestions === 1 ? "" : "s"
-            } requested.`,
-        );
+        try {
+            setIsGeneratingQuestions(true);
 
-        console.log("Certification:", selectedCertification);
-        console.log("Documents ready for question generation:", selectedDocuments);
-        console.log("Requested question counts:", requestedQuestionCounts);
+            const savedQuestions = await generateQuestionsFromFiles(
+                certificationId,
+                selectedDocuments,
+                requestedQuestionCounts,
+            );
 
-        /*
-         * Later, replace the alert with your AI generation API call.
-         *
-         * const formData = new FormData();
-         *
-         * selectedDocuments.forEach((file) => {
-         *     formData.append("files", file);
-         * });
-         *
-         * formData.append(
-         *     "certificationId",
-         *     selectedCertification.certificationId ?? selectedCertification.id,
-         * );
-         *
-         * formData.append(
-         *     "questionCounts",
-         *     JSON.stringify(requestedQuestionCounts),
-         * );
-         *
-         * const response = await generateQuestionsFromFile(formData);
-         * setQuestions(response.questions);
-         */
+            const savedCount = Array.isArray(savedQuestions)
+                ? savedQuestions.length
+                : 0;
 
-        setIsQuestionFileGeneratorOpen(false);
+            setIsQuestionFileGeneratorOpen(false);
+
+
+
+            await refetchQuestions();
+
+            showFeedbackDialog({
+                type: "success",
+                title: "Questions Generated",
+                description: `${savedCount} question(s) were generated and saved successfully.`,
+            });
+        } finally {
+            setIsGeneratingQuestions(false);
+        }
     }
 
     async function handleSave() {
@@ -3032,7 +3071,11 @@ function QuestionBank() {
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={!selectedCertification || isSavingQuestions}
+                                disabled={
+                                    !selectedCertification ||
+                                    isSavingQuestions ||
+                                    isGeneratingQuestions
+                                }
                                 onClick={() => setIsQuestionFileGeneratorOpen(true)}
                             >
                                 <UploadIcon className="mr-2 h-4 w-4" />
@@ -3292,34 +3335,34 @@ function QuestionBank() {
                                         </Select>
                                     </div>
 
-                                    {/*
-                                      Built-in question search is disabled.
-                                      Add your own search UI and logic here later.
+                                    {
 
-                                    <div className="space-y-1.5 md:col-span-2 xl:col-span-4">
-                                        <Label
-                                            htmlFor="question-search"
-                                            className="text-xs font-medium text-muted-foreground"
-                                        >
-                                            Search
-                                        </Label>
 
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
-                                            <Input
-                                                id="question-search"
-                                                value={questionSearch}
-                                                onChange={(event) =>
-                                                    setQuestionSearch(event.target.value)
-                                                }
-                                                placeholder="Search question text, lesson, category, or question type..."
-                                                className="h-10 rounded-lg bg-background pl-9"
-                                                disabled={!selectedFilterCertification}
-                                            />
-                                        </div>
-                                    </div>
-                                    */}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
                                 </div>
                             </CardContent>
                         </Card>
@@ -4031,6 +4074,21 @@ function QuestionBank() {
                 onOpenChange={setIsQuestionFileGeneratorOpen}
                 onGenerate={handleGenerateQuestionsFromFiles}
                 selectedCertification={selectedCertification}
+                isGenerating={isGeneratingQuestions}
+            />
+
+            <AiGenerationProgress
+                open={isGeneratingQuestions}
+                title="Generating questions"
+                description={getCertificationTitle(selectedCertification)}
+                stepDurationMs={6000}
+                steps={[
+                    "Reading your documents",
+                    "Matching topics to lessons",
+                    "Writing the questions",
+                    "Checking answers and difficulty",
+                    "Saving to the question bank",
+                ]}
             />
 
             <FeedbackDialog

@@ -10,11 +10,11 @@ import { ProgressBar } from "@/components/base/progress-indicators/progress-indi
 import { FeaturedIcon } from "@/components/foundations/featured-icon/featured-icon";
 import { cx } from "@/lib/utils/cx";
 
-/**
- * Returns a human-readable file size.
- * @param bytes - The size of the file in bytes.
- * @returns A string representing the file size in a human-readable format.
- */
+
+
+
+
+
 export const getReadableFileSize = (bytes: number) => {
     if (bytes === 0) return "0 KB";
 
@@ -26,43 +26,43 @@ export const getReadableFileSize = (bytes: number) => {
 };
 
 interface FileUploadDropZoneProps {
-    /** The class name of the drop zone. */
+
     className?: string;
-    /**
-     * A hint text explaining what files can be dropped.
-     */
+
+
+
     hint?: string;
-    /**
-     * Disables dropping or uploading files.
-     */
+
+
+
     isDisabled?: boolean;
-    /**
-     * Specifies the types of files that the server accepts.
-     * Examples: "image/*", ".pdf,image/*", "image/*,video/mpeg,application/pdf"
-     */
+
+
+
+
     accept?: string;
-    /**
-     * Allows multiple file uploads.
-     */
+
+
+
     allowsMultiple?: boolean;
-    /**
-     * Maximum file size in bytes.
-     */
+
+
+
     maxSize?: number;
-    /**
-     * Callback function that is called with the list of dropped files
-     * when files are dropped on the drop zone.
-     */
+
+
+
+
     onDropFiles?: (files: FileList) => void;
-    /**
-     * Callback function that is called with the list of unaccepted files
-     * when files are dropped on the drop zone.
-     */
+
+
+
+
     onDropUnacceptedFiles?: (files: FileList) => void;
-    /**
-     * Callback function that is called with the list of files that exceed
-     * the size limit when files are dropped on the drop zone.
-     */
+
+
+
+
     onSizeLimitExceed?: (files: FileList) => void;
 }
 
@@ -85,23 +85,23 @@ export const FileUploadDropZone = ({
     const isFileTypeAccepted = (file: File): boolean => {
         if (!accept) return true;
 
-        // Split the accept string into individual types
+
         const acceptedTypes = accept.split(",").map((type) => type.trim());
 
         return acceptedTypes.some((acceptedType) => {
-            // Handle file extensions (e.g., .pdf, .doc)
+
             if (acceptedType.startsWith(".")) {
                 const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
                 return extension === acceptedType.toLowerCase();
             }
 
-            // Handle wildcards (e.g., image/*)
+
             if (acceptedType.endsWith("/*")) {
                 const typePrefix = acceptedType.split("/")[0];
                 return file.type.startsWith(`${typePrefix}/`);
             }
 
-            // Handle exact MIME types (e.g., application/pdf)
+
             return file.type === acceptedType;
         });
     };
@@ -123,24 +123,24 @@ export const FileUploadDropZone = ({
     };
 
     const processFiles = (files: File[]): void => {
-        // Reset the invalid state when processing files.
+
         setIsInvalid(false);
 
         const acceptedFiles: File[] = [];
         const unacceptedFiles: File[] = [];
         const oversizedFiles: File[] = [];
 
-        // If multiple files are not allowed, only process the first file
+
         const filesToProcess = allowsMultiple ? files : files.slice(0, 1);
 
         filesToProcess.forEach((file) => {
-            // Check file size first
+
             if (maxSize && file.size > maxSize) {
                 oversizedFiles.push(file);
                 return;
             }
 
-            // Then check file type
+
             if (isFileTypeAccepted(file)) {
                 acceptedFiles.push(file);
             } else {
@@ -148,7 +148,7 @@ export const FileUploadDropZone = ({
             }
         });
 
-        // Handle oversized files
+
         if (oversizedFiles.length > 0 && typeof onSizeLimitExceed === "function") {
             const dataTransfer = new DataTransfer();
             oversizedFiles.forEach((file) => dataTransfer.items.add(file));
@@ -157,14 +157,14 @@ export const FileUploadDropZone = ({
             onSizeLimitExceed(dataTransfer.files);
         }
 
-        // Handle accepted files
+
         if (acceptedFiles.length > 0 && typeof onDropFiles === "function") {
             const dataTransfer = new DataTransfer();
             acceptedFiles.forEach((file) => dataTransfer.items.add(file));
             onDropFiles(dataTransfer.files);
         }
 
-        // Handle unaccepted files
+
         if (unacceptedFiles.length > 0 && typeof onDropUnacceptedFiles === "function") {
             const unacceptedDataTransfer = new DataTransfer();
             unacceptedFiles.forEach((file) => unacceptedDataTransfer.items.add(file));
@@ -173,7 +173,7 @@ export const FileUploadDropZone = ({
             onDropUnacceptedFiles(unacceptedDataTransfer.files);
         }
 
-        // Clear the input value to ensure the same file can be selected again
+
         if (inputRef.current) {
             inputRef.current.value = "";
         }
@@ -235,23 +235,23 @@ export const FileUploadDropZone = ({
 };
 
 export interface FileListItemProps {
-    /** The name of the file. */
+
     name: string;
-    /** The size of the file. */
+
     size: number;
-    /** The upload progress of the file. */
+
     progress: number;
-    /** Whether the file failed to upload. */
+
     failed?: boolean;
-    /** The type of the file. */
+
     type?: ComponentProps<typeof FileIcon>["type"];
-    /** The class name of the file list item. */
+
     className?: string;
-    /** The variant of the file icon. */
+
     fileIconVariant?: ComponentProps<typeof FileTypeIcon>["variant"];
-    /** The function to call when the file is deleted. */
+
     onDelete?: () => void;
-    /** The function to call when the file upload is retried. */
+
     onRetry?: () => void;
 }
 
@@ -317,7 +317,7 @@ export const FileListItemProgressFill = ({ name, size, progress, failed, type, f
 
     return (
         <motion.li layout="position" className={cx("relative flex gap-3 overflow-hidden rounded-xl bg-primary p-4", className)}>
-            {/* Progress fill. */}
+            {}
             <div
                 style={{ transform: `translateX(-${100 - progress}%)` }}
                 className={cx("absolute inset-0 size-full bg-secondary transition duration-75 ease-linear", isComplete && "opacity-0")}
@@ -326,7 +326,7 @@ export const FileListItemProgressFill = ({ name, size, progress, failed, type, f
                 aria-valuemin={0}
                 aria-valuemax={100}
             />
-            {/* Inner ring. */}
+            {}
             <div
                 className={cx(
                     "absolute inset-0 size-full rounded-[inherit] ring-1 ring-secondary transition duration-100 ease-linear ring-inset",

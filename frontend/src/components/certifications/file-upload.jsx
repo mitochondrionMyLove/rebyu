@@ -9,18 +9,18 @@ function FileUploadComponent({
                              }) {
   const inputRef = useRef(null)
 
-  // Only used for a NEW image chosen from the computer.
+
   const [previewUrl, setPreviewUrl] = useState("")
   const [localError, setLocalError] = useState("")
 
   useEffect(() => {
-    // No newly selected file.
+
     if (!value) {
       setPreviewUrl("")
       return undefined
     }
 
-    // Create temporary browser URL for the new File.
+
     const objectUrl = URL.createObjectURL(value)
 
     setPreviewUrl(objectUrl)
@@ -62,13 +62,13 @@ function FileUploadComponent({
     }
   }
 
-  /*
-    previewUrl = new image selected by admin
-    imageUrl = old saved image from database
 
-    New selected image comes first.
-    If there is no new image, show the old saved image.
-  */
+
+
+
+
+
+
   const displayedImage = previewUrl || imageUrl
 
   const displayError = error || localError

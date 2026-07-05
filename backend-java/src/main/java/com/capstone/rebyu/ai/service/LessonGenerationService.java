@@ -2,21 +2,22 @@ package com.capstone.rebyu.ai.service;
 
 import com.capstone.rebyu.ai.assistant.LessonGenerationAssistant;
 import com.capstone.rebyu.ai.dto.AILessonStructureDTO;
-import com.capstone.rebyu.ai.dto.LessonSectionDTO;
-import com.capstone.rebyu.ai.dto.LessonToolDTO;
 import com.capstone.rebyu.ai.entity.KnowledgeDocument;
 import com.capstone.rebyu.certification.dto.LessonComponentResponseDto;
 import com.capstone.rebyu.certification.entity.Lesson;
 import com.capstone.rebyu.certification.entity.MajorCategory;
 import com.capstone.rebyu.certification.entity.MiddleCategory;
 import com.capstone.rebyu.certification.repository.LessonRepository;
+import com.capstone.rebyu.common.InvalidAiResponseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.query.Query;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,23 +30,24 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@Transactional
 public class LessonGenerationService {
 
-    private static final List<String> VALID_TOOL_TYPES = List.of(
-            "heading", "subheading", "description",
-            "unordered-list", "ordered-list",
-            "tabs", "accordion", "flip-grid",
-            "image", "video", "image-left-text", "image-right-text"
-    );
-    private static final List<String> MEDIA_TOOL_TYPES = List.of("image", "video", "image-left-text", "image-right-text");
+    private static final int MAX_DOC_CHARS = 10_000;
+
+    record LessonContext(Long lessonId, String lessonTitle, String middleTitle,
+                         String majorTitle, String certTitle, Long certId) {}
 
     private final LessonRepository lessonRepository;
     private final DocumentIngestionService documentIngestionService;
     private final LessonGenerationAssistant lessonGenerationAssistant;
     private final ContentRetriever lessonContentRetriever;
     private final LessonEmbeddingService lessonEmbeddingService;
+    private final AiUploadValidator aiUploadValidator;
+    private final LessonContentValidator lessonContentValidator;
     private final ObjectMapper objectMapper;
+
+    @Autowired @Lazy
+    private LessonGenerationService self;
 
     public LessonGenerationService(
             LessonRepository lessonRepository,
@@ -53,6 +55,8 @@ public class LessonGenerationService {
             LessonGenerationAssistant lessonGenerationAssistant,
             @Qualifier("lessonContentRetriever") ContentRetriever lessonContentRetriever,
             LessonEmbeddingService lessonEmbeddingService,
+            AiUploadValidator aiUploadValidator,
+            LessonContentValidator lessonContentValidator,
             ObjectMapper objectMapper
     ) {
         this.lessonRepository = lessonRepository;
@@ -60,97 +64,141 @@ public class LessonGenerationService {
         this.lessonGenerationAssistant = lessonGenerationAssistant;
         this.lessonContentRetriever = lessonContentRetriever;
         this.lessonEmbeddingService = lessonEmbeddingService;
+        this.aiUploadValidator = aiUploadValidator;
+        this.lessonContentValidator = lessonContentValidator;
         this.objectMapper = objectMapper;
     }
+
+
+
+
+
+
 
     public LessonComponentResponseDto generateAndSave(
             Long lessonId,
             List<MultipartFile> files,
             String additionalInstructions
     ) throws IOException {
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + lessonId));
+        aiUploadValidator.validate(files);
 
-        
-        MiddleCategory mid = lesson.getMiddleCategory();
-        MajorCategory major = mid.getMajorCategory();
-        String certTitle = major.getCertification() != null ? major.getCertification().getTitle() : "";
-        Long certId = major.getCertification() != null ? major.getCertification().getCertificationId() : null;
+        LessonContext ctx = self.loadLessonContext(lessonId);
 
-        
-        if (files != null) {
-            for (MultipartFile file : files) {
-                if (file != null && !file.isEmpty()) {
-                    log.info("Ingesting file '{}' for lesson {}", file.getOriginalFilename(), lessonId);
-                    documentIngestionService.ingest(file, certId, KnowledgeDocument.UseCase.LESSON);
-                }
+        StringBuilder rawText = new StringBuilder();
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty()) {
+                rawText.append(documentIngestionService.extractDocumentText(file)).append("\n\n");
+                documentIngestionService.ingest(file, ctx.certId(), KnowledgeDocument.UseCase.LESSON);
             }
         }
+        aiUploadValidator.requireReadableText(rawText.toString());
 
-        
-        String queryText = String.join(" ", certTitle, major.getTitle(), mid.getTitle(), lesson.getName());
-        List<Content> contents = lessonContentRetriever.retrieve(Query.from(queryText));
-        String referenceContext = contents.stream()
-                .map(c -> c.textSegment().text())
-                .collect(Collectors.joining("\n\n---\n\n"));
+        String referenceContext = buildReferenceContext(ctx, rawText.toString());
 
-        if (referenceContext.isBlank()) {
-            referenceContext = "No uploaded reference documents available. Generate based on the topic and your knowledge.";
-        }
-
-        
         Map<String, Object> requestData = new LinkedHashMap<>();
-        requestData.put("lessonId", lessonId);
-        requestData.put("lessonTitle", lesson.getName());
-        requestData.put("middleCategoryTitle", mid.getTitle());
-        requestData.put("majorCategoryTitle", major.getTitle());
-        requestData.put("certificationTitle", certTitle);
+        requestData.put("lessonId", ctx.lessonId());
+        requestData.put("lessonTitle", ctx.lessonTitle());
+        requestData.put("middleCategoryTitle", ctx.middleTitle());
+        requestData.put("majorCategoryTitle", ctx.majorTitle());
+        requestData.put("certificationTitle", ctx.certTitle());
         if (additionalInstructions != null && !additionalInstructions.isBlank()) {
             requestData.put("additionalInstructions", additionalInstructions);
         }
         String requestJson = objectMapper.writeValueAsString(requestData);
 
-        log.info("Generating lesson structure for lessonId={} ({})", lessonId, lesson.getName());
-        AILessonStructureDTO structure = lessonGenerationAssistant.generateLesson(requestJson, referenceContext);
+        log.info("Generating lesson structure for lessonId={} ({})", lessonId, ctx.lessonTitle());
+        AILessonStructureDTO clean = generateValidatedStructure(requestJson, referenceContext, lessonId);
 
-        
-        AILessonStructureDTO clean = stripMediaTools(structure);
-        String structureJson = objectMapper.writeValueAsString(clean.getSections());
+        String structureJson;
+        try {
+            structureJson = objectMapper.writeValueAsString(clean.getSections());
+        } catch (Exception e) {
+            throw new InvalidAiResponseException("The AI returned lesson content that could not be serialized.", e);
+        }
 
-        lesson.setLessonComponentStructure(structureJson);
-        lessonRepository.save(lesson);
-        log.info("Saved generated lesson for lessonId={} with {} sections", lessonId,
-                clean.getSections() != null ? clean.getSections().size() : 0);
+        self.saveGeneratedStructure(lessonId, structureJson);
+        log.info("Saved generated lesson for lessonId={} with {} sections",
+                lessonId, clean.getSections().size());
 
-        lessonEmbeddingService.embedLessonContent(lessonId, certId, lesson.getName(), structureJson);
+        lessonEmbeddingService.embedLessonContent(lessonId, ctx.certId(), ctx.lessonTitle(), structureJson);
 
-        
         return new LessonComponentResponseDto(structureJson, Map.of(), Map.of());
     }
 
-    private AILessonStructureDTO stripMediaTools(AILessonStructureDTO structure) {
-        if (structure == null || structure.getSections() == null) {
-            return new AILessonStructureDTO(List.of());
+    @Transactional(readOnly = true)
+    public LessonContext loadLessonContext(Long lessonId) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + lessonId));
+
+        MiddleCategory mid = lesson.getMiddleCategory();
+        MajorCategory major = mid.getMajorCategory();
+        String certTitle = major.getCertification() != null ? major.getCertification().getTitle() : "";
+        Long certId = major.getCertification() != null ? major.getCertification().getCertificationId() : null;
+
+        return new LessonContext(lesson.getLessonId(), lesson.getName(),
+                mid.getTitle(), major.getTitle(), certTitle, certId);
+    }
+
+    @Transactional
+    public void saveGeneratedStructure(Long lessonId, String structureJson) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + lessonId));
+        lesson.setLessonComponentStructure(structureJson);
+        lessonRepository.save(lesson);
+    }
+
+
+
+
+
+
+    private AILessonStructureDTO generateValidatedStructure(
+            String requestJson,
+            String referenceContext,
+            Long lessonId
+    ) {
+        InvalidAiResponseException lastError = null;
+
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            AILessonStructureDTO structure =
+                    lessonGenerationAssistant.generateLesson(requestJson, referenceContext);
+            AILessonStructureDTO clean = lessonContentValidator.ensureRequiredTools(
+                    lessonContentValidator.sanitize(structure)
+            );
+
+            try {
+                lessonContentValidator.validate(clean);
+                return clean;
+            } catch (InvalidAiResponseException e) {
+                lastError = e;
+                log.warn("Attempt {}/2 for lessonId={} rejected: {} — returned shape: {}",
+                        attempt, lessonId, e.getMessage(),
+                        lessonContentValidator.describeStructure(structure));
+            }
         }
-        List<LessonSectionDTO> cleaned = structure.getSections().stream()
-                .map(section -> {
-                    List<LessonToolDTO> tools = section.getContent() == null
-                            ? List.of()
-                            : section.getContent().stream()
-                                    .filter(t -> t.getType() != null && VALID_TOOL_TYPES.contains(t.getType()))
-                                    .map(t -> {
-                                        if (!MEDIA_TOOL_TYPES.contains(t.getType()) || t.getData() == null) return t;
-                                        Map<String, Object> data = new LinkedHashMap<>(t.getData());
-                                        data.remove("file");
-                                        data.put("imageKey", "");
-                                        data.put("videoKey", "");
-                                        data.values().removeIf(v -> v == null);
-                                        return new LessonToolDTO(t.getId(), t.getType(), data);
-                                    })
-                                    .toList();
-                    return new LessonSectionDTO(section.getId(), section.getSectionName(), tools);
-                })
-                .toList();
-        return new AILessonStructureDTO(cleaned);
+
+        throw lastError;
+    }
+
+    private String buildReferenceContext(LessonContext ctx, String extractedText) {
+        String documentText = extractedText.length() > MAX_DOC_CHARS
+                ? extractedText.substring(0, MAX_DOC_CHARS)
+                : extractedText;
+
+        String queryText = String.join(" ", ctx.certTitle(), ctx.majorTitle(), ctx.middleTitle(), ctx.lessonTitle());
+        String retrieved = "";
+        try {
+            List<Content> contents = lessonContentRetriever.retrieve(Query.from(queryText));
+            retrieved = contents.stream()
+                    .map(c -> c.textSegment().text())
+                    .collect(Collectors.joining("\n\n---\n\n"));
+        } catch (Exception e) {
+            log.warn("Reference retrieval failed for lessonId={}: {}", ctx.lessonId(), e.getMessage());
+        }
+
+        if (retrieved.isBlank()) {
+            return documentText;
+        }
+        return documentText + "\n\n--- Related reference material ---\n\n" + retrieved;
     }
 }

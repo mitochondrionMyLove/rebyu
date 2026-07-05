@@ -16,12 +16,12 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> {})
                 .authorizeHttpRequests(authorize -> authorize
-                        
+
                         .requestMatchers("/api/certifications/**").permitAll()
                         .requestMatchers("/api/files/**").permitAll()
                         .requestMatchers("/api/lessons/**").permitAll()
 
-                        
+
                         .requestMatchers("/api/questions/**").permitAll()
                         .requestMatchers("/api/choices/**").permitAll()
                         .requestMatchers("/api/text-question-configs/**").permitAll()
@@ -29,21 +29,21 @@ public class SecurityConfig {
                         .requestMatchers("/api/programming-question-configs/**").permitAll()
                         .requestMatchers("/api/programming-test-cases/**").permitAll()
 
-                        
+
                         .requestMatchers("/api/exams/**").permitAll()
                         .requestMatchers("/api/exam-types/**").permitAll()
                         .requestMatchers("/api/exam-questions/**").permitAll()
                         .requestMatchers("/api/exam-choices/**").permitAll()
                         .requestMatchers("/api/exam-results/**").permitAll()
 
-                        
+
                         .requestMatchers("/api/learner-exam-details/**").permitAll()
                         .requestMatchers("/api/learner-mcq-answers/**").permitAll()
                         .requestMatchers("/api/learner-text-answers/**").permitAll()
                         .requestMatchers("/api/learner-diagram-answers/**").permitAll()
                         .requestMatchers("/api/learner-programming-answers/**").permitAll()
 
-                        
+
                         .requestMatchers("/api/ai/**").permitAll()
 
                         .anyRequest().authenticated()

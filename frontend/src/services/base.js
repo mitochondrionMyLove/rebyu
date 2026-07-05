@@ -1,6 +1,8 @@
 import axios from "axios"
 
-export const API = "http://localhost:8080/api"
+// In dev the Vite proxy forwards /api to the backend (see vite.config.ts),
+// which keeps requests same-origin regardless of the dev server port.
+export const API = import.meta.env.DEV ? "/api" : "http://localhost:8080/api"
 
 export async function base(endpoint, options = {}) {
   try {

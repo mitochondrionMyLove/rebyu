@@ -10,7 +10,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-    /* Neutral white workspace */
+
     --background: oklch(0.99 0.002 255);
     --foreground: oklch(0.18 0.03 265);
 
@@ -20,18 +20,18 @@
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.18 0.03 265);
 
-    /* Education blue: buttons, active tabs, active menu items */
+
     --primary: oklch(0.53 0.19 260);
     --primary-foreground: oklch(0.985 0.003 255);
 
-    /* Mostly neutral surfaces */
+
     --secondary: oklch(0.97 0.003 255);
     --secondary-foreground: oklch(0.22 0.03 265);
 
     --muted: oklch(0.965 0.004 255);
     --muted-foreground: oklch(0.5 0.02 265);
 
-    /* Very soft blue only for hover and selected areas */
+
     --accent: oklch(0.95 0.025 255);
     --accent-foreground: oklch(0.22 0.05 265);
 
@@ -50,7 +50,7 @@
 
     --radius: 0.8rem;
 
-    /* Custom reusable colors */
+
     --brand-navy: oklch(0.18 0.03 265);
     --brand-navy-soft: oklch(0.29 0.05 265);
 
@@ -58,11 +58,11 @@
     --brand-blue-dark: oklch(0.4 0.15 263);
     --brand-blue-soft: oklch(0.95 0.025 255);
 
-    /* Use only for small labels, icons, or info blocks */
+
     --brand-sky: oklch(0.72 0.1 235);
     --brand-sky-soft: oklch(0.96 0.02 235);
 
-    /* Optional yellow education highlight */
+
     --brand-yellow: oklch(0.87 0.16 94);
     --brand-yellow-foreground: oklch(0.2 0.03 265);
     --brand-yellow-soft: oklch(0.975 0.055 95);
@@ -70,14 +70,14 @@
     --brand-lilac: oklch(0.95 0.018 290);
     --brand-lilac-foreground: oklch(0.28 0.05 285);
 
-    /* Sidebar stays white */
+
     --sidebar: oklch(0.995 0.001 255);
     --sidebar-foreground: oklch(0.18 0.03 265);
 
     --sidebar-primary: oklch(0.53 0.19 260);
     --sidebar-primary-foreground: oklch(0.985 0.003 255);
 
-    /* Selected sidebar item: soft blue, not full blue */
+
     --sidebar-accent: oklch(0.95 0.025 255);
     --sidebar-accent-foreground: oklch(0.22 0.05 265);
 

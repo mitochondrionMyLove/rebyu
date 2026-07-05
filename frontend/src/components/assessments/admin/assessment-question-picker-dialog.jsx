@@ -1,0 +1,292 @@
+import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Search } from "lucide-react"
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { getQuestions } from "@/services/questionService.js"
+
+const QUESTION_TYPE_LABELS = {
+  MULTIPLE_CHOICE: "Multiple Choice",
+  DESCRIPTIVE: "Descriptive",
+  SHORT_ANSWER: "Short Answer",
+  CRITICAL_THINKING: "Critical Thinking",
+}
+
+// Builds lessonId -> { lesson, middleCategory, majorCategory } lookup from the
+// certification tree so questions can be scoped and filtered per certification.
+export function buildLessonIndex(certification) {
+  const index = new Map()
+  ;(certification?.majorCategory ?? []).forEach((majorCategory) => {
+    ;(majorCategory.middleCategory ?? []).forEach((middleCategory) => {
+      ;(middleCategory.lessons ?? []).forEach((lesson) => {
+        index.set(lesson.lessonId, { lesson, middleCategory, majorCategory })
+      })
+    })
+  })
+  return index
+}
+
+export default function AssessmentQuestionPickerDialog({
+  open,
+  onOpenChange,
+  certification,
+  alreadySelectedIds,
+  onAddQuestions,
+  initialMiddleCategoryId = null,
+}) {
+  const [search, setSearch] = useState("")
+  const [difficultyFilter, setDifficultyFilter] = useState("all")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [middleFilter, setMiddleFilter] = useState(
+    initialMiddleCategoryId ? String(initialMiddleCategoryId) : "all"
+  )
+  const [picked, setPicked] = useState(() => new Set())
+
+  const questionsQuery = useQuery({
+    queryKey: ["questions"],
+    queryFn: () => getQuestions(),
+    enabled: open,
+  })
+
+  const lessonIndex = useMemo(
+    () => buildLessonIndex(certification),
+    [certification]
+  )
+
+  const middleCategories = useMemo(() => {
+    const seen = new Map()
+    lessonIndex.forEach(({ middleCategory }) => {
+      seen.set(middleCategory.middleCategoryId, middleCategory.title)
+    })
+    return [...seen.entries()]
+  }, [lessonIndex])
+
+  const rows = useMemo(() => {
+    const list = Array.isArray(questionsQuery.data) ? questionsQuery.data : []
+    return list
+      .filter((question) => {
+        // Scope to this certification and exclude sub-questions.
+        if (!lessonIndex.has(question.lessonId)) return false
+        if (question.parentQuestionId != null) return false
+        if (alreadySelectedIds.has(question.questionId)) return false
+        if (
+          difficultyFilter !== "all" &&
+          question.difficultyLevel !== difficultyFilter
+        ) {
+          return false
+        }
+        if (typeFilter !== "all" && question.questionType !== typeFilter) {
+          return false
+        }
+        if (middleFilter !== "all") {
+          const entry = lessonIndex.get(question.lessonId)
+          if (
+            String(entry.middleCategory.middleCategoryId) !== middleFilter
+          ) {
+            return false
+          }
+        }
+        if (search.trim()) {
+          const term = search.trim().toLowerCase()
+          if (!question.questionText?.toLowerCase().includes(term)) {
+            return false
+          }
+        }
+        return true
+      })
+      .map((question) => ({
+        question,
+        context: lessonIndex.get(question.lessonId),
+      }))
+  }, [
+    questionsQuery.data,
+    lessonIndex,
+    alreadySelectedIds,
+    difficultyFilter,
+    typeFilter,
+    middleFilter,
+    search,
+  ])
+
+  const togglePicked = (questionId) => {
+    setPicked((current) => {
+      const next = new Set(current)
+      if (next.has(questionId)) next.delete(questionId)
+      else next.add(questionId)
+      return next
+    })
+  }
+
+  const handleAdd = () => {
+    const list = Array.isArray(questionsQuery.data) ? questionsQuery.data : []
+    const selectedQuestions = list.filter((question) =>
+      picked.has(question.questionId)
+    )
+    onAddQuestions(selectedQuestions)
+    setPicked(new Set())
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none overflow-hidden rounded-2xl p-0 sm:h-[calc(100dvh-4rem)] sm:w-[80vw] sm:max-w-[80vw] lg:h-[min(680px,calc(100dvh-4rem))] lg:w-[60vw] lg:max-w-[60vw]"
+      >
+        <div className="flex h-full min-h-0 flex-col">
+          <DialogHeader className="border-b px-6 py-5">
+            <DialogTitle className="text-xl font-semibold">
+              Add Questions
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Select questions from the {certification?.title} question bank.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-wrap items-center gap-2 border-b px-6 py-3">
+            <label className="relative w-full max-w-56">
+              <span className="sr-only">Search questions</span>
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search questions"
+                className="pl-9"
+              />
+            </label>
+            <Select value={middleFilter} onValueChange={setMiddleFilter}>
+              <SelectTrigger className="w-[190px]" aria-label="Module filter">
+                <SelectValue placeholder="Module" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All modules</SelectItem>
+                {middleCategories.map(([id, title]) => (
+                  <SelectItem key={id} value={String(id)}>
+                    {title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[170px]" aria-label="Type filter">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                {Object.entries(QUESTION_TYPE_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={difficultyFilter}
+              onValueChange={setDifficultyFilter}
+            >
+              <SelectTrigger className="w-[140px]" aria-label="Difficulty filter">
+                <SelectValue placeholder="Difficulty" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All levels</SelectItem>
+                <SelectItem value="EASY">Easy</SelectItem>
+                <SelectItem value="AVERAGE">Average</SelectItem>
+                <SelectItem value="HARD">Hard</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            {questionsQuery.isLoading ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Loading questions...
+              </p>
+            ) : questionsQuery.isError ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Unable to load questions. Close this dialog and try again.
+              </p>
+            ) : rows.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No questions match the current filters. Create questions in the
+                Question Bank first.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {rows.map(({ question, context }) => (
+                  <li key={question.questionId}>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition hover:bg-muted/40 has-[[data-state=checked]]:border-primary/50 has-[[data-state=checked]]:bg-primary/5">
+                      <Checkbox
+                        checked={picked.has(question.questionId)}
+                        onCheckedChange={() =>
+                          togglePicked(question.questionId)
+                        }
+                        aria-label={`Select question ${question.questionId}`}
+                        className="mt-1"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm font-medium">
+                          {question.questionText}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {QUESTION_TYPE_LABELS[question.questionType] ??
+                              question.questionType}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px]">
+                            {question.difficultyLevel}
+                          </Badge>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {context.lesson.name ?? context.lesson.title} ·{" "}
+                            {context.middleCategory.title}
+                          </span>
+                        </div>
+                      </div>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
+            <p className="text-sm text-muted-foreground">
+              {picked.size} question(s) selected
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleAdd}
+                disabled={picked.size === 0}
+              >
+                Add Selected Questions
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

@@ -10,7 +10,7 @@ import MainArea from "../components/challenges/main.jsx"
 export default function ChallengesLayout() {
     return (
         <section className="flex h-dvh min-h-0 flex-col overflow-hidden bg-white">
-            {/* Header */}
+            {}
             <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 px-4 sm:px-6">
                 <div className="flex min-w-0 items-center gap-3">
                     <button
