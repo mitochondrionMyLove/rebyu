@@ -1,6 +1,5 @@
 import { base } from "./base"
 
-// Exam types
 export function getExamTypes() {
   return base("exam-types")
 }
@@ -9,7 +8,6 @@ export function createExamType(examTypeText) {
   return base("exam-types", { method: "POST", data: { examTypeText } })
 }
 
-// Finds an exam type by its text label, creating it when missing.
 export async function ensureExamType(examTypeText) {
   const types = await getExamTypes()
   const existing = (Array.isArray(types) ? types : []).find(
@@ -19,7 +17,6 @@ export async function ensureExamType(examTypeText) {
   return createExamType(examTypeText)
 }
 
-// Exams
 export function getExams() {
   return base("exams")
 }

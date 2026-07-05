@@ -94,11 +94,6 @@ public class QuestionGenerationService {
     }
 
 
-
-
-
-
-
     public List<QuestionDto> generateAndSave(
             AiQuestionGenerationRequest request,
             List<MultipartFile> files
@@ -165,9 +160,6 @@ public class QuestionGenerationService {
     }
 
 
-
-
-
     @Transactional
     public List<QuestionDto> persistBatch(List<Map<String, Object>> generatedQuestions) {
         List<QuestionDto> saved = new ArrayList<>();
@@ -221,7 +213,7 @@ public class QuestionGenerationService {
         for (Map<String, Object> data : generatedQuestions) {
             String type = getNormalizedQuestionType(data);
             String questionText = str(data, "question");
-            String difficulty = str(data, "difficulty");
+            String difficulty = getNormalizedDifficulty(data);
             Long suggestedLessonId = longOf(data.get("suggestedLessonId"));
 
             if (type == null || !SUPPORTED_TYPES.contains(type)) {
@@ -323,7 +315,7 @@ public class QuestionGenerationService {
     }
 
     private QuestionDto persistQuestion(Map<String, Object> data) {
-        String aiType = str(data, "questionType");
+        String aiType = getNormalizedQuestionType(data);
         Long lessonId = longOf(data.get("suggestedLessonId"));
 
         Lesson lesson = lessonRepository.findById(lessonId)
@@ -332,7 +324,7 @@ public class QuestionGenerationService {
         Question question = new Question();
 
         question.setQuestionType(toStoredQuestionType(aiType));
-        question.setDifficultyLevel(str(data, "difficulty"));
+        question.setDifficultyLevel(getNormalizedDifficulty(data));
         question.setQuestionText(str(data, "question"));
         question.setLesson(lesson);
         question.setImageKey(null);
@@ -495,5 +487,25 @@ public class QuestionGenerationService {
         if (v == null) v = map.get("type");
         if (v == null) return null;
         return v.toString().trim().toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * Extracts and normalizes difficulty values from AI responses.
+     * Accepts several key names and maps common synonyms to the
+     * canonical values: easy, average, hard.
+     */
+    private static String getNormalizedDifficulty(Map<String, Object> map) {
+        Object v = map.get("difficulty");
+        if (v == null) v = map.get("difficultyLevel");
+        if (v == null) v = map.get("difficulty_level");
+        if (v == null) v = map.get("level");
+        if (v == null) return null;
+        String s = v.toString().trim().toLowerCase(Locale.ROOT);
+        return switch (s) {
+            case "easy" -> "easy";
+            case "average", "avg", "medium", "moderate" -> "average";
+            case "hard", "difficult" -> "hard";
+            default -> null;
+        };
     }
 }

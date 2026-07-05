@@ -1835,9 +1835,6 @@ function QuestionFileGeneratorDialog({
 
         try {
             await onGenerate?.(selectedDocuments, questionCounts);
-
-
-
             resetGeneratorForm();
         } catch (error) {
             setSubmitError(

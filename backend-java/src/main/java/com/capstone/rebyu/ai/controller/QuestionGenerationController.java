@@ -23,14 +23,6 @@ public class QuestionGenerationController {
     private final QuestionGenerationService questionGenerationService;
     private final ObjectMapper objectMapper;
 
-
-
-
-
-
-
-
-
     @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public List<QuestionDto> generate(
