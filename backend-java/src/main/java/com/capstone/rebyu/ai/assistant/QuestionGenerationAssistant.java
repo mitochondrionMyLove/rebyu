@@ -75,9 +75,9 @@ public interface QuestionGenerationAssistant {
             Reference context:
             {{referenceContext}}
 
-            Return only structured question draft data.
+            Return only structured question draft data as a valid JSON array.
             """)
-    List<GeneratedQuestionDraftDto> generateQuestions(
+    String generateQuestions(
             @V("requestJson") String requestJson,
             @V("referenceContext") String referenceContext
     );

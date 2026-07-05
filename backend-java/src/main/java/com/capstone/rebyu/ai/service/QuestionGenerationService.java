@@ -101,7 +101,8 @@ public class QuestionGenerationService {
 
         List<GeneratedQuestionDraftDto> generatedDrafts;
         try {
-            generatedDrafts = questionGenerationAssistant.generateQuestions(requestJson, referenceContext);
+            String aiResponse = questionGenerationAssistant.generateQuestions(requestJson, referenceContext);
+            generatedDrafts = parseGeneratedQuestionDrafts(aiResponse);
         } catch (Exception e) {
             log.error("Failed to deserialize AI question draft response for certificationId={}. Error: {}",
                     request.getCertificationId(), e.getMessage(), e);
@@ -200,6 +201,46 @@ public class QuestionGenerationService {
             return documentText;
         }
         return documentText + "\n\n--- Related reference material ---\n\n" + retrieved;
+    }
+
+    private List<GeneratedQuestionDraftDto> parseGeneratedQuestionDrafts(String json) {
+        if (json == null || json.isBlank()) {
+            throw new InvalidAiGeneratedQuestionException("The AI returned an empty response.");
+        }
+        try {
+            String cleaned = json.trim();
+            if (cleaned.startsWith("```")) {
+                cleaned = cleaned.replaceFirst("```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
+            }
+            
+            // Try direct array parse first
+            try {
+                return objectMapper.readValue(cleaned, new com.fasterxml.jackson.core.type.TypeReference<List<GeneratedQuestionDraftDto>>() {});
+            } catch (Exception ignore) {
+                // continue to smarter extraction
+            }
+            
+            // Try to extract array from the response
+            int arrayStart = cleaned.indexOf('[');
+            int arrayEnd = cleaned.lastIndexOf(']');
+            if (arrayStart >= 0 && arrayEnd > arrayStart) {
+                String arr = cleaned.substring(arrayStart, arrayEnd + 1);
+                try {
+                    return objectMapper.readValue(arr, new com.fasterxml.jackson.core.type.TypeReference<List<GeneratedQuestionDraftDto>>() {});
+                } catch (Exception ignored) {
+                    // continue
+                }
+            }
+            
+            log.error("Failed to parse AI question draft response; excerpt: {}", 
+                    cleaned.length() > 200 ? cleaned.substring(0, 200) : cleaned);
+            throw new InvalidAiGeneratedQuestionException("The AI returned malformed question draft JSON. Please try again.");
+        } catch (InvalidAiGeneratedQuestionException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to parse AI question draft response", e);
+            throw new InvalidAiGeneratedQuestionException("The AI returned malformed question draft JSON. Please try again.", e);
+        }
     }
 
 }
