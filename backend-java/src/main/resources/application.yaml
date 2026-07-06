@@ -2,6 +2,18 @@ spring:
   application:
     name: rebyu
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: puffpower177@gmail.com
+    password: {$GOOGLE_APP_PASS}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -53,7 +65,19 @@ spring:
     livereload:
       enabled: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${COGNITO_ISSUER_URI:https://cognito-idp.us-east-1.amazonaws.com/us-east-1_YhXCAZ9HF}
+
 app:
+  cognito:
+    region: ${COGNITO_REGION:us-east-1}
+    user-pool-id: ${COGNITO_USER_POOL_ID:us-east-1_YhXCAZ9HF}
+  frontend-url: http://localhost:5173
+  mail:
+    from: puffpower177@gmail.com
 
 server:
   port: 8080
@@ -118,7 +142,7 @@ langchain4j:
     chat-model:
       # Groq rate limits are model-specific. Use a lower-cost default so draft generation
       # is less likely to hit the daily token cap during normal authoring workflows.
-      model-name: ${GROQ_MODEL:llama-3.1-8b-instant}
+      model-name: ${GROQ_MODEL:llama-3.3-70b-versatile}
       temperature: 0.7
 
 db:

@@ -45,4 +45,14 @@ public class LearnerCertification {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.active;
+
+    /** Set once the learner submits the certification's diagnostic assessment. */
+    @Column(name = "diagnostic_completed_at")
+    private LocalDateTime diagnosticCompletedAt;
+
+    @Column(name = "diagnostic_attempt_id")
+    private Long diagnosticAttemptId;
+
+    @Column(name = "last_accessed_at")
+    private LocalDateTime lastAccessedAt;
 }

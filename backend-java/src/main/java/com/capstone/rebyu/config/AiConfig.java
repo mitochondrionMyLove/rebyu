@@ -5,6 +5,7 @@ import com.capstone.rebyu.ai.assistant.CurriculumPlanningAssistant;
 import com.capstone.rebyu.ai.assistant.LessonGenerationAssistant;
 import com.capstone.rebyu.ai.assistant.QuestionGenerationAssistant;
 import com.capstone.rebyu.ai.assistant.ReviewAssistant;
+import com.capstone.rebyu.ai.tools.LessonComponentDraftTools;
 import com.capstone.rebyu.ai.tools.LessonTool;
 import com.capstone.rebyu.ai.tools.QuestionTool;
 import dev.langchain4j.data.segment.TextSegment;
@@ -166,10 +167,18 @@ public class AiConfig {
     }
 
     @Bean
-    public LessonGenerationAssistant lessonGenerationAssistant(ChatModel chatModel, LessonTool lessonTool) {
+    public LessonGenerationAssistant lessonGenerationAssistant(
+            ChatModel chatModel,
+            LessonTool lessonTool,
+            LessonComponentDraftTools lessonComponentDraftTools
+    ) {
+        // Lesson drafts are produced as a single JSON document and parsed
+        // deterministically in the service. LangChain4j 1.0.0 + Groq cannot
+        // reliably satisfy the tool-parameter schema for the complex lesson
+        // tools, so no tools are attached here (the draft tool/mapper classes
+        // remain for validation and data-shape reuse).
         return AiServices.builder(LessonGenerationAssistant.class)
                 .chatModel(chatModel)
-                .tools(lessonTool)
                 .build();
     }
 

@@ -1,0 +1,363 @@
+package com.capstone.rebyu.ai.service;
+
+import com.capstone.rebyu.ai.dto.GeneratedLessonSectionDraftDto;
+import com.capstone.rebyu.ai.dto.GeneratedLessonToolDraftDto;
+import com.capstone.rebyu.ai.dto.lesson.data.AccordionItemDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.AccordionToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.DescriptionToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.FlipGridCardDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.FlipGridToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.HeadingToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ImageLeftTextToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ImageRightTextToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ImageToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ListItemDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.OrderedListToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.SubheadingToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.TabItemDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.TabsToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.UnorderedListToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.VideoToolDataDto;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Parses the lesson assistant's JSON response into editable draft sections,
+ * mapping each tool into the exact frontend {type, data} shape. Media fields
+ * are always forced empty because media is admin-controlled. Unknown tool
+ * types are skipped with a warning rather than failing the batch.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class LessonDraftJsonParser {
+
+    private static final Set<String> SUPPORTED_TYPES = Set.of(
+            "heading", "subheading", "description", "unordered-list", "ordered-list",
+            "tabs", "accordion", "flip-grid", "image", "video",
+            "image-left-text", "image-right-text");
+
+    private final ObjectMapper objectMapper;
+
+    public List<GeneratedLessonSectionDraftDto> parseSections(String raw, List<String> warnings) {
+        JsonNode array = extractArray(raw);
+        if (array == null) {
+            return List.of();
+        }
+
+        List<GeneratedLessonSectionDraftDto> sections = new ArrayList<>();
+        for (JsonNode sectionNode : array) {
+            if (!sectionNode.isObject()) continue;
+            String sectionName = firstText(sectionNode,
+                    "sectionName", "sectionTitle", "section", "name", "title", "heading");
+            if (sectionName == null || sectionName.isBlank()) continue;
+
+            List<GeneratedLessonToolDraftDto> content = new ArrayList<>();
+
+            // Preferred: an explicit array of typed content tools.
+            JsonNode contentNode = sectionNode.has("content") && sectionNode.get("content").isArray()
+                    ? sectionNode.get("content")
+                    : sectionNode.get("tools");
+            if (contentNode != null && contentNode.isArray()) {
+                for (JsonNode toolNode : contentNode) {
+                    GeneratedLessonToolDraftDto tool = mapTool(toolNode, warnings);
+                    if (tool != null) content.add(tool);
+                }
+            }
+
+            // Fallback: the model produced a generic lesson section (sectionContent,
+            // learningObjectives, steps, definitions ...). Synthesize typed tools
+            // so drafts are still produced and remain admin-editable.
+            if (content.isEmpty()) {
+                content.addAll(synthesizeTools(sectionNode));
+            }
+
+            if (!content.isEmpty()) {
+                sections.add(new GeneratedLessonSectionDraftDto(
+                        UUID.randomUUID(), sectionName.trim(), content));
+            }
+        }
+        return sections;
+    }
+
+    /**
+     * Converts a generic lesson section (as models often produce) into the
+     * supported typed tools: prose becomes a description, objective/point
+     * arrays become bullet lists, step arrays become ordered lists, and
+     * term/definition arrays become flip-grid review cards.
+     */
+    private List<GeneratedLessonToolDraftDto> synthesizeTools(JsonNode section) {
+        List<GeneratedLessonToolDraftDto> tools = new ArrayList<>();
+
+        String prose = text(section,
+                "sectionContent", "content", "description", "text", "overview", "summary", "body");
+        if (prose != null && !prose.isBlank()) {
+            tools.add(tool(UUID.randomUUID(), "description",
+                    new DescriptionToolDataDto(prose.trim()), ""));
+        }
+
+        addStringListAsList(tools, section, "unordered-list",
+                "learningObjectives", "objectives", "keyPoints", "points",
+                "keyConcepts", "highlights", "takeaways", "examples");
+        addStringListAsList(tools, section, "ordered-list",
+                "steps", "procedure", "process", "instructions");
+
+        JsonNode definitions = firstArray(section, "definitions", "terms", "glossary", "keyTerms");
+        if (definitions != null) {
+            List<FlipGridCardDataDto> cards = new ArrayList<>();
+            for (JsonNode def : definitions) {
+                String front = text(def, "term", "word", "concept", "title", "frontTitle");
+                String back = text(def, "definition", "meaning", "description", "backTitle");
+                if (isBlank(front) || isBlank(back)) continue;
+                cards.add(new FlipGridCardDataDto(UUID.randomUUID(),
+                        front.trim(), back.trim(), back.trim()));
+            }
+            if (!cards.isEmpty()) {
+                tools.add(tool(UUID.randomUUID(), "flip-grid",
+                        new FlipGridToolDataDto(cards), ""));
+            }
+        }
+        return tools;
+    }
+
+    private void addStringListAsList(
+            List<GeneratedLessonToolDraftDto> tools, JsonNode section,
+            String toolType, String... keys) {
+        JsonNode arr = firstArray(section, keys);
+        if (arr == null) return;
+        List<ListItemDataDto> items = new ArrayList<>();
+        for (JsonNode item : arr) {
+            String value = item.isTextual() ? item.asText() : text(item, "text", "item", "value", "point");
+            if (value != null && !value.isBlank()) {
+                items.add(new ListItemDataDto(UUID.randomUUID(), value.trim()));
+            }
+        }
+        if (items.isEmpty()) return;
+        Object data = toolType.equals("ordered-list")
+                ? new OrderedListToolDataDto(items)
+                : new UnorderedListToolDataDto(items);
+        tools.add(tool(UUID.randomUUID(), toolType, data, ""));
+    }
+
+    private GeneratedLessonToolDraftDto mapTool(JsonNode toolNode, List<String> warnings) {
+        if (toolNode == null || !toolNode.isObject()) return null;
+        String type = firstText(toolNode, "type", "toolType", "componentType");
+        if (type == null) return null;
+        type = type.trim().toLowerCase().replace('_', '-').replace(' ', '-');
+        if (type.equals("bullet-list") || type.equals("bulletlist")) type = "unordered-list";
+        if (type.equals("numbered-list") || type.equals("numberedlist")) type = "ordered-list";
+        if (type.equals("flip-cards") || type.equals("flipcard") || type.equals("flip-card")) {
+            type = "flip-grid";
+        }
+        if (!SUPPORTED_TYPES.contains(type)) {
+            warnings.add("Skipped an unsupported generated lesson tool: " + type);
+            return null;
+        }
+
+        JsonNode data = toolNode.has("data") && toolNode.get("data").isObject()
+                ? toolNode.get("data")
+                : toolNode;
+        String notes = firstText(toolNode, "authoringNotes", "notes");
+        UUID id = UUID.randomUUID();
+
+        try {
+            return switch (type) {
+                case "heading" -> tool(id, "heading",
+                        new HeadingToolDataDto(requireText(data, "heading", "text", "title")), notes);
+                case "subheading" -> tool(id, "subheading",
+                        new SubheadingToolDataDto(requireText(data, "subheading", "text", "title")), notes);
+                case "description" -> tool(id, "description",
+                        new DescriptionToolDataDto(requireText(data, "description", "text", "content")), notes);
+                case "unordered-list" -> tool(id, "unordered-list",
+                        new UnorderedListToolDataDto(listItems(data)), notes);
+                case "ordered-list" -> tool(id, "ordered-list",
+                        new OrderedListToolDataDto(listItems(data)), notes);
+                case "tabs" -> tool(id, "tabs", new TabsToolDataDto(tabItems(data)), notes);
+                case "accordion" -> tool(id, "accordion",
+                        new AccordionToolDataDto(accordionItems(data)), notes);
+                case "flip-grid" -> tool(id, "flip-grid",
+                        new FlipGridToolDataDto(flipCards(data)), notes);
+                case "image-left-text" -> tool(id, "image-left-text",
+                        ImageLeftTextToolDataDto.draft(
+                                requireText(data, "image-left-text", "title"),
+                                requireText(data, "image-left-text", "description", "text")),
+                        notesOrDefault(notes));
+                case "image-right-text" -> tool(id, "image-right-text",
+                        ImageRightTextToolDataDto.draft(
+                                requireText(data, "image-right-text", "title"),
+                                requireText(data, "image-right-text", "description", "text")),
+                        notesOrDefault(notes));
+                case "image" -> tool(id, "image", ImageToolDataDto.draft(), notesOrDefault(notes));
+                case "video" -> tool(id, "video", VideoToolDataDto.draft(), notesOrDefault(notes));
+                default -> null;
+            };
+        } catch (IllegalArgumentException invalid) {
+            warnings.add("Skipped an incomplete generated " + type + " block.");
+            return null;
+        }
+    }
+
+    private GeneratedLessonToolDraftDto tool(UUID id, String type, Object data, String notes) {
+        return new GeneratedLessonToolDraftDto(id, type, data, notes == null ? "" : notes.trim());
+    }
+
+    private List<ListItemDataDto> listItems(JsonNode data) {
+        JsonNode items = firstArray(data, "items", "list", "points");
+        List<ListItemDataDto> result = new ArrayList<>();
+        if (items != null) {
+            for (JsonNode item : items) {
+                String text = item.isTextual() ? item.asText() : text(item, "text", "item", "value");
+                if (text != null && !text.isBlank()) {
+                    result.add(new ListItemDataDto(UUID.randomUUID(), text.trim()));
+                }
+            }
+        }
+        if (result.isEmpty()) throw new IllegalArgumentException("empty list");
+        return result;
+    }
+
+    private List<TabItemDataDto> tabItems(JsonNode data) {
+        JsonNode items = firstArray(data, "items", "tabs");
+        List<TabItemDataDto> result = new ArrayList<>();
+        if (items != null) {
+            for (JsonNode item : items) {
+                String label = text(item, "label", "title");
+                String title = text(item, "title", "label");
+                String description = text(item, "description", "content", "text");
+                if (isBlank(label) || isBlank(description)) continue;
+                result.add(new TabItemDataDto(UUID.randomUUID(),
+                        label.trim(), title == null ? label.trim() : title.trim(), description.trim()));
+            }
+        }
+        if (result.isEmpty()) throw new IllegalArgumentException("empty tabs");
+        return result;
+    }
+
+    private List<AccordionItemDataDto> accordionItems(JsonNode data) {
+        JsonNode items = firstArray(data, "items", "sections");
+        List<AccordionItemDataDto> result = new ArrayList<>();
+        if (items != null) {
+            for (JsonNode item : items) {
+                String title = text(item, "title", "label", "header");
+                String content = text(item, "content", "description", "text", "body");
+                if (isBlank(title) || isBlank(content)) continue;
+                result.add(new AccordionItemDataDto(UUID.randomUUID(), title.trim(), content.trim()));
+            }
+        }
+        if (result.isEmpty()) throw new IllegalArgumentException("empty accordion");
+        return result;
+    }
+
+    private List<FlipGridCardDataDto> flipCards(JsonNode data) {
+        JsonNode cards = firstArray(data, "cards", "items");
+        List<FlipGridCardDataDto> result = new ArrayList<>();
+        if (cards != null) {
+            for (JsonNode card : cards) {
+                String front = text(card, "frontTitle", "front", "term", "title");
+                String back = text(card, "backTitle", "back", "definition");
+                String description = text(card, "description", "detail", "explanation");
+                if (isBlank(front) || isBlank(back)) continue;
+                // The validator requires a non-blank description; fall back to
+                // the back title when the model omits the extra explanation.
+                if (isBlank(description)) description = back;
+                result.add(new FlipGridCardDataDto(UUID.randomUUID(),
+                        front.trim(), back.trim(), description.trim()));
+            }
+        }
+        if (result.isEmpty()) throw new IllegalArgumentException("empty flip-grid");
+        return result;
+    }
+
+    // ---- JSON helpers ------------------------------------------------------
+
+    private JsonNode extractArray(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String cleaned = raw.trim();
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned.replaceFirst("```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
+        }
+        JsonNode direct = tryReadArray(cleaned);
+        if (direct != null) return direct;
+
+        int start = cleaned.indexOf('[');
+        int end = cleaned.lastIndexOf(']');
+        if (start >= 0 && end > start) {
+            JsonNode embedded = tryReadArray(cleaned.substring(start, end + 1));
+            if (embedded != null) return embedded;
+        }
+        // Wrapper object { "sections": [...] }
+        int objStart = cleaned.indexOf('{');
+        int objEnd = cleaned.lastIndexOf('}');
+        if (objStart >= 0 && objEnd > objStart) {
+            try {
+                JsonNode node = objectMapper.readTree(cleaned.substring(objStart, objEnd + 1));
+                if (node.has("sections") && node.get("sections").isArray()) {
+                    return node.get("sections");
+                }
+            } catch (Exception ignored) {
+                // fall through
+            }
+        }
+        log.warn("Could not extract a lesson section array from AI response");
+        return null;
+    }
+
+    private JsonNode tryReadArray(String candidate) {
+        try {
+            JsonNode node = objectMapper.readTree(candidate);
+            return node != null && node.isArray() ? node : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String requireText(JsonNode node, String type, String... keys) {
+        String value = text(node, keys);
+        if (isBlank(value)) {
+            throw new IllegalArgumentException("missing text for " + type);
+        }
+        return value.trim();
+    }
+
+    private String text(JsonNode node, String... keys) {
+        if (node == null) return null;
+        for (String key : keys) {
+            JsonNode value = node.get(key);
+            if (value != null && value.isTextual() && !value.asText().isBlank()) {
+                return value.asText();
+            }
+        }
+        return null;
+    }
+
+    private String firstText(JsonNode node, String... keys) {
+        return text(node, keys);
+    }
+
+    private JsonNode firstArray(JsonNode node, String... keys) {
+        if (node == null) return null;
+        for (String key : keys) {
+            JsonNode value = node.get(key);
+            if (value != null && value.isArray()) return value;
+        }
+        return null;
+    }
+
+    private String notesOrDefault(String notes) {
+        return isBlank(notes)
+                ? "Upload the appropriate media and review before saving."
+                : notes.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+}

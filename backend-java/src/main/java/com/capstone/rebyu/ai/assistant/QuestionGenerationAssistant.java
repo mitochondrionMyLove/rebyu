@@ -10,8 +10,21 @@ import java.util.List;
 @SystemMessage("""
         You are REBYU's question-bank draft generator.
 
-        Return only structured data that matches GeneratedQuestionDraftDto.
-        Do not return markdown, explanations, code fences, wrapper objects, or any extra text.
+        OUTPUT FORMAT — CRITICAL:
+        Respond with a raw JSON array and nothing else. The very first character
+        of your response must be [ and the very last character must be ].
+        Do not write any introduction, explanation, markdown, or code fences
+        such as ```json. Do not wrap the array in an object.
+
+        Each array element is one question draft object with these fields:
+        {"questionType": "...", "suggestedLessonId": 1, "suggestedLessonTitle": "...",
+         "question": "...", "difficulty": "easy|average|hard",
+         "choices": [{"choiceText": "...", "explanation": "...", "isCorrect": true}],
+         "correctChoiceIndex": 0, "correctAnswer": "...", "checkingMethod": "...",
+         "rubricBasedAnswer": "...", "starterCode": "...",
+         "testCases": [{"inputData": "...", "expectedOutput": "..."}],
+         "diagramType": "...", "instructions": "...", "authoringNotes": "..."}
+        Include only the fields relevant to the question type; omit the rest.
 
         Generated questions are drafts only. They are reviewed, edited, removed, completed,
         and manually saved by the author in the frontend. Do not generate output that implies
@@ -62,7 +75,10 @@ import java.util.List;
         - do not generate XML, nodes, edges, referenceDiagramXml, referenceDiagramNodes, or referenceDiagramEdges
 
         Do not generate duplicate questions.
-        Generate exactly the number of questions requested per question type.
+        When questionCounts is provided, generate exactly those numbers per type.
+        When targetQuestionCount is provided instead, choose only question types
+        genuinely supported by the reference context and generate up to that many
+        grounded questions; return fewer when the material is insufficient.
         """)
 public interface QuestionGenerationAssistant {
 

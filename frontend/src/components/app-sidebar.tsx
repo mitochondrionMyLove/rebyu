@@ -23,6 +23,7 @@ import {
   UsersIcon,
   ChartNoAxesCombinedIcon,
   LayoutDashboardIcon,
+  HandshakeIcon,
 } from "lucide-react"
 
 const data = {
@@ -65,6 +66,11 @@ const data = {
         name: "Organizations",
         url: "/admin/organizations",
         icon: Building2Icon,
+      },
+      {
+        name: "Partnership Requests",
+        url: "/admin/partnership-requests",
+        icon: HandshakeIcon,
       },
       {
         name: "Learners",

@@ -5,6 +5,12 @@ import ChallengesLayout from "./layouts/ChallengesLayout"
 import LearnerLayout from "./layouts/learner-layout.jsx"
 import EnterpriseLayout from "./layouts/enterprise-layout.jsx"
 import { getDemoRoleHome } from "./lib/demo-role"
+import { roleHomePath, useAuth } from "./context/auth-context.jsx"
+import LoginPage from "./pages/auth/login-page.jsx"
+import RegisterPage from "./pages/auth/register-page.jsx"
+import VerifyEmailPage from "./pages/auth/verify-email-page.jsx"
+import ForgotPasswordPage from "./pages/auth/forgot-password-page.jsx"
+import SetNewPasswordPage from "@/pages/auth/set-new-password-page.jsx"
 
 import Certifications from "./pages/admin/Certifications"
 import Challenges from "./pages/admin/Challenges"
@@ -14,6 +20,8 @@ import Learners from "./pages/admin/Learners"
 import Organizations from "./pages/admin/Organizations"
 import ViewCertificationAdmin from "./pages/admin/ViewCertificationAdmin"
 import AdminDashboard from "./pages/admin/AdminDashboard"
+import PartnershipRequests from "./pages/admin/PartnershipRequests"
+import AcceptEnterpriseInvitationPage from "./pages/admin/AcceptEnterpriseInvitationPage"
 
 import LandingPage from "./pages/public/LandingPage"
 import CreateLessons from "./pages/admin/CreateLessons"
@@ -39,10 +47,19 @@ import EnterpriseBillingPage from "./pages/enterprise/enterprise-billing-page.js
 import EnterpriseFilesPage from "./pages/enterprise/enterprise-files-page.jsx"
 import EnterpriseOrganizationPage from "./pages/enterprise/enterprise-organization-page.jsx"
 import EnterpriseSettingsPage from "./pages/enterprise/enterprise-settings-page.jsx"
+import EnterpriseRequestAccessPage from "./pages/public/enterprise-request-access-page.jsx"
 
-// Preview-mode entry: "/" always lands on the selected demo role's dashboard.
+
 function RoleHomeRedirect() {
-  return <Navigate to={getDemoRoleHome()} replace />
+  const { user, status } = useAuth()
+  if (status === "loading") return null
+  if (status === "authenticated") {
+    return <Navigate to={roleHomePath(user?.role)} replace />
+  }
+  if (import.meta.env.DEV) {
+    return <Navigate to={getDemoRoleHome()} replace />
+  }
+  return <Navigate to="/login" replace />
 }
 
 export function App() {
@@ -50,6 +67,21 @@ export function App() {
     <Routes>
       <Route path="/" element={<RoleHomeRedirect />} />
       <Route path="/welcome" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/set-new-password" element={<SetNewPasswordPage />} />
+      {/* Public: organization representatives request Enterprise access with
+          no account (Transaction 1). */}
+      <Route
+        path="/enterprise/request-access"
+        element={<EnterpriseRequestAccessPage />}
+      />
+        <Route
+            path="/invitations/accept"
+            element={<AcceptEnterpriseInvitationPage />}
+        />
 
       <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
         <Route path="/admin" element={<DashboardLayout />}>
@@ -58,6 +90,7 @@ export function App() {
           <Route path="challenges" element={<Challenges />} />
           <Route path="question-bank" element={<QuestionBank />} />
           <Route path="organizations" element={<Organizations />} />
+          <Route path="partnership-requests" element={<PartnershipRequests />} />
           <Route path="learners" element={<Learners />} />
           <Route path="analytics" element={<Analytics />} />
           <Route

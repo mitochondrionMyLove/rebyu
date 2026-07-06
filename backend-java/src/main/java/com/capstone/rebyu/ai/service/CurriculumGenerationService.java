@@ -2,7 +2,9 @@ package com.capstone.rebyu.ai.service;
 
 import com.capstone.rebyu.ai.assistant.CurriculumPlanningAssistant;
 import com.capstone.rebyu.ai.assistant.LessonGenerationAssistant;
-import com.capstone.rebyu.ai.dto.AILessonStructureDTO;
+import com.capstone.rebyu.ai.collector.LessonDraftCollector;
+import com.capstone.rebyu.ai.dto.GeneratedLessonSectionDraftDto;
+import com.capstone.rebyu.ai.dto.GeneratedLessonToolDraftDto;
 import com.capstone.rebyu.ai.dto.CurriculumLessonDTO;
 import com.capstone.rebyu.ai.dto.CurriculumMajorCategoryDTO;
 import com.capstone.rebyu.ai.dto.CurriculumMiddleCategoryDTO;
@@ -64,6 +66,7 @@ public class CurriculumGenerationService {
     private final LessonEmbeddingService lessonEmbeddingService;
     private final AiUploadValidator aiUploadValidator;
     private final LessonContentValidator lessonContentValidator;
+    private final LessonDraftCollector lessonDraftCollector;
 
     @Autowired @Lazy
     private CurriculumGenerationService self;
@@ -81,7 +84,8 @@ public class CurriculumGenerationService {
             ObjectMapper objectMapper,
             LessonEmbeddingService lessonEmbeddingService,
             AiUploadValidator aiUploadValidator,
-            LessonContentValidator lessonContentValidator
+            LessonContentValidator lessonContentValidator,
+            LessonDraftCollector lessonDraftCollector
     ) {
         this.certificationRepository = certificationRepository;
         this.majorCategoryRepository = majorCategoryRepository;
@@ -96,6 +100,7 @@ public class CurriculumGenerationService {
         this.lessonEmbeddingService = lessonEmbeddingService;
         this.aiUploadValidator = aiUploadValidator;
         this.lessonContentValidator = lessonContentValidator;
+        this.lessonDraftCollector = lessonDraftCollector;
     }
 
 
@@ -436,27 +441,43 @@ public class CurriculumGenerationService {
         }
         String requestJson = objectMapper.writeValueAsString(req);
 
-        InvalidAiResponseException lastError = null;
-
         for (int attempt = 1; attempt <= 2; attempt++) {
-            AILessonStructureDTO structure =
-                    lessonGenerationAssistant.generateLesson(requestJson, referenceContext);
-            AILessonStructureDTO clean = lessonContentValidator.ensureRequiredTools(
-                    lessonContentValidator.sanitize(structure)
-            );
+            lessonDraftCollector.clear();
+            lessonGenerationAssistant.generateLessonDraft(requestJson, referenceContext);
 
-            try {
-                lessonContentValidator.validate(clean);
-                return objectMapper.writeValueAsString(clean.getSections());
-            } catch (InvalidAiResponseException e) {
-                lastError = e;
-                log.warn("Attempt {}/2 for lesson '{}' rejected: {} — returned shape: {}",
-                        attempt, ctx.lessonTitle(), e.getMessage(),
-                        lessonContentValidator.describeStructure(structure));
+            List<GeneratedLessonSectionDraftDto> sections = lessonDraftCollector.getSections();
+            if (!sections.isEmpty()) {
+                return objectMapper.writeValueAsString(toPersistedSections(sections));
             }
+            log.warn("Attempt {}/2 for lesson '{}' produced no draft sections",
+                    attempt, ctx.lessonTitle());
         }
 
-        throw lastError;
+        throw new InvalidAiResponseException(
+                "Lesson draft generation produced no sections for lesson '" + ctx.lessonTitle() + "'");
+    }
+
+    // Draft tools already passed deterministic validation inside the tool
+    // layer; persist them in the exact shape the lesson editor saves.
+    // Authoring notes are draft-only and are intentionally dropped here.
+    private List<Map<String, Object>> toPersistedSections(List<GeneratedLessonSectionDraftDto> sections) {
+        List<Map<String, Object>> persisted = new ArrayList<>();
+        for (GeneratedLessonSectionDraftDto section : sections) {
+            List<Map<String, Object>> content = new ArrayList<>();
+            for (GeneratedLessonToolDraftDto tool : section.content()) {
+                Map<String, Object> toolMap = new LinkedHashMap<>();
+                toolMap.put("id", tool.id().toString());
+                toolMap.put("type", tool.type());
+                toolMap.put("data", tool.data());
+                content.add(toolMap);
+            }
+            Map<String, Object> sectionMap = new LinkedHashMap<>();
+            sectionMap.put("id", section.id().toString());
+            sectionMap.put("sectionName", section.sectionName());
+            sectionMap.put("content", content);
+            persisted.add(sectionMap);
+        }
+        return persisted;
     }
 
     private static String truncate(String text, int maxChars) {

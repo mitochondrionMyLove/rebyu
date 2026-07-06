@@ -33,6 +33,7 @@ import {
 } from "@/components/learner/learner-ui.jsx"
 import { getLearnerPortalData } from "@/services/learnerAnalyticsService.js"
 import DemoRoleSwitcher from "@/components/development/demo-role-switcher"
+import { useAuth } from "@/context/auth-context.jsx"
 
 function getInitials(name = "", email = "") {
   const source = name || email || "Learner"
@@ -46,6 +47,7 @@ function getInitials(name = "", email = "") {
 
 export default function LearnerLayout() {
   const navigate = useNavigate()
+  const { logout: authLogout } = useAuth()
   const [searchValue, setSearchValue] = useState("")
 
   const query = useQuery({
@@ -67,15 +69,12 @@ export default function LearnerLayout() {
     [query.data, query.refetch, searchValue]
   )
 
-  const logout = () => {
-    localStorage.removeItem("role")
-    localStorage.removeItem("learnerId")
+  const logout = async () => {
+    await authLogout()
     localStorage.removeItem("learner_id")
     localStorage.removeItem("userId")
     localStorage.removeItem("user_id")
-    localStorage.removeItem("name")
-    localStorage.removeItem("email")
-    navigate("/", { replace: true })
+    navigate("/login", { replace: true })
   }
 
   return (

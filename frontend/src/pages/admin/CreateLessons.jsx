@@ -65,6 +65,10 @@ import {
   getLessonComponent,
   setLessonComponent,
 } from "../../services/lessonService.js"
+import {
+  getGeneratedLessonWarnings,
+  mapGeneratedLessonDraftsToSections,
+} from "../../utils/generated-lesson-draft-mapper.js"
 import { saveFile as MediaFileUpload } from "../../services/fileService.js"
 
 function getBackendErrorMessage(error, fallbackMessage) {
@@ -868,14 +872,22 @@ function CreateLessons() {
           selectedDocuments
       )
 
-      const generatedSections = parseLessonComponent(response)
+      const generatedSections = mapGeneratedLessonDraftsToSections(response)
+      const generationWarnings = getGeneratedLessonWarnings(response)
 
       setSections(generatedSections)
       setSectionIndex(0)
       setIsLessonFileGeneratorOpen(false)
 
-      toast.success("Lesson generated", {
-        description: `${lessonName} content was generated and saved.`,
+      toast.success("Lesson draft ready", {
+        description:
+            "Review the generated sections and add any required images or videos before saving.",
+      })
+
+      generationWarnings.forEach((warning) => {
+        toast.warning("Generation warning", {
+          description: warning,
+        })
       })
     } finally {
       setIsGeneratingLesson(false)

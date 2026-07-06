@@ -1,9 +1,20 @@
 package com.capstone.rebyu.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -16,38 +27,38 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> {})
                 .authorizeHttpRequests(authorize -> authorize
-
-                        .requestMatchers("/api/certifications/**").permitAll()
-                        .requestMatchers("/api/files/**").permitAll()
-                        .requestMatchers("/api/lessons/**").permitAll()
-
-
-                        .requestMatchers("/api/questions/**").permitAll()
-                        .requestMatchers("/api/choices/**").permitAll()
-                        .requestMatchers("/api/text-question-configs/**").permitAll()
-                        .requestMatchers("/api/diagram-question-configs/**").permitAll()
-                        .requestMatchers("/api/programming-question-configs/**").permitAll()
-                        .requestMatchers("/api/programming-test-cases/**").permitAll()
-
-
-                        .requestMatchers("/api/exams/**").permitAll()
-                        .requestMatchers("/api/exam-types/**").permitAll()
-                        .requestMatchers("/api/exam-questions/**").permitAll()
-                        .requestMatchers("/api/exam-choices/**").permitAll()
-                        .requestMatchers("/api/exam-results/**").permitAll()
-
-
-                        .requestMatchers("/api/learner-exam-details/**").permitAll()
-                        .requestMatchers("/api/learner-mcq-answers/**").permitAll()
-                        .requestMatchers("/api/learner-text-answers/**").permitAll()
-                        .requestMatchers("/api/learner-diagram-answers/**").permitAll()
-                        .requestMatchers("/api/learner-programming-answers/**").permitAll()
-
-
-                        .requestMatchers("/api/ai/**").permitAll()
-
-                        .anyRequest().authenticated()
+                        // Current-user synchronization always requires a
+                        // validated Cognito access token.
+                        .requestMatchers("/api/auth/**").authenticated()
+                        // Existing application routes keep their current
+                        // public behavior; tokens are validated when present.
+                        .anyRequest().permitAll()
                 )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
                 .build();
+    }
+
+    // Decoder bound to the Cognito User Pool: validates signature against the
+    // pool JWKS, the issuer, expiry, and that the token is an access token.
+    @Bean
+    public JwtDecoder jwtDecoder(
+            @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri
+    ) {
+        NimbusJwtDecoder decoder = (NimbusJwtDecoder) JwtDecoders.fromIssuerLocation(issuerUri);
+
+        OAuth2TokenValidator<Jwt> tokenUseIsAccess = jwt -> {
+            Object tokenUse = jwt.getClaims().get("token_use");
+            if ("access".equals(tokenUse)) {
+                return OAuth2TokenValidatorResult.success();
+            }
+            return OAuth2TokenValidatorResult.failure(
+                    new OAuth2Error("invalid_token", "Not a Cognito access token", null));
+        };
+
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuerUri),
+                tokenUseIsAccess
+        ));
+        return decoder;
     }
 }

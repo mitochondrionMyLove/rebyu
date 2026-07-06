@@ -40,25 +40,47 @@ export async function getQuestions() {
     })
 }
 
+/**
+ * Generates editable question drafts (never saved automatically).
+ * Returns { questions, analysis, warnings }.
+ *
+ * Options:
+ * - sourceMode: CERTIFICATION_KNOWLEDGE | UPLOADED_FILES | COMBINED
+ *   (omitted → the backend resolves a sensible default)
+ * - questionCounts: legacy explicit per-type counts; when omitted the AI
+ *   chooses suitable question types from the grounded source material.
+ * - targetQuestionCount: soft target when no explicit counts are given.
+ */
 export async function generateQuestionsFromFiles(
     certificationId,
     files,
-    questionCounts
+    questionCounts,
+    options = {}
 ) {
     const formData = new FormData()
-    const countsToSend =
-        questionCounts && typeof questionCounts === "object"
-            ? questionCounts
-            : DEFAULT_GENERATION_COUNTS
 
     formData.append("certificationId", String(certificationId))
 
-    formData.append(
-        "questionCountsJson",
-        JSON.stringify(countsToSend)
-    )
+    if (questionCounts && typeof questionCounts === "object") {
+        formData.append("questionCountsJson", JSON.stringify(questionCounts))
+    }
+    if (options.sourceMode) {
+        formData.append("sourceMode", options.sourceMode)
+    }
+    if (options.targetQuestionCount) {
+        formData.append(
+            "targetQuestionCount",
+            String(options.targetQuestionCount)
+        )
+    }
+    if (options.additionalInstructions) {
+        formData.append(
+            "additionalInstructions",
+            options.additionalInstructions
+        )
+    }
 
-    files.forEach((file) => {
+    ;(files ?? []).forEach((file) => {
         formData.append("files", file)
     })
 
@@ -66,6 +88,24 @@ export async function generateQuestionsFromFiles(
         method: "POST",
         data: formData,
     })
+}
+
+export function generateQuestionDrafts({
+    certificationId,
+    sourceMode,
+    files = [],
+    targetQuestionCount,
+    additionalInstructions,
+}) {
+    return generateQuestionsFromFiles(certificationId, files, null, {
+        sourceMode,
+        targetQuestionCount,
+        additionalInstructions,
+    })
+}
+
+export function getCertificationKnowledgeStatus(certificationId) {
+    return base(`certifications/${certificationId}/knowledge-status`)
 }
 
 export async function saveChoices(choices) {

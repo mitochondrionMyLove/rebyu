@@ -25,6 +25,62 @@ public class GeneratedQuestionDraftValidator {
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
+    /**
+     * Lenient validation used when the AI chooses question types itself:
+     * invalid or duplicate drafts are skipped with a warning instead of
+     * failing the whole batch. Throws only when nothing valid remains.
+     */
+    public List<GeneratedQuestionDraftDto> validateLenient(
+            List<GeneratedQuestionDraftDto> drafts,
+            Map<Long, QuestionGenerationService.LessonRef> availableLessons,
+            List<String> warnings
+    ) {
+        if (drafts == null || drafts.isEmpty()) {
+            throw new InvalidAiGeneratedQuestionException("The AI returned no question drafts.");
+        }
+        if (availableLessons == null || availableLessons.isEmpty()) {
+            throw new InvalidAiGeneratedQuestionException("No lessons are available for draft validation.");
+        }
+
+        List<GeneratedQuestionDraftDto> valid = new java.util.ArrayList<>();
+        Set<String> normalizedQuestions = new HashSet<>();
+
+        for (int index = 0; index < drafts.size(); index++) {
+            GeneratedQuestionDraftDto draft = drafts.get(index);
+            try {
+                if (draft == null) {
+                    throw new InvalidAiGeneratedQuestionException("Draft was null.");
+                }
+                GeneratedQuestionType questionType = requireQuestionType(draft.questionType(), index);
+                String questionText = requireText(draft.question(), "question", index);
+                String normalizedQuestion = normalizeQuestionText(questionText);
+                if (!normalizedQuestions.add(normalizedQuestion)) {
+                    warnings.add("Skipped a duplicate generated question.");
+                    continue;
+                }
+                requireDifficulty(draft.difficulty(), index);
+                Long suggestedLessonId = requireLessonId(draft.suggestedLessonId(), index);
+                QuestionGenerationService.LessonRef lessonRef = availableLessons.get(suggestedLessonId);
+                if (lessonRef == null
+                        || !Objects.equals(lessonRef.title(), draft.suggestedLessonTitle())) {
+                    warnings.add("Skipped a question mapped to a lesson outside this certification.");
+                    continue;
+                }
+                validatePerType(draft, questionType, index);
+                valid.add(draft);
+            } catch (InvalidAiGeneratedQuestionException e) {
+                log.warn("Skipping invalid generated draft at index {}: {}", index, e.getMessage());
+                warnings.add("Skipped one invalid generated question draft.");
+            }
+        }
+
+        if (valid.isEmpty()) {
+            throw new InvalidAiGeneratedQuestionException(
+                    "The AI did not return any valid question drafts. Please try again.");
+        }
+        return valid;
+    }
+
     public void validate(
             List<GeneratedQuestionDraftDto> drafts,
             Map<String, Integer> requestedCounts,

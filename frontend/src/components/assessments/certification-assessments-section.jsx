@@ -18,9 +18,9 @@ import { Button } from "@/components/ui/button"
 import {
   getAssessmentTypeLabel,
   getExamQuestions,
-  getExamResults,
   getExamTypes,
   getExams,
+  getLearnerAttempts,
 } from "@/services/assessmentService.js"
 
 const TYPE_COPY = {
@@ -67,15 +67,18 @@ export default function CertificationAssessmentsSection({
     queryKey: ["exam-questions"],
     queryFn: getExamQuestions,
   })
-  const resultsQuery = useQuery({
-    queryKey: ["exam-results"],
-    queryFn: getExamResults,
+  const attemptsQuery = useQuery({
+    queryKey: ["learner-attempts", learnerId],
+    queryFn: () => getLearnerAttempts(learnerId),
+    enabled: learnerId != null,
     retry: 1,
   })
 
   const rows = useMemo(() => {
     const exams = (Array.isArray(examsQuery.data) ? examsQuery.data : []).filter(
-      (exam) => String(exam.certificationId) === String(certificationId)
+      (exam) =>
+        String(exam.certificationId) === String(certificationId) &&
+        exam.status === "PUBLISHED"
     )
     const typeById = new Map(
       (Array.isArray(examTypesQuery.data) ? examTypesQuery.data : []).map(
@@ -85,27 +88,27 @@ export default function CertificationAssessmentsSection({
     const examQuestions = Array.isArray(examQuestionsQuery.data)
       ? examQuestionsQuery.data
       : []
-    const results = Array.isArray(resultsQuery.data) ? resultsQuery.data : []
+    const allAttempts = Array.isArray(attemptsQuery.data) ? attemptsQuery.data : []
 
     return exams.map((exam) => {
       const typeText = typeById.get(exam.examTypeId)
       const questionCount = examQuestions.filter(
         (link) => link.examId === exam.examId
       ).length
-      const attempts = results
+      const attempts = allAttempts
         .filter(
-          (result) =>
-            result.examId === exam.examId &&
-            (learnerId == null || Number(result.learnerId) === Number(learnerId))
+          (attempt) =>
+            attempt.assessmentId === exam.examId &&
+            attempt.status === "SUBMITTED"
         )
-        .sort((a, b) => (b.attemptNo ?? 0) - (a.attemptNo ?? 0))
+        .sort((a, b) => (b.attemptNumber ?? 0) - (a.attemptNumber ?? 0))
       return { exam, typeText, questionCount, attempts }
     })
   }, [
     examsQuery.data,
     examTypesQuery.data,
     examQuestionsQuery.data,
-    resultsQuery.data,
+    attemptsQuery.data,
     certificationId,
     learnerId,
   ])
@@ -195,7 +198,7 @@ export default function CertificationAssessmentsSection({
                 {lastAttempt && learnerId != null ? (
                   <Button asChild size="sm" variant="outline">
                     <Link
-                      to={`/learner/results/${learnerId}-${exam.examId}-${lastAttempt.attemptNo}`}
+                      to={`/learner/results/${lastAttempt.assessmentAttemptId}`}
                     >
                       Review Result
                     </Link>

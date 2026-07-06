@@ -37,6 +37,14 @@ export function deleteExam(examId) {
   return base(`exams/${examId}`, { method: "DELETE" })
 }
 
+export function publishExam(examId) {
+  return base(`exams/${examId}/publish`, { method: "POST" })
+}
+
+export function archiveExam(examId) {
+  return base(`exams/${examId}/archive`, { method: "POST" })
+}
+
 // Exam questions (join between exam and question bank)
 export function getExamQuestions() {
   return base("exam-questions")
@@ -105,6 +113,69 @@ export function createDiagramAnswer(answer) {
 
 export function createProgrammingAnswer(answer) {
   return base("learner-programming-answers", { method: "POST", data: answer })
+}
+
+// ---------------------------------------------------------------------------
+// Learner-safe attempt transaction API (server-side snapshots and scoring)
+// ---------------------------------------------------------------------------
+
+export function getLearnerAssessment(assessmentId, learnerId) {
+  return base(`learner/assessments/${assessmentId}?learnerId=${learnerId}`)
+}
+
+export function startAssessmentAttempt(assessmentId, learnerId, idempotencyKey) {
+  return base(`learner/assessments/${assessmentId}/attempts`, {
+    method: "POST",
+    data: { learnerId, idempotencyKey },
+  })
+}
+
+export function autosaveAttemptAnswers(attemptId, learnerId, answers) {
+  return base(`learner/assessment-attempts/${attemptId}/answers`, {
+    method: "PUT",
+    data: { learnerId, answers },
+  })
+}
+
+export function submitAssessmentAttempt(attemptId, learnerId, answers) {
+  return base(`learner/assessment-attempts/${attemptId}/submit`, {
+    method: "POST",
+    data: { learnerId, answers },
+  })
+}
+
+export function getAttemptResult(attemptId, learnerId) {
+  return base(`learner/assessment-attempts/${attemptId}/result?learnerId=${learnerId}`)
+}
+
+export function getLearnerAttempts(learnerId) {
+  return base(`learner/assessment-attempts?learnerId=${learnerId}`)
+}
+
+// ---------------------------------------------------------------------------
+// Enrollment / purchase transaction API
+// ---------------------------------------------------------------------------
+
+export function purchaseCertification(certificationId, learnerId, idempotencyKey) {
+  return base(`learner/certifications/${certificationId}/purchase`, {
+    method: "POST",
+    data: { learnerId, idempotencyKey },
+  })
+}
+
+export function confirmPurchase(transactionId, learnerId, paymentReference) {
+  return base(`learner/purchases/${transactionId}/confirm`, {
+    method: "POST",
+    data: { learnerId, paymentReference },
+  })
+}
+
+export function getLearnerEnrollments(learnerId) {
+  return base(`learner/enrollments?learnerId=${learnerId}`)
+}
+
+export function getCertificationKnowledgeStatus(certificationId) {
+  return base(`certifications/${certificationId}/knowledge-status`)
 }
 
 // Well-known assessment type labels stored in exam_types.exam_type_text.

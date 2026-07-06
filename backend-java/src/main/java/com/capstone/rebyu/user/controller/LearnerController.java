@@ -30,6 +30,11 @@ public class LearnerController {
     public LearnerDto create(@Valid @RequestBody LearnerDto dto) {
         return learnerService.create(dto);
     }
+    @PostMapping("accept-invitation")
+    @ResponseStatus(HttpStatus.OK)
+    public void acceptInvitation(@Valid @RequestBody String token) throws Exception {
+        learnerService.acceptInvitation(token);
+    }
 
     @PutMapping("/{id}")
     public LearnerDto update(@PathVariable Long id, @Valid @RequestBody LearnerDto dto) {

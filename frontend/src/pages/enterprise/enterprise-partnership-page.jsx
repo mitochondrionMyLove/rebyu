@@ -39,15 +39,10 @@ import {
 } from "@/components/enterprise/enterprise-ui.jsx"
 import { useEnterpriseData } from "@/hooks/use-enterprise-data.js"
 import {
-  createPartnershipRequest,
-  createPartnershipRequestItem,
   getPartnershipRequestItems,
   getPartnershipRequests,
+  submitPartnershipRequestTransaction,
 } from "@/services/enterpriseService.js"
-
-function toLocalDateTime(date) {
-  return date.toISOString().slice(0, 19)
-}
 
 function toLocalDate(date) {
   return date.toISOString().slice(0, 10)
@@ -60,38 +55,44 @@ function RequestPartnershipDialog({ open, onOpenChange, enterprise, data }) {
   ])
   const [error, setError] = useState("")
 
+  // One idempotency key per open dialog: a double-click cannot create two
+  // requests, and the whole request+items submission is atomic on the server.
+  const [idempotencyKey] = useState(() => crypto.randomUUID())
+
   const submitMutation = useMutation({
-    mutationFn: async () => {
-      const request = await createPartnershipRequest({
-        enterpriseId: enterprise.enterpriseId,
-        submittedAt: toLocalDateTime(new Date()),
-        status: "PENDING",
-      })
+    mutationFn: () => {
       const start = new Date()
-      await Promise.all(
-        items.map((item) => {
+      return submitPartnershipRequestTransaction({
+        enterpriseId: enterprise.enterpriseId,
+        idempotencyKey,
+        items: items.map((item) => {
           const end = new Date(start)
           end.setMonth(end.getMonth() + Number(item.months))
-          return createPartnershipRequestItem({
-            requestId: request.requestId,
+          return {
             certificationId: Number(item.certificationId),
             slots: Number(item.slots),
             requestedAccessStartDate: toLocalDate(start),
             requestedAccessEndDate: toLocalDate(end),
-          })
-        })
-      )
+          }
+        }),
+      })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["partnership-requests"] })
       queryClient.invalidateQueries({ queryKey: ["partnership-request-items"] })
+      queryClient.invalidateQueries({
+        queryKey: ["partnership-request-transactions"],
+      })
       toast.success("Partnership request submitted.")
       setItems([{ certificationId: "", slots: 10, months: 12 }])
       setError("")
       onOpenChange(false)
     },
-    onError: () => {
-      toast.error("Unable to submit the partnership request. Please try again.")
+    onError: (mutationError) => {
+      toast.error(
+        mutationError?.response?.data?.message ??
+          "Unable to submit the partnership request. Please try again."
+      )
     },
   })
 

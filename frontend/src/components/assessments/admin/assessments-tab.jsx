@@ -34,12 +34,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   ASSESSMENT_TYPES,
+  archiveExam,
   deleteExam,
   deleteExamQuestion,
   getAssessmentTypeLabel,
   getExamQuestions,
   getExamTypes,
   getExams,
+  publishExam,
 } from "@/services/assessmentService.js"
 import { getQuestions } from "@/services/questionService.js"
 import AssessmentDialog from "./assessment-dialog.jsx"
@@ -137,6 +139,27 @@ export default function AssessmentsTab({
       onCreateRequestHandled?.()
     }
   }, [createRequest, onCreateRequestHandled])
+
+  const publishMutation = useMutation({
+    mutationFn: ({ exam, publish }) =>
+      publish ? publishExam(exam.examId) : archiveExam(exam.examId),
+    onSuccess: (_, { publish }) => {
+      queryClient.invalidateQueries({ queryKey: ["exams"] })
+      toast.success(
+        publish
+          ? "Assessment published successfully."
+          : "Assessment unpublished."
+      )
+    },
+    onError: (error, { publish }) => {
+      toast.error(
+        error?.response?.data?.message ??
+          (publish
+            ? "The assessment could not be published."
+            : "The assessment could not be unpublished.")
+      )
+    },
+  })
 
   const deleteMutation = useMutation({
     mutationFn: async (exam) => {
@@ -277,6 +300,7 @@ export default function AssessmentsTab({
               <TableRow>
                 <TableHead>Title</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Questions</TableHead>
                 <TableHead className="text-right">Duration</TableHead>
                 <TableHead className="text-right">Passing</TableHead>
@@ -294,6 +318,20 @@ export default function AssessmentsTab({
                       {getAssessmentTypeLabel(typeText)}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        exam.status === "PUBLISHED"
+                          ? "default"
+                          : exam.status === "ARCHIVED"
+                            ? "outline"
+                            : "secondary"
+                      }
+                      className="capitalize"
+                    >
+                      {(exam.status ?? "DRAFT").toLowerCase()}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {questionCount}
                   </TableCell>
@@ -307,6 +345,31 @@ export default function AssessmentsTab({
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
+                      {exam.status === "PUBLISHED" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={publishMutation.isPending}
+                          onClick={() =>
+                            publishMutation.mutate({ exam, publish: false })
+                          }
+                        >
+                          Unpublish
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={
+                            publishMutation.isPending || questionCount === 0
+                          }
+                          onClick={() =>
+                            publishMutation.mutate({ exam, publish: true })
+                          }
+                        >
+                          Publish
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

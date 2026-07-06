@@ -63,6 +63,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), null));
     }
 
+    @ExceptionHandler(BusinessRuleException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleException ex) {
+        log.warn("Business rule violation: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), null));
+    }
+
     @ExceptionHandler(InvalidAiResponseException.class)
     public ResponseEntity<ErrorResponse> handleInvalidAiResponse(InvalidAiResponseException ex) {
         log.warn("Invalid AI response: {}", ex.getMessage());

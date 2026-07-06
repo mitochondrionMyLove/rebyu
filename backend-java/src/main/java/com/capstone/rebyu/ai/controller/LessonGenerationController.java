@@ -1,10 +1,13 @@
 package com.capstone.rebyu.ai.controller;
 
+import com.capstone.rebyu.ai.dto.LessonGenerationDraftResponseDto;
 import com.capstone.rebyu.ai.service.LessonGenerationService;
-import com.capstone.rebyu.certification.dto.LessonComponentResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -17,15 +20,12 @@ public class LessonGenerationController {
 
     private final LessonGenerationService lessonGenerationService;
 
-
-
-
     @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public LessonComponentResponseDto generate(
+    public LessonGenerationDraftResponseDto generate(
             @RequestParam("lessonId") Long lessonId,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "additionalInstructions", required = false) String additionalInstructions
     ) throws IOException {
-        return lessonGenerationService.generateAndSave(lessonId, files, additionalInstructions);
+        return lessonGenerationService.generateDrafts(lessonId, files, additionalInstructions);
     }
 }

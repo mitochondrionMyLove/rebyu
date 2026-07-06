@@ -3,11 +3,14 @@ import { useNavigate, useParams } from "react-router-dom"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   ArrowLeftIcon,
+  CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CloudOffIcon,
   ClockIcon,
   FlagIcon,
   ListIcon,
+  Loader2Icon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -25,10 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@/components/ui/radio-group"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Sheet,
@@ -46,32 +46,13 @@ import QuestionNavigator from "@/components/assessments/attempt/question-navigat
 import SubQuestionTabs from "@/components/assessments/attempt/sub-question-tabs.jsx"
 import { getFileViewUrl } from "@/services/fileService.js"
 import { getCurrentLearnerIdentity } from "@/services/learnerService.js"
-import { getQuestions } from "@/services/questionService.js"
-import { extractDiagramData } from "@/utils/diagram-graph.js"
 import {
-  createDiagramAnswer,
-  createExamResult,
-  createLearnerExamDetail,
-  createMcqAnswer,
-  createProgrammingAnswer,
-  createTextAnswer,
+  autosaveAttemptAnswers,
   getAssessmentTypeLabel,
-  getDiagramQuestionConfig,
-  getExamById,
-  getExamQuestions,
-  getExamResults,
-  getExamTypes,
-  getProgrammingQuestionConfig,
+  startAssessmentAttempt,
+  submitAssessmentAttempt,
 } from "@/services/assessmentService.js"
 import { base } from "@/services/base"
-
-function isChoiceCorrect(choice) {
-  return Boolean(choice?.correct ?? choice?.isCorrect)
-}
-
-function toLocalDateTime(date) {
-  return date.toISOString().slice(0, 19)
-}
 
 function formatClock(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -79,28 +60,65 @@ function formatClock(totalSeconds) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 }
 
-function isAnswered(question, answer) {
-  if (!answer) return false
-  switch (question.questionType) {
-    case "MULTIPLE_CHOICE":
-      return answer.choiceId != null
-    case "SHORT_ANSWER":
-    case "DESCRIPTIVE":
-      return Boolean(answer.answerText?.trim())
-    case "CRITICAL_THINKING":
-      return (
-        Boolean(answer.code?.trim()) ||
-        Boolean(answer.diagramXml?.trim()) ||
-        Object.values(answer.subAnswers ?? {}).some((text) => text?.trim())
-      )
-    default:
-      return Boolean(answer.answerText?.trim())
+// Serializes one local answer into the backend AttemptAnswerDraftDto shape.
+function toDraftDto(attemptQuestionId, answer) {
+  const subAnswers = answer.subAnswers ?? {}
+  const hasSubs = Object.values(subAnswers).some((text) => text?.trim())
+  return {
+    attemptQuestionId,
+    learnerAnswer: hasSubs
+      ? JSON.stringify(subAnswers)
+      : (answer.learnerAnswer ?? null),
+    selectedChoiceId: answer.selectedChoiceId ?? null,
+    submittedCode: answer.submittedCode ?? null,
+    programmingLanguage: answer.programmingLanguage ?? null,
+    diagramSubmissionData: answer.diagramSubmissionData ?? null,
   }
 }
 
-// ---------------------------------------------------------------------------
-// Normal question layout (MCQ / short answer / descriptive)
-// ---------------------------------------------------------------------------
+function isAnswered(question, answer) {
+  if (!answer) return false
+  if (question.questionType === "MULTIPLE_CHOICE") {
+    return answer.selectedChoiceId != null
+  }
+  if (question.questionType === "CRITICAL_THINKING") {
+    return (
+      Boolean(answer.submittedCode?.trim()) ||
+      Boolean(answer.diagramSubmissionData?.trim()) ||
+      Object.values(answer.subAnswers ?? {}).some((text) => text?.trim())
+    )
+  }
+  return Boolean(answer.learnerAnswer?.trim())
+}
+
+function SaveStatusIndicator({ status }) {
+  if (status === "saving") {
+    return (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Loader2Icon className="size-3 animate-spin" aria-hidden="true" />
+        Saving…
+      </span>
+    )
+  }
+  if (status === "saved") {
+    return (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <CheckIcon className="size-3" aria-hidden="true" />
+        Saved
+      </span>
+    )
+  }
+  if (status === "error") {
+    return (
+      <span className="flex items-center gap-1 text-xs text-destructive">
+        <CloudOffIcon className="size-3" aria-hidden="true" />
+        Unable to save draft
+      </span>
+    )
+  }
+  return null
+}
+
 function NormalQuestionPanel({ question, index, answer, onAnswer }) {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5">
@@ -108,19 +126,16 @@ function NormalQuestionPanel({ question, index, answer, onAnswer }) {
         <span className="text-sm font-semibold text-muted-foreground">
           Question {index + 1}
         </span>
-        <Badge variant="outline">{question.difficultyLevel}</Badge>
-        {question.totalPoints != null ? (
-          <Badge variant="secondary">
-            {Number(question.totalPoints)} pt(s)
-          </Badge>
+        {question.points != null ? (
+          <Badge variant="secondary">{Number(question.points)} pt(s)</Badge>
         ) : null}
       </div>
 
-      <p className="text-base leading-7">{question.questionText}</p>
+      <p className="text-base leading-7">{question.question}</p>
 
-      {question.imageKey ? (
+      {question.questionImageKey ? (
         <img
-          src={getFileViewUrl(question.imageKey)}
+          src={getFileViewUrl(question.questionImageKey)}
           alt="Question reference"
           className="max-h-80 w-auto rounded-xl border"
         />
@@ -128,8 +143,14 @@ function NormalQuestionPanel({ question, index, answer, onAnswer }) {
 
       {question.questionType === "MULTIPLE_CHOICE" ? (
         <RadioGroup
-          value={answer?.choiceId != null ? String(answer.choiceId) : ""}
-          onValueChange={(value) => onAnswer({ choiceId: Number(value) })}
+          value={
+            answer?.selectedChoiceId != null
+              ? String(answer.selectedChoiceId)
+              : ""
+          }
+          onValueChange={(value) =>
+            onAnswer({ selectedChoiceId: Number(value) })
+          }
           className="gap-2"
         >
           {(question.choices ?? []).map((choice, choiceIndex) => (
@@ -137,7 +158,7 @@ function NormalQuestionPanel({ question, index, answer, onAnswer }) {
               key={choice.choiceId ?? choiceIndex}
               className={cn(
                 "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition hover:bg-muted/40",
-                answer?.choiceId === choice.choiceId &&
+                answer?.selectedChoiceId === choice.choiceId &&
                   "border-primary bg-primary/5"
               )}
             >
@@ -169,8 +190,10 @@ function NormalQuestionPanel({ question, index, answer, onAnswer }) {
           <Label htmlFor="short-answer">Your answer</Label>
           <Input
             id="short-answer"
-            value={answer?.answerText ?? ""}
-            onChange={(event) => onAnswer({ answerText: event.target.value })}
+            value={answer?.learnerAnswer ?? ""}
+            onChange={(event) =>
+              onAnswer({ learnerAnswer: event.target.value })
+            }
             placeholder="Type your answer"
           />
         </div>
@@ -179,13 +202,15 @@ function NormalQuestionPanel({ question, index, answer, onAnswer }) {
           <Label htmlFor="descriptive-answer">Your answer</Label>
           <Textarea
             id="descriptive-answer"
-            value={answer?.answerText ?? ""}
-            onChange={(event) => onAnswer({ answerText: event.target.value })}
+            value={answer?.learnerAnswer ?? ""}
+            onChange={(event) =>
+              onAnswer({ learnerAnswer: event.target.value })
+            }
             placeholder="Write your answer..."
             className="min-h-48"
           />
           <p className="text-right text-xs text-muted-foreground">
-            {(answer?.answerText ?? "").length} characters
+            {(answer?.learnerAnswer ?? "").length} characters
           </p>
         </div>
       )}
@@ -193,51 +218,20 @@ function NormalQuestionPanel({ question, index, answer, onAnswer }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Critical thinking / diagram / programming workspace (three-panel)
-// ---------------------------------------------------------------------------
-function WorkspaceQuestionPanel({
-  question,
-  index,
-  subQuestions,
-  answer,
-  onAnswer,
-}) {
-  const programmingConfigQuery = useQuery({
-    queryKey: ["programming-config", question.questionId],
-    queryFn: () =>
-      getProgrammingQuestionConfig(question.questionId).catch(() => null),
-    staleTime: Infinity,
-  })
-  const diagramConfigQuery = useQuery({
-    queryKey: ["diagram-config", question.questionId],
-    queryFn: () =>
-      getDiagramQuestionConfig(question.questionId).catch(() => null),
-    staleTime: Infinity,
-  })
+function WorkspaceQuestionPanel({ question, index, answer, onAnswer }) {
+  const format = question.criticalThinkingType ?? "TEXT"
 
-  const programmingConfig = programmingConfigQuery.data ?? null
-  const diagramConfig = diagramConfigQuery.data ?? null
-  const loadingConfigs =
-    programmingConfigQuery.isLoading || diagramConfigQuery.isLoading
-
-  const format = programmingConfig
-    ? "CODING"
-    : diagramConfig
-      ? "DIAGRAM"
-      : "TEXT"
-
-  // Seed starter code once the config arrives, unless the learner typed already.
+  // Seed starter code once, unless the learner already typed something.
   useEffect(() => {
     if (
-      format === "CODING" &&
-      programmingConfig?.starterCode &&
-      answer?.code == null
+      format === "PROGRAMMING" &&
+      question.starterCode &&
+      answer?.submittedCode == null
     ) {
-      onAnswer({ code: programmingConfig.starterCode })
+      onAnswer({ submittedCode: question.starterCode })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, programmingConfig])
+  }, [format, question.starterCode])
 
   const problemPanel = (
     <div className="space-y-4">
@@ -245,24 +239,24 @@ function WorkspaceQuestionPanel({
         <span className="text-sm font-semibold text-muted-foreground">
           Item {index + 1}
         </span>
-        <Badge variant="outline">{question.difficultyLevel}</Badge>
-        {question.totalPoints != null ? (
-          <Badge variant="secondary">
-            {Number(question.totalPoints)} pt(s)
-          </Badge>
+        {question.points != null ? (
+          <Badge variant="secondary">{Number(question.points)} pt(s)</Badge>
         ) : null}
       </div>
       <p className="whitespace-pre-wrap text-sm leading-7">
-        {question.questionText}
+        {question.question}
       </p>
-      {diagramConfig?.instructions ? (
+      {question.instructions ? (
         <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-          {diagramConfig.instructions}
+          {question.instructions}
         </p>
       ) : null}
-      {question.imageKey ? (
+      {question.diagramType ? (
+        <Badge variant="outline">{question.diagramType}</Badge>
+      ) : null}
+      {question.questionImageKey ? (
         <img
-          src={getFileViewUrl(question.imageKey)}
+          src={getFileViewUrl(question.questionImageKey)}
           alt="Problem reference"
           className="w-full rounded-xl border"
         />
@@ -270,63 +264,66 @@ function WorkspaceQuestionPanel({
     </div>
   )
 
-  const workspace = loadingConfigs ? (
-    <div className="space-y-3 p-4">
-      <Skeleton className="h-8 w-1/3" />
-      <Skeleton className="h-64 w-full" />
-    </div>
-  ) : format === "CODING" ? (
-    <CodeMirrorProgrammingWorkspace
-      value={answer?.code ?? programmingConfig?.starterCode ?? ""}
-      language={answer?.language ?? "Java"}
-      starterCode={programmingConfig?.starterCode ?? ""}
-      onChange={(code) => onAnswer({ code })}
-      onLanguageChange={(language) => onAnswer({ language })}
-    />
-  ) : format === "DIAGRAM" ? (
-    <div className="h-full min-h-[420px] overflow-hidden rounded-xl border">
-      <DiagramArea
-        initialXml={answer?.diagramXml}
-        onChange={(diagramXml) => onAnswer({ diagramXml })}
+  const subQuestionTabs =
+    (question.subQuestions ?? []).length > 0 ? (
+      <SubQuestionTabs
+        subQuestions={question.subQuestions.map((sub) => ({
+          questionId: sub.subQuestionId,
+          questionText: sub.questionText,
+        }))}
+        answers={answer?.subAnswers ?? {}}
+        onAnswerChange={(subQuestionId, text) =>
+          onAnswer({
+            subAnswers: { ...(answer?.subAnswers ?? {}), [subQuestionId]: text },
+          })
+        }
       />
-    </div>
-  ) : (
-    <SubQuestionTabs
-      subQuestions={
-        subQuestions.length > 0
-          ? subQuestions
-          : [question] /* fall back to a single structured response */
-      }
-      answers={answer?.subAnswers ?? {}}
-      onAnswerChange={(subQuestionId, text) =>
-        onAnswer({
-          subAnswers: { ...(answer?.subAnswers ?? {}), [subQuestionId]: text },
-        })
-      }
-    />
-  )
+    ) : null
+
+  const workspace =
+    format === "PROGRAMMING" ? (
+      <CodeMirrorProgrammingWorkspace
+        value={answer?.submittedCode ?? question.starterCode ?? ""}
+        language={answer?.programmingLanguage ?? "Java"}
+        starterCode={question.starterCode ?? ""}
+        onChange={(code) => onAnswer({ submittedCode: code })}
+        onLanguageChange={(language) =>
+          onAnswer({ programmingLanguage: language })
+        }
+      />
+    ) : format === "DIAGRAM" ? (
+      <div className="h-full min-h-[420px] overflow-hidden rounded-xl border">
+        <DiagramArea
+          initialXml={answer?.diagramSubmissionData}
+          onChange={(diagramXml) =>
+            onAnswer({ diagramSubmissionData: diagramXml })
+          }
+        />
+      </div>
+    ) : (
+      subQuestionTabs ?? (
+        <div className="space-y-2">
+          <Label htmlFor="workspace-answer">Your answer</Label>
+          <Textarea
+            id="workspace-answer"
+            value={answer?.learnerAnswer ?? ""}
+            onChange={(event) =>
+              onAnswer({ learnerAnswer: event.target.value })
+            }
+            className="min-h-64"
+          />
+        </div>
+      )
+    )
 
   return (
     <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_1fr]">
       <ScrollArea className="max-h-full rounded-xl border bg-card p-4">
         {problemPanel}
       </ScrollArea>
-      <div className="flex min-h-0 flex-col">
-        {format === "CODING" && subQuestions.length > 0 ? (
-          <div className="mb-3 rounded-xl border bg-card p-3">
-            <SubQuestionTabs
-              subQuestions={subQuestions}
-              answers={answer?.subAnswers ?? {}}
-              onAnswerChange={(subQuestionId, text) =>
-                onAnswer({
-                  subAnswers: {
-                    ...(answer?.subAnswers ?? {}),
-                    [subQuestionId]: text,
-                  },
-                })
-              }
-            />
-          </div>
+      <div className="flex min-h-0 flex-col gap-3">
+        {format !== "TEXT" && subQuestionTabs ? (
+          <div className="rounded-xl border bg-card p-3">{subQuestionTabs}</div>
         ) : null}
         <div className="min-h-0 flex-1">{workspace}</div>
       </div>
@@ -334,90 +331,134 @@ function WorkspaceQuestionPanel({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 export default function LearnerAssessmentAttemptPage() {
   const { examId } = useParams()
   const navigate = useNavigate()
 
-  const examQuery = useQuery({
-    queryKey: ["exam", examId],
-    queryFn: () => getExamById(examId),
-  })
-  const examTypesQuery = useQuery({
-    queryKey: ["exam-types"],
-    queryFn: getExamTypes,
-  })
-  const examQuestionsQuery = useQuery({
-    queryKey: ["exam-questions"],
-    queryFn: getExamQuestions,
-  })
-  const questionsQuery = useQuery({
-    queryKey: ["questions"],
-    queryFn: () => getQuestions(),
-  })
+  const identity = getCurrentLearnerIdentity()
   const learnersQuery = useQuery({
     queryKey: ["learners"],
     queryFn: () => base("learners"),
     retry: 1,
+    enabled: identity.learnerId == null,
   })
-  const resultsQuery = useQuery({
-    queryKey: ["exam-results"],
-    queryFn: getExamResults,
-    retry: 1,
-  })
+  const learnerId =
+    identity.learnerId ??
+    (Array.isArray(learnersQuery.data) ? learnersQuery.data[0]?.learnerId : null) ??
+    null
 
-  const exam = examQuery.data ?? null
-
-  const { orderedQuestions, subQuestionsByParent, examQuestionByQuestionId } =
-    useMemo(() => {
-      const allQuestions = Array.isArray(questionsQuery.data)
-        ? questionsQuery.data
-        : []
-      const questionById = new Map(
-        allQuestions.map((question) => [question.questionId, question])
-      )
-      const subsByParent = new Map()
-      allQuestions.forEach((question) => {
-        if (question.parentQuestionId != null) {
-          const list = subsByParent.get(question.parentQuestionId) ?? []
-          list.push(question)
-          subsByParent.set(question.parentQuestionId, list)
-        }
-      })
-      const links = (
-        Array.isArray(examQuestionsQuery.data) ? examQuestionsQuery.data : []
-      )
-        .filter((link) => String(link.examId) === String(examId))
-        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-      const ordered = links
-        .map((link) => questionById.get(link.questionId))
-        .filter(Boolean)
-      const linkByQuestion = new Map(
-        links.map((link) => [link.questionId, link])
-      )
-      return {
-        orderedQuestions: ordered,
-        subQuestionsByParent: subsByParent,
-        examQuestionByQuestionId: linkByQuestion,
-      }
-    }, [questionsQuery.data, examQuestionsQuery.data, examId])
+  // Server-driven attempt state
+  const [attempt, setAttempt] = useState(null)
+  const [startError, setStartError] = useState(null)
+  const startedRef = useRef(false)
 
   const [answers, setAnswers] = useState({})
+  const answersRef = useRef(answers)
+  answersRef.current = answers
+  const dirtyRef = useRef(new Set())
+  const [saveStatus, setSaveStatus] = useState("idle")
+
   const [flagged, setFlagged] = useState(() => new Set())
   const [currentIndex, setCurrentIndex] = useState(0)
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
   const [timeUp, setTimeUp] = useState(false)
   const [remainingSeconds, setRemainingSeconds] = useState(null)
-  const startedAtRef = useRef(Date.now())
   const warnedRef = useRef({ ten: false, one: false })
 
-  // Countdown timer (only when the exam has a duration).
+  // ---------------------------------------------------------------
+  // Start / resume the attempt on the server
+  // ---------------------------------------------------------------
   useEffect(() => {
-    if (!exam?.durationMinutes) return
-    const endAt = startedAtRef.current + exam.durationMinutes * 60 * 1000
+    if (learnerId == null || startedRef.current) return
+    startedRef.current = true
+    const keyName = `rebyu-attempt-key-${examId}-${learnerId}`
+    let idempotencyKey = sessionStorage.getItem(keyName)
+    if (!idempotencyKey) {
+      idempotencyKey = crypto.randomUUID()
+      sessionStorage.setItem(keyName, idempotencyKey)
+    }
+    startAssessmentAttempt(examId, learnerId, idempotencyKey)
+      .then((response) => {
+        setAttempt(response)
+        // Rehydrate saved draft answers when resuming.
+        const rehydrated = {}
+        Object.values(response.savedAnswers ?? {}).forEach((draft) => {
+          let subAnswers
+          if (draft.learnerAnswer?.startsWith("{")) {
+            try {
+              subAnswers = JSON.parse(draft.learnerAnswer)
+            } catch {
+              subAnswers = undefined
+            }
+          }
+          rehydrated[draft.attemptQuestionId] = {
+            learnerAnswer: subAnswers ? undefined : draft.learnerAnswer,
+            selectedChoiceId: draft.selectedChoiceId,
+            submittedCode: draft.submittedCode,
+            programmingLanguage: draft.programmingLanguage,
+            diagramSubmissionData: draft.diagramSubmissionData,
+            subAnswers,
+          }
+        })
+        setAnswers(rehydrated)
+        if (response.resumed) {
+          toast.info("Resumed your attempt in progress.")
+        }
+      })
+      .catch((error) => {
+        sessionStorage.removeItem(keyName)
+        setStartError(
+          error?.response?.data?.message ??
+            "This assessment could not be started."
+        )
+      })
+  }, [examId, learnerId])
+
+  const questions = attempt?.questions ?? []
+
+  // ---------------------------------------------------------------
+  // Debounced autosave of dirty answers
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    if (!attempt) return
+    const interval = setInterval(() => {
+      if (dirtyRef.current.size === 0) return
+      const dirtyIds = [...dirtyRef.current]
+      dirtyRef.current = new Set()
+      const payload = dirtyIds
+        .map((id) => {
+          const answer = answersRef.current[id]
+          return answer ? toDraftDto(Number(id), answer) : null
+        })
+        .filter(Boolean)
+      if (payload.length === 0) return
+      setSaveStatus("saving")
+      autosaveAttemptAnswers(attempt.assessmentAttemptId, learnerId, payload)
+        .then(() => setSaveStatus("saved"))
+        .catch(() => {
+          // Keep local answers; retry on the next tick.
+          dirtyIds.forEach((id) => dirtyRef.current.add(id))
+          setSaveStatus("error")
+        })
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [attempt, learnerId])
+
+  const setAnswer = useCallback((attemptQuestionId, patch) => {
+    setAnswers((current) => ({
+      ...current,
+      [attemptQuestionId]: { ...(current[attemptQuestionId] ?? {}), ...patch },
+    }))
+    dirtyRef.current.add(attemptQuestionId)
+  }, [])
+
+  // ---------------------------------------------------------------
+  // Timer from the server-issued expiry
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    if (!attempt?.expiresAt) return
+    const endAt = new Date(attempt.expiresAt).getTime()
     const tick = () => {
       const left = Math.max(0, Math.round((endAt - Date.now()) / 1000))
       setRemainingSeconds(left)
@@ -429,16 +470,13 @@ export default function LearnerAssessmentAttemptPage() {
         warnedRef.current.one = true
         toast.warning("1 minute remaining.")
       }
-      if (left === 0) {
-        setTimeUp(true)
-      }
+      if (left === 0) setTimeUp(true)
     }
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [exam?.durationMinutes])
+  }, [attempt?.expiresAt])
 
-  // Warn before closing the tab during an active attempt.
   useEffect(() => {
     const handler = (event) => {
       event.preventDefault()
@@ -448,255 +486,56 @@ export default function LearnerAssessmentAttemptPage() {
     return () => window.removeEventListener("beforeunload", handler)
   }, [])
 
-  const setAnswer = useCallback((questionId, patch) => {
-    setAnswers((current) => ({
-      ...current,
-      [questionId]: { ...(current[questionId] ?? {}), ...patch },
-    }))
-  }, [])
-
   const answeredIds = useMemo(() => {
     const set = new Set()
-    orderedQuestions.forEach((question) => {
-      if (isAnswered(question, answers[question.questionId])) {
-        set.add(question.questionId)
+    questions.forEach((question) => {
+      if (isAnswered(question, answers[question.attemptQuestionId])) {
+        set.add(question.attemptQuestionId)
       }
     })
     return set
-  }, [orderedQuestions, answers])
-
-  const identity = getCurrentLearnerIdentity()
-  const learners = Array.isArray(learnersQuery.data) ? learnersQuery.data : []
-  const learnerId =
-    identity.learnerId ??
-    // Preview mode: scope the attempt to the first learner on record.
-    learners[0]?.learnerId ??
-    null
+  }, [questions, answers])
 
   const submitMutation = useMutation({
-    mutationFn: async () => {
-      if (learnerId == null) {
-        throw new Error("no-learner")
-      }
-      const existingResults = (
-        Array.isArray(resultsQuery.data) ? resultsQuery.data : []
-      ).filter(
-        (result) =>
-          String(result.examId) === String(examId) &&
-          Number(result.learnerId) === Number(learnerId)
-      )
-      const attemptNo =
-        existingResults.reduce(
-          (max, result) => Math.max(max, result.attemptNo ?? 0),
-          0
-        ) + 1
-
-      // Auto-grade what can be graded honestly: multiple choice. Other types
-      // are stored for review without a fabricated score.
-      let correctCount = 0
-      const gradedQuestions = orderedQuestions.map((question) => {
-        const answer = answers[question.questionId] ?? {}
-        let isCorrect = false
-        let earnedScore = null
-        if (question.questionType === "MULTIPLE_CHOICE") {
-          const chosen = (question.choices ?? []).find(
-            (choice) => choice.choiceId === answer.choiceId
-          )
-          isCorrect = isChoiceCorrect(chosen)
-          earnedScore = isCorrect ? Number(question.totalPoints ?? 1) : 0
-          if (isCorrect) correctCount += 1
-        }
-        return { question, answer, isCorrect, earnedScore }
-      })
-
-      const mcqCount = orderedQuestions.filter(
-        (question) => question.questionType === "MULTIPLE_CHOICE"
-      ).length
-      const score =
-        orderedQuestions.length > 0
-          ? (correctCount / orderedQuestions.length) * 100
-          : 0
-      const passing = exam?.passingScore != null ? Number(exam.passingScore) : 0
-      const now = new Date()
-
-      await createExamResult({
-        learnerId,
-        examId: Number(examId),
-        attemptNo,
-        takenAt: toLocalDateTime(now),
-        score: Number(score.toFixed(2)),
-        durationSeconds: Math.round(
-          (Date.now() - startedAtRef.current) / 1000
-        ),
-        isPassed: score >= passing,
-      })
-
-      for (const { question, answer, isCorrect, earnedScore } of gradedQuestions) {
-        const link = examQuestionByQuestionId.get(question.questionId)
-        if (!link) continue
-
-        const detail = await createLearnerExamDetail({
-          learnerId,
-          examId: Number(examId),
-          attemptNo,
-          examQuestionId: link.examQuestionId,
-          questionId: question.questionId,
-          lessonId: question.lessonId,
-          isCorrect,
-          answeredAt: toLocalDateTime(now),
-          earnedScore,
+    mutationFn: () => {
+      const payload = questions
+        .map((question) => {
+          const answer = answers[question.attemptQuestionId]
+          return answer
+            ? toDraftDto(question.attemptQuestionId, answer)
+            : null
         })
-        const detailId = detail.learnerExamDetailId
-
-        if (
-          question.questionType === "MULTIPLE_CHOICE" &&
-          answer.choiceId != null
-        ) {
-          await createMcqAnswer({
-            learnerExamDetailId: detailId,
-            examQuestionId: link.examQuestionId,
-            choiceId: answer.choiceId,
-          })
-        } else if (answer.answerText?.trim()) {
-          await createTextAnswer({
-            learnerExamDetailId: detailId,
-            answerText: answer.answerText,
-          })
-        } else if (answer.code?.trim()) {
-          await createProgrammingAnswer({
-            learnerExamDetailId: detailId,
-            programmingLanguage: answer.language ?? "Java",
-            submittedCode: answer.code,
-          })
-        } else if (answer.diagramXml?.trim()) {
-          let diagramJson = "{}"
-          try {
-            diagramJson = JSON.stringify(
-              extractDiagramData(answer.diagramXml) ?? {}
-            )
-          } catch {
-            diagramJson = "{}"
-          }
-          await createDiagramAnswer({
-            learnerExamDetailId: detailId,
-            diagramXml: answer.diagramXml,
-            diagramJson,
-          })
-        }
-
-        // Sub-question responses are stored as text answers on details that
-        // reference the sub-question id.
-        const subAnswers = answer.subAnswers ?? {}
-        for (const [subQuestionId, text] of Object.entries(subAnswers)) {
-          if (!text?.trim()) continue
-          if (Number(subQuestionId) === question.questionId) {
-            // Structured response stored against the parent above.
-            const subDetail = await createLearnerExamDetail({
-              learnerId,
-              examId: Number(examId),
-              attemptNo,
-              examQuestionId: link.examQuestionId,
-              questionId: question.questionId,
-              lessonId: question.lessonId,
-              isCorrect: false,
-              answeredAt: toLocalDateTime(now),
-              earnedScore: null,
-            })
-            await createTextAnswer({
-              learnerExamDetailId: subDetail.learnerExamDetailId,
-              answerText: text,
-            })
-            continue
-          }
-          const sub = (
-            subQuestionsByParent.get(question.questionId) ?? []
-          ).find((item) => item.questionId === Number(subQuestionId))
-          const subDetail = await createLearnerExamDetail({
-            learnerId,
-            examId: Number(examId),
-            attemptNo,
-            examQuestionId: link.examQuestionId,
-            questionId: Number(subQuestionId),
-            lessonId: sub?.lessonId ?? question.lessonId,
-            isCorrect: false,
-            answeredAt: toLocalDateTime(now),
-            earnedScore: null,
-          })
-          await createTextAnswer({
-            learnerExamDetailId: subDetail.learnerExamDetailId,
-            answerText: text,
-          })
-        }
-      }
-
-      return { attemptNo, mcqCount }
+        .filter(Boolean)
+      return submitAssessmentAttempt(
+        attempt.assessmentAttemptId,
+        learnerId,
+        payload
+      )
     },
-    onSuccess: ({ attemptNo }) => {
+    onSuccess: (result) => {
+      sessionStorage.removeItem(`rebyu-attempt-key-${examId}-${learnerId}`)
       toast.success("Assessment submitted.")
-      navigate(`/learner/results/${learnerId}-${examId}-${attemptNo}`, {
+      navigate(`/learner/results/${result.assessmentAttemptId}`, {
         replace: true,
       })
     },
     onError: (error) => {
-      if (error?.message === "no-learner") {
-        toast.error(
-          "No learner profile is available, so this attempt cannot be recorded."
-        )
-      } else {
-        toast.error("Unable to submit the assessment. Please try again.")
-      }
+      toast.error(
+        error?.response?.data?.message ??
+          "Unable to submit the assessment. Please try again."
+      )
     },
   })
 
-  const isLoading =
-    examQuery.isLoading ||
-    examQuestionsQuery.isLoading ||
-    questionsQuery.isLoading ||
-    examTypesQuery.isLoading
-
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-4xl space-y-4 p-6">
-        <Skeleton className="h-10 w-2/3" />
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    )
-  }
-
-  if (examQuery.isError || !exam) {
+  // ---------------------------------------------------------------
+  // Render states
+  // ---------------------------------------------------------------
+  if (startError) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
         <div className="max-w-md rounded-2xl border bg-card p-8 text-center">
-          <p className="font-medium">Assessment not found</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This assessment may have been removed, or the backend is
-            unavailable.
-          </p>
-          <Button
-            className="mt-4"
-            variant="outline"
-            onClick={() => navigate("/learner/progress")}
-          >
-            Back to Progress
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  const examTypeText = (
-    Array.isArray(examTypesQuery.data) ? examTypesQuery.data : []
-  ).find((type) => type.examTypeId === exam.examTypeId)?.examTypeText
-
-  if (orderedQuestions.length === 0) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center p-6">
-        <div className="max-w-md rounded-2xl border bg-card p-8 text-center">
-          <p className="font-medium">{exam.title}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This assessment has no questions yet. Check back later.
-          </p>
+          <p className="font-medium">Assessment unavailable</p>
+          <p className="mt-1 text-sm text-muted-foreground">{startError}</p>
           <Button
             className="mt-4"
             variant="outline"
@@ -709,14 +548,28 @@ export default function LearnerAssessmentAttemptPage() {
     )
   }
 
-  const currentQuestion = orderedQuestions[currentIndex]
-  const isWorkspace = currentQuestion.questionType === "CRITICAL_THINKING"
-  const currentAnswer = answers[currentQuestion.questionId]
+  if (!attempt) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-4 p-6">
+        <Skeleton className="h-10 w-2/3" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    )
+  }
+
+  const currentQuestion = questions[currentIndex]
+  const isWorkspace = currentQuestion?.questionType === "CRITICAL_THINKING"
+  const currentAnswer = currentQuestion
+    ? answers[currentQuestion.attemptQuestionId]
+    : null
   const editingLocked = timeUp || submitMutation.isPending
 
   const navigatorPanel = (
     <QuestionNavigator
-      questions={orderedQuestions}
+      questions={questions.map((question) => ({
+        questionId: question.attemptQuestionId,
+      }))}
       currentIndex={currentIndex}
       answeredIds={answeredIds}
       flaggedIds={flagged}
@@ -728,7 +581,6 @@ export default function LearnerAssessmentAttemptPage() {
 
   return (
     <div className="flex h-dvh flex-col bg-muted/30">
-      {/* Header */}
       <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <Button
@@ -741,22 +593,21 @@ export default function LearnerAssessmentAttemptPage() {
             <span className="hidden sm:inline">Exit</span>
           </Button>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{exam.title}</p>
+            <p className="truncate text-sm font-semibold">
+              {attempt.assessmentTitle}
+            </p>
             <p className="truncate text-xs text-muted-foreground">
-              Question {currentIndex + 1} of {orderedQuestions.length}
+              Question {currentIndex + 1} of {questions.length} · Attempt{" "}
+              {attempt.attemptNumber}
             </p>
           </div>
           <Badge variant="secondary" className="hidden sm:inline-flex">
-            {getAssessmentTypeLabel(examTypeText)}
+            {getAssessmentTypeLabel(attempt.assessmentType)}
           </Badge>
         </div>
 
-        <div className="flex items-center gap-2">
-          {identity.learnerId == null && learnerId != null ? (
-            <Badge variant="outline" className="hidden md:inline-flex">
-              Preview learner
-            </Badge>
-          ) : null}
+        <div className="flex items-center gap-3">
+          <SaveStatusIndicator status={saveStatus} />
           {remainingSeconds != null ? (
             <span
               className={cn(
@@ -775,7 +626,6 @@ export default function LearnerAssessmentAttemptPage() {
             </span>
           ) : null}
 
-          {/* Mobile navigator */}
           <Sheet>
             <SheetTrigger asChild>
               <Button
@@ -806,7 +656,6 @@ export default function LearnerAssessmentAttemptPage() {
         </div>
       </header>
 
-      {/* Body */}
       <div className="flex min-h-0 flex-1 gap-4 p-4">
         <main
           className={cn(
@@ -815,30 +664,29 @@ export default function LearnerAssessmentAttemptPage() {
           )}
           aria-live="polite"
         >
-          {isWorkspace ? (
-            <WorkspaceQuestionPanel
-              key={currentQuestion.questionId}
-              question={currentQuestion}
-              index={currentIndex}
-              subQuestions={
-                subQuestionsByParent.get(currentQuestion.questionId) ?? []
-              }
-              answer={currentAnswer}
-              onAnswer={(patch) =>
-                setAnswer(currentQuestion.questionId, patch)
-              }
-            />
-          ) : (
-            <NormalQuestionPanel
-              key={currentQuestion.questionId}
-              question={currentQuestion}
-              index={currentIndex}
-              answer={currentAnswer}
-              onAnswer={(patch) =>
-                setAnswer(currentQuestion.questionId, patch)
-              }
-            />
-          )}
+          {currentQuestion ? (
+            isWorkspace ? (
+              <WorkspaceQuestionPanel
+                key={currentQuestion.attemptQuestionId}
+                question={currentQuestion}
+                index={currentIndex}
+                answer={currentAnswer}
+                onAnswer={(patch) =>
+                  setAnswer(currentQuestion.attemptQuestionId, patch)
+                }
+              />
+            ) : (
+              <NormalQuestionPanel
+                key={currentQuestion.attemptQuestionId}
+                question={currentQuestion}
+                index={currentIndex}
+                answer={currentAnswer}
+                onAnswer={(patch) =>
+                  setAnswer(currentQuestion.attemptQuestionId, patch)
+                }
+              />
+            )
+          ) : null}
         </main>
 
         <aside className="hidden w-64 shrink-0 rounded-2xl border bg-background p-4 lg:block">
@@ -846,7 +694,6 @@ export default function LearnerAssessmentAttemptPage() {
         </aside>
       </div>
 
-      {/* Bottom navigation */}
       <footer className="flex h-16 shrink-0 items-center justify-between gap-2 border-t bg-background px-4">
         <Button
           variant="outline"
@@ -858,39 +705,41 @@ export default function LearnerAssessmentAttemptPage() {
         </Button>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setFlagged((current) => {
-                const next = new Set(current)
-                if (next.has(currentQuestion.questionId)) {
-                  next.delete(currentQuestion.questionId)
-                } else {
-                  next.add(currentQuestion.questionId)
-                }
-                return next
-              })
-            }
-            aria-pressed={flagged.has(currentQuestion.questionId)}
-          >
-            <FlagIcon
-              className={cn(
-                flagged.has(currentQuestion.questionId) &&
-                  "fill-amber-400 text-amber-500"
-              )}
-              aria-hidden="true"
-            />
-            {flagged.has(currentQuestion.questionId)
-              ? "Flagged"
-              : "Flag for review"}
-          </Button>
+          {currentQuestion ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setFlagged((current) => {
+                  const next = new Set(current)
+                  if (next.has(currentQuestion.attemptQuestionId)) {
+                    next.delete(currentQuestion.attemptQuestionId)
+                  } else {
+                    next.add(currentQuestion.attemptQuestionId)
+                  }
+                  return next
+                })
+              }
+              aria-pressed={flagged.has(currentQuestion.attemptQuestionId)}
+            >
+              <FlagIcon
+                className={cn(
+                  flagged.has(currentQuestion.attemptQuestionId) &&
+                    "fill-amber-400 text-amber-500"
+                )}
+                aria-hidden="true"
+              />
+              {flagged.has(currentQuestion.attemptQuestionId)
+                ? "Flagged"
+                : "Flag for review"}
+            </Button>
+          ) : null}
           <span className="hidden text-sm text-muted-foreground sm:block">
-            Question {currentIndex + 1} of {orderedQuestions.length}
+            {currentIndex + 1} / {questions.length}
           </span>
         </div>
 
-        {currentIndex === orderedQuestions.length - 1 ? (
+        {currentIndex === questions.length - 1 ? (
           <Button
             onClick={() => setFinishOpen(true)}
             disabled={submitMutation.isPending}
@@ -902,7 +751,7 @@ export default function LearnerAssessmentAttemptPage() {
             variant="outline"
             onClick={() =>
               setCurrentIndex((index) =>
-                Math.min(orderedQuestions.length - 1, index + 1)
+                Math.min(questions.length - 1, index + 1)
               )
             }
           >
@@ -912,31 +761,27 @@ export default function LearnerAssessmentAttemptPage() {
         )}
       </footer>
 
-      {/* Leave attempt */}
       <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Leave this attempt?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have answered {answeredIds.size} of{" "}
-              {orderedQuestions.length} question(s)
+              You have answered {answeredIds.size} of {questions.length}{" "}
+              question(s)
               {flagged.size > 0 ? `, with ${flagged.size} flagged` : ""}. Your
-              answers are not submitted and will be lost if you leave now.
+              saved drafts stay on the server — you can resume this attempt
+              later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep Taking Assessment</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => navigate(-1)}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={() => navigate(-1)}>
               Leave Attempt
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Finish / submit */}
       <AlertDialog open={finishOpen} onOpenChange={setFinishOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -946,7 +791,7 @@ export default function LearnerAssessmentAttemptPage() {
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
                   <dt className="text-muted-foreground">Total items</dt>
                   <dd className="text-right tabular-nums">
-                    {orderedQuestions.length}
+                    {questions.length}
                   </dd>
                   <dt className="text-muted-foreground">Answered</dt>
                   <dd className="text-right tabular-nums">
@@ -954,7 +799,7 @@ export default function LearnerAssessmentAttemptPage() {
                   </dd>
                   <dt className="text-muted-foreground">Unanswered</dt>
                   <dd className="text-right tabular-nums">
-                    {orderedQuestions.length - answeredIds.size}
+                    {questions.length - answeredIds.size}
                   </dd>
                   <dt className="text-muted-foreground">Flagged</dt>
                   <dd className="text-right tabular-nums">{flagged.size}</dd>
@@ -967,7 +812,7 @@ export default function LearnerAssessmentAttemptPage() {
                     </>
                   ) : null}
                 </dl>
-                {orderedQuestions.length - answeredIds.size > 0 ? (
+                {questions.length - answeredIds.size > 0 ? (
                   <p className="text-destructive">
                     Unanswered items may receive no score.
                   </p>
@@ -986,15 +831,12 @@ export default function LearnerAssessmentAttemptPage() {
               }}
               disabled={submitMutation.isPending}
             >
-              {submitMutation.isPending
-                ? "Submitting..."
-                : "Submit Assessment"}
+              {submitMutation.isPending ? "Submitting..." : "Submit Assessment"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Time up */}
       <AlertDialog open={timeUp && !submitMutation.isPending}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -43,4 +43,9 @@ public class User {
 
     @Column(name = "phone_number", length = 30)
     private String phoneNumber;
+
+    // Stable Amazon Cognito subject linked to this account. Nullable so
+    // pre-Cognito accounts keep working until their first federated sign-in.
+    @Column(name = "cognito_sub", unique = true, length = 64)
+    private String cognitoSub;
 }

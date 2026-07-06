@@ -1,17 +1,42 @@
 import { Navigate, Outlet } from "react-router-dom"
 
 import { getDemoRole, getDemoRoleHome } from "@/lib/demo-role"
+import { roleHomePath, useAuth } from "@/context/auth-context.jsx"
 
-// Preview-mode route guard: routes render only for the selected demo role.
-// Entering another role's route redirects to the selected role's dashboard.
+/**
+ * Role guard.
+ *
+ * Signed in: the backend-confirmed role from /api/auth/me is the only
+ * authority — localStorage is never trusted for access decisions.
+ *
+ * Signed out: in development the demo-role preview keeps working so the
+ * portals can be browsed without an account; in production the user is sent
+ * to the sign-in page.
+ */
 function ProtectedRoute({ allowedRoles }) {
-  const role = getDemoRole()
+  const { user, status } = useAuth()
 
-  if (!allowedRoles.includes(role)) {
-    return <Navigate to={getDemoRoleHome(role)} replace />
+  if (status === "loading") {
+    return null
   }
 
-  return <Outlet />
+  if (status === "authenticated") {
+    const role = (user?.role ?? "LEARNER").toUpperCase()
+    if (!allowedRoles.includes(role)) {
+      return <Navigate to={roleHomePath(role)} replace />
+    }
+    return <Outlet />
+  }
+
+  if (import.meta.env.DEV) {
+    const role = getDemoRole()
+    if (!allowedRoles.includes(role)) {
+      return <Navigate to={getDemoRoleHome(role)} replace />
+    }
+    return <Outlet />
+  }
+
+  return <Navigate to="/login" replace />
 }
 
 export default ProtectedRoute

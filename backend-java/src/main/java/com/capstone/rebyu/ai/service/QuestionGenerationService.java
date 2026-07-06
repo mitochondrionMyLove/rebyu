@@ -3,16 +3,24 @@ package com.capstone.rebyu.ai.service;
 import com.capstone.rebyu.ai.assistant.QuestionGenerationAssistant;
 import com.capstone.rebyu.ai.dto.AiQuestionGenerationRequest;
 import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftDto;
+import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftResponseDto;
+import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftResponseDto.GenerationAnalysisDto;
+import com.capstone.rebyu.ai.dto.QuestionGenerationSourceMode;
 import com.capstone.rebyu.ai.entity.KnowledgeDocument;
+import com.capstone.rebyu.ai.repository.KnowledgeDocumentRepository;
 import com.capstone.rebyu.certification.entity.Certification;
 import com.capstone.rebyu.certification.entity.Lesson;
 import com.capstone.rebyu.certification.repository.CertificationRepository;
 import com.capstone.rebyu.certification.repository.LessonRepository;
 import com.capstone.rebyu.ai.common.InvalidAiGeneratedQuestionException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.langchain4j.rag.content.Content;
-import dev.langchain4j.rag.content.retriever.ContentRetriever;
-import dev.langchain4j.rag.query.Query;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
+import dev.langchain4j.store.embedding.EmbeddingSearchResult;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -26,7 +34,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,48 +41,68 @@ public class QuestionGenerationService {
 
     private static final int MAX_DOC_CHARS = 10_000;
     private static final int MAX_QUESTIONS_PER_TYPE = 50;
+    private static final int DEFAULT_TARGET = 10;
+    private static final int MAX_TARGET = 100;
+    private static final int RETRIEVAL_MAX_RESULTS = 12;
     private static final java.util.Set<String> SUPPORTED_TYPES = java.util.Set.of(
             "MCQ", "SHORT_ANSWER", "DESCRIPTIVE", "PROGRAMMING", "DIAGRAM"
     );
 
-    record LessonRef(Long lessonId, String title) {}
-    record CertContext(String certTitle, Map<Long, LessonRef> lessonsById) {}
+    public record LessonRef(Long lessonId, String title) {}
+    public record CertContext(String certTitle, Map<Long, LessonRef> lessonsById) {}
 
     private final LessonRepository lessonRepository;
     private final CertificationRepository certificationRepository;
     private final DocumentIngestionService documentIngestionService;
     private final QuestionGenerationAssistant questionGenerationAssistant;
-    private final ContentRetriever questionContentRetriever;
     private final AiUploadValidator aiUploadValidator;
     private final GeneratedQuestionDraftValidator generatedQuestionDraftValidator;
+    private final KnowledgeDocumentRepository knowledgeDocumentRepository;
+    private final EmbeddingModel embeddingModel;
+    private final EmbeddingStore<TextSegment> questionEmbeddingStore;
+    private final EmbeddingStore<TextSegment> lessonEmbeddingStore;
     private final ObjectMapper objectMapper;
+    // Tolerant reader for AI drafts: ignores stray fields (questionId,
+    // lessonId, etc.) the model sometimes adds, without affecting the shared
+    // application ObjectMapper.
+    private final ObjectMapper draftMapper;
 
     public QuestionGenerationService(
             LessonRepository lessonRepository,
             CertificationRepository certificationRepository,
             DocumentIngestionService documentIngestionService,
             QuestionGenerationAssistant questionGenerationAssistant,
-            @Qualifier("questionContentRetriever") ContentRetriever questionContentRetriever,
             AiUploadValidator aiUploadValidator,
             GeneratedQuestionDraftValidator generatedQuestionDraftValidator,
+            KnowledgeDocumentRepository knowledgeDocumentRepository,
+            EmbeddingModel embeddingModel,
+            @Qualifier("questionEmbeddingStore") EmbeddingStore<TextSegment> questionEmbeddingStore,
+            @Qualifier("lessonEmbeddingStore") EmbeddingStore<TextSegment> lessonEmbeddingStore,
             ObjectMapper objectMapper
     ) {
         this.lessonRepository = lessonRepository;
         this.certificationRepository = certificationRepository;
         this.documentIngestionService = documentIngestionService;
         this.questionGenerationAssistant = questionGenerationAssistant;
-        this.questionContentRetriever = questionContentRetriever;
         this.aiUploadValidator = aiUploadValidator;
         this.generatedQuestionDraftValidator = generatedQuestionDraftValidator;
+        this.knowledgeDocumentRepository = knowledgeDocumentRepository;
+        this.embeddingModel = embeddingModel;
+        this.questionEmbeddingStore = questionEmbeddingStore;
+        this.lessonEmbeddingStore = lessonEmbeddingStore;
         this.objectMapper = objectMapper;
+        this.draftMapper = objectMapper.copy().disable(
+                com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
-    public List<GeneratedQuestionDraftDto> generateDrafts(
+    public GeneratedQuestionDraftResponseDto generateDrafts(
             AiQuestionGenerationRequest request,
             List<MultipartFile> files
     ) throws IOException {
-        Map<String, Integer> requestedCounts = normalizeCounts(request.getQuestionCounts());
-        aiUploadValidator.validate(files);
+        List<String> warnings = new ArrayList<>();
+        List<MultipartFile> uploadedFiles = files == null
+                ? List.of()
+                : files.stream().filter(f -> f != null && !f.isEmpty()).toList();
 
         CertContext ctx = loadCertificationContext(request.getCertificationId());
         if (ctx.lessonsById().isEmpty()) {
@@ -84,39 +111,210 @@ public class QuestionGenerationService {
             );
         }
 
-        StringBuilder rawText = new StringBuilder();
-        for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
+        boolean hasKnowledge = knowledgeDocumentRepository.countByCertificationIdAndStatus(
+                request.getCertificationId(), KnowledgeDocument.DocumentStatus.READY) > 0;
+        QuestionGenerationSourceMode mode = resolveSourceMode(
+                request.getSourceMode(), hasKnowledge, uploadedFiles);
+
+        // --- Resolve grounded source context per mode -------------------
+        String temporaryText = "";
+        if (mode == QuestionGenerationSourceMode.UPLOADED_FILES
+                || mode == QuestionGenerationSourceMode.COMBINED) {
+            if (uploadedFiles.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Upload at least one source file for this generation mode.");
+            }
+            aiUploadValidator.validate(uploadedFiles);
+            StringBuilder rawText = new StringBuilder();
+            for (MultipartFile file : uploadedFiles) {
+                // Temporary extraction only — never permanently ingested here.
                 rawText.append(documentIngestionService.extractDocumentText(file)).append("\n\n");
-                documentIngestionService.ingest(file, request.getCertificationId(), KnowledgeDocument.UseCase.QUESTION);
+            }
+            aiUploadValidator.requireReadableText(rawText.toString());
+            temporaryText = truncate(rawText.toString());
+        }
+
+        String retrievedKnowledge = "";
+        int chunksUsed = 0;
+        if (mode == QuestionGenerationSourceMode.CERTIFICATION_KNOWLEDGE
+                || mode == QuestionGenerationSourceMode.COMBINED) {
+            if (!hasKnowledge) {
+                throw new IllegalArgumentException(
+                        "This certification has no indexed knowledge yet. Upload a temporary file "
+                                + "or add source materials to the certification first.");
+            }
+            List<String> chunks = retrieveCertificationChunks(
+                    request.getCertificationId(), ctx.certTitle(),
+                    request.getAdditionalInstructions());
+            chunksUsed = chunks.size();
+            retrievedKnowledge = String.join("\n\n---\n\n", chunks);
+            if (retrievedKnowledge.isBlank()) {
+                warnings.add("Little indexed knowledge matched this certification; "
+                        + "fewer questions may be generated.");
             }
         }
-        aiUploadValidator.requireReadableText(rawText.toString());
 
-        String referenceContext = buildReferenceContext(ctx, rawText.toString());
-        String requestJson = buildRequestJson(request, ctx, requestedCounts);
-
-        log.info("Generating question drafts for certificationId={} with counts {}",
-                request.getCertificationId(), requestedCounts);
-
-        List<GeneratedQuestionDraftDto> generatedDrafts;
-        try {
-            String aiResponse = questionGenerationAssistant.generateQuestions(requestJson, referenceContext);
-            generatedDrafts = parseGeneratedQuestionDrafts(aiResponse);
-        } catch (Exception e) {
-            log.error("Failed to deserialize AI question draft response for certificationId={}. Error: {}",
-                    request.getCertificationId(), e.getMessage(), e);
+        // Permanent certification knowledge is listed first so it wins when
+        // the two sources conflict.
+        String referenceContext = switch (mode) {
+            case CERTIFICATION_KNOWLEDGE -> retrievedKnowledge;
+            case UPLOADED_FILES -> temporaryText;
+            case COMBINED -> retrievedKnowledge
+                    + "\n\n--- Additional uploaded material (secondary) ---\n\n"
+                    + temporaryText;
+        };
+        if (referenceContext.isBlank()) {
             throw new InvalidAiGeneratedQuestionException(
-                    "The AI returned invalid question drafts. Please check the format and try again.",
-                    e
-            );
+                    "No readable source material was available to ground question generation.");
         }
 
-        generatedQuestionDraftValidator.validate(generatedDrafts, requestedCounts, ctx.lessonsById());
+        // --- Counts vs. AI-chosen types ---------------------------------
+        Map<String, Integer> requestedCounts = null;
+        int target;
+        if (request.getQuestionCounts() != null && !request.getQuestionCounts().isEmpty()) {
+            requestedCounts = normalizeCounts(request.getQuestionCounts());
+            target = requestedCounts.values().stream().mapToInt(Integer::intValue).sum();
+        } else {
+            target = request.getTargetQuestionCount() == null
+                    ? DEFAULT_TARGET
+                    : Math.max(1, Math.min(MAX_TARGET, request.getTargetQuestionCount()));
+        }
 
-        log.info("Generated {} question draft(s) for certificationId={}",
-                generatedDrafts.size(), request.getCertificationId());
-        return generatedDrafts;
+        String requestJson = buildRequestJson(request, ctx, requestedCounts, target);
+
+        log.info("Generating question drafts for certificationId={} mode={} target={}",
+                request.getCertificationId(), mode, target);
+
+        List<GeneratedQuestionDraftDto> generatedDrafts = null;
+        InvalidAiGeneratedQuestionException lastParseError = null;
+        for (int attempt = 1; attempt <= 2 && generatedDrafts == null; attempt++) {
+            try {
+                String aiResponse = questionGenerationAssistant.generateQuestions(
+                        requestJson, referenceContext);
+                generatedDrafts = parseGeneratedQuestionDrafts(aiResponse);
+            } catch (InvalidAiGeneratedQuestionException e) {
+                lastParseError = e;
+                log.warn("Attempt {}/2: unparseable question draft response for certificationId={}: {}",
+                        attempt, request.getCertificationId(), e.getMessage());
+            } catch (Exception e) {
+                log.error("Failed to deserialize AI question draft response for certificationId={}",
+                        request.getCertificationId(), e);
+                throw new InvalidAiGeneratedQuestionException(
+                        "The AI returned invalid question drafts. Please check the format and try again.", e);
+            }
+        }
+        if (generatedDrafts == null) {
+            throw lastParseError != null
+                    ? lastParseError
+                    : new InvalidAiGeneratedQuestionException(
+                            "The AI returned malformed question draft JSON. Please try again.");
+        }
+
+        generatedDrafts = assignMissingLessons(generatedDrafts, ctx, warnings);
+
+        // Always validate leniently: keep every valid draft, skip the rest
+        // with warnings, and never fail the whole batch over one bad item.
+        List<GeneratedQuestionDraftDto> validDrafts =
+                generatedQuestionDraftValidator.validateLenient(
+                        generatedDrafts, ctx.lessonsById(), warnings);
+
+        if (requestedCounts != null) {
+            Map<String, Long> producedByType = validDrafts.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            d -> d.questionType().name(), java.util.stream.Collectors.counting()));
+            requestedCounts.forEach((type, requested) -> {
+                long produced = producedByType.getOrDefault(type, 0L);
+                if (produced < requested) {
+                    warnings.add("Requested " + requested + " " + type
+                            + " question(s) but the source material supported "
+                            + produced + ". Regenerate to try for more.");
+                }
+            });
+        } else if (validDrafts.size() < target) {
+            warnings.add("The grounded source material supported "
+                    + validDrafts.size() + " of the " + target + " requested questions.");
+        }
+
+        log.info("Generated {} valid question draft(s) for certificationId={}",
+                validDrafts.size(), request.getCertificationId());
+
+        return new GeneratedQuestionDraftResponseDto(
+                validDrafts,
+                new GenerationAnalysisDto(
+                        request.getCertificationId(),
+                        mode,
+                        target,
+                        validDrafts.size(),
+                        chunksUsed,
+                        uploadedFiles.size()),
+                warnings
+        );
+    }
+
+    private QuestionGenerationSourceMode resolveSourceMode(
+            QuestionGenerationSourceMode requested,
+            boolean hasKnowledge,
+            List<MultipartFile> files) {
+        if (requested != null) {
+            return requested;
+        }
+        // Default to permanent knowledge when it exists; otherwise files.
+        if (hasKnowledge && files.isEmpty()) {
+            return QuestionGenerationSourceMode.CERTIFICATION_KNOWLEDGE;
+        }
+        if (hasKnowledge) {
+            return QuestionGenerationSourceMode.COMBINED;
+        }
+        return QuestionGenerationSourceMode.UPLOADED_FILES;
+    }
+
+    /**
+     * Retrieves chunks strictly filtered to this certification's metadata.
+     * Certification source documents uploaded during certification
+     * creation/editing are embedded in the knowledge (lesson) store, while
+     * question-specific uploads land in the question store — so both stores
+     * are searched and merged.
+     */
+    private List<String> retrieveCertificationChunks(
+            Long certificationId, String certTitle, String additionalInstructions) {
+        try {
+            String queryText = additionalInstructions == null || additionalInstructions.isBlank()
+                    ? certTitle
+                    : certTitle + " — " + additionalInstructions;
+            EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
+                    .queryEmbedding(embeddingModel.embed(queryText).content())
+                    .maxResults(RETRIEVAL_MAX_RESULTS)
+                    .filter(MetadataFilterBuilder.metadataKey("certificationId")
+                            .isEqualTo(String.valueOf(certificationId)))
+                    .build();
+
+            List<String> chunks = new ArrayList<>();
+            chunks.addAll(searchStore(questionEmbeddingStore, searchRequest, "question"));
+            if (chunks.size() < RETRIEVAL_MAX_RESULTS) {
+                chunks.addAll(searchStore(lessonEmbeddingStore, searchRequest, "knowledge"));
+            }
+            return chunks.stream().distinct().limit(RETRIEVAL_MAX_RESULTS).toList();
+        } catch (Exception e) {
+            log.warn("Certification-filtered retrieval failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<String> searchStore(
+            EmbeddingStore<TextSegment> store, EmbeddingSearchRequest request, String label) {
+        try {
+            EmbeddingSearchResult<TextSegment> result = store.search(request);
+            return result.matches().stream()
+                    .map(match -> match.embedded().text())
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Retrieval from {} store failed: {}", label, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private String truncate(String text) {
+        return text.length() > MAX_DOC_CHARS ? text.substring(0, MAX_DOC_CHARS) : text;
     }
 
     @Transactional(readOnly = true)
@@ -133,10 +331,6 @@ public class QuestionGenerationService {
     }
 
     private Map<String, Integer> normalizeCounts(Map<String, Integer> counts) {
-        if (counts == null || counts.isEmpty()) {
-            throw new IllegalArgumentException("At least one question count is required.");
-        }
-
         Map<String, Integer> normalized = new LinkedHashMap<>();
         for (Map.Entry<String, Integer> entry : counts.entrySet()) {
             String type = entry.getKey() == null ? "" : entry.getKey().trim().toUpperCase(Locale.ROOT);
@@ -165,7 +359,8 @@ public class QuestionGenerationService {
     private String buildRequestJson(
             AiQuestionGenerationRequest request,
             CertContext ctx,
-            Map<String, Integer> requestedCounts
+            Map<String, Integer> requestedCounts,
+            int target
     ) throws IOException {
         List<Map<String, Object>> availableLessons = ctx.lessonsById().values().stream()
                 .map(l -> Map.<String, Object>of("lessonId", l.lessonId(), "lessonTitle", l.title()))
@@ -175,72 +370,421 @@ public class QuestionGenerationService {
         requestData.put("certificationId", request.getCertificationId());
         requestData.put("certificationTitle", ctx.certTitle());
         requestData.put("availableLessons", availableLessons);
-        requestData.put("questionCounts", requestedCounts);
+        if (requestedCounts != null) {
+            requestData.put("questionCounts", requestedCounts);
+        } else {
+            requestData.put("targetQuestionCount", target);
+            requestData.put("typeSelection",
+                    "Choose only question types genuinely supported by the reference context. "
+                            + "Return fewer questions when the material is insufficient.");
+        }
         if (request.getAdditionalInstructions() != null && !request.getAdditionalInstructions().isBlank()) {
             requestData.put("additionalInstructions", request.getAdditionalInstructions());
         }
         return objectMapper.writeValueAsString(requestData);
     }
 
-    private String buildReferenceContext(CertContext ctx, String extractedText) {
-        String documentText = extractedText.length() > MAX_DOC_CHARS
-                ? extractedText.substring(0, MAX_DOC_CHARS)
-                : extractedText;
-
-        String retrieved = "";
-        try {
-            List<Content> contents = questionContentRetriever.retrieve(Query.from(ctx.certTitle()));
-            retrieved = contents.stream()
-                    .map(c -> c.textSegment().text())
-                    .collect(Collectors.joining("\n\n---\n\n"));
-        } catch (Exception e) {
-            log.warn("Reference retrieval failed for question generation: {}", e.getMessage());
-        }
-
-        if (retrieved.isBlank()) {
-            return documentText;
-        }
-        return documentText + "\n\n--- Related reference material ---\n\n" + retrieved;
-    }
-
+    /**
+     * Safe JSON extraction: plain arrays, fenced blocks, arrays embedded in
+     * prose, {"questions":[...]} wrappers, and single-object responses.
+     */
     private List<GeneratedQuestionDraftDto> parseGeneratedQuestionDrafts(String json) {
         if (json == null || json.isBlank()) {
             throw new InvalidAiGeneratedQuestionException("The AI returned an empty response.");
         }
-        try {
-            String cleaned = json.trim();
-            if (cleaned.startsWith("```")) {
-                cleaned = cleaned.replaceFirst("```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
-            }
-            
-            // Try direct array parse first
-            try {
-                return objectMapper.readValue(cleaned, new com.fasterxml.jackson.core.type.TypeReference<List<GeneratedQuestionDraftDto>>() {});
-            } catch (Exception ignore) {
-                // continue to smarter extraction
-            }
-            
-            // Try to extract array from the response
-            int arrayStart = cleaned.indexOf('[');
-            int arrayEnd = cleaned.lastIndexOf(']');
-            if (arrayStart >= 0 && arrayEnd > arrayStart) {
-                String arr = cleaned.substring(arrayStart, arrayEnd + 1);
-                try {
-                    return objectMapper.readValue(arr, new com.fasterxml.jackson.core.type.TypeReference<List<GeneratedQuestionDraftDto>>() {});
-                } catch (Exception ignored) {
-                    // continue
+        String cleaned = json.trim();
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned.replaceFirst("```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
+        }
+
+        List<GeneratedQuestionDraftDto> direct = tryParseArray(cleaned);
+        if (direct != null) return direct;
+
+        int arrayStart = cleaned.indexOf('[');
+        int arrayEnd = cleaned.lastIndexOf(']');
+        if (arrayStart >= 0 && arrayEnd > arrayStart) {
+            List<GeneratedQuestionDraftDto> embedded =
+                    tryParseArray(cleaned.substring(arrayStart, arrayEnd + 1));
+            if (embedded != null) return embedded;
+        }
+
+        // Truncated output (token limit hit mid-array): keep every complete
+        // top-level object and close the array after the last one.
+        if (arrayStart >= 0) {
+            String salvaged = salvageTruncatedArray(cleaned, arrayStart);
+            if (salvaged != null) {
+                List<GeneratedQuestionDraftDto> recovered = tryParseArray(salvaged);
+                if (recovered != null && !recovered.isEmpty()) {
+                    log.warn("Recovered {} question draft(s) from a truncated AI response",
+                            recovered.size());
+                    return recovered;
                 }
             }
-            
-            log.error("Failed to parse AI question draft response; excerpt: {}", 
-                    cleaned.length() > 200 ? cleaned.substring(0, 200) : cleaned);
-            throw new InvalidAiGeneratedQuestionException("The AI returned malformed question draft JSON. Please try again.");
-        } catch (InvalidAiGeneratedQuestionException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to parse AI question draft response", e);
-            throw new InvalidAiGeneratedQuestionException("The AI returned malformed question draft JSON. Please try again.", e);
         }
+
+        int objStart = cleaned.indexOf('{');
+        int objEnd = cleaned.lastIndexOf('}');
+        if (objStart >= 0 && objEnd > objStart) {
+            String obj = cleaned.substring(objStart, objEnd + 1);
+            try {
+                JsonNode node = objectMapper.readTree(obj);
+                if (node.has("questions") && node.get("questions").isArray()) {
+                    List<GeneratedQuestionDraftDto> wrapped =
+                            tryParseArray(node.get("questions").toString());
+                    if (wrapped != null) return wrapped;
+                }
+                // Single-object regeneration response.
+                GeneratedQuestionDraftDto single =
+                        draftMapper.treeToValue(normalizeDraftNode(node), GeneratedQuestionDraftDto.class);
+                if (single != null && single.question() != null) {
+                    return List.of(single);
+                }
+            } catch (Exception ignored) {
+                // fall through to the failure below
+            }
+        }
+
+        log.error("Failed to parse AI question draft response; excerpt: {}",
+                cleaned.length() > 200 ? cleaned.substring(0, 200) : cleaned);
+        throw new InvalidAiGeneratedQuestionException(
+                "The AI returned malformed question draft JSON. Please try again.");
     }
 
+    /**
+     * Scans from the array opening bracket tracking brace depth and string
+     * state, and returns the array cut after the last complete top-level
+     * object. Returns null when no complete object exists.
+     */
+    private String salvageTruncatedArray(String text, int arrayStart) {
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        int lastCompleteObjectEnd = -1;
+
+        for (int i = arrayStart + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                escaped = inString;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) lastCompleteObjectEnd = i;
+            }
+        }
+
+        if (lastCompleteObjectEnd < 0) return null;
+        return text.substring(arrayStart, lastCompleteObjectEnd + 1) + "]";
+    }
+
+    /**
+     * Parses the candidate as a JSON array, mapping each element
+     * independently so one malformed question cannot fail the whole batch.
+     * Returns null when the candidate is not a parseable non-empty array.
+     */
+    private List<GeneratedQuestionDraftDto> tryParseArray(String candidate) {
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(candidate);
+        } catch (Exception e) {
+            return null;
+        }
+        if (root == null || !root.isArray() || root.isEmpty()) {
+            return null;
+        }
+
+        List<GeneratedQuestionDraftDto> drafts = new java.util.ArrayList<>();
+        int skipped = 0;
+        for (JsonNode element : root) {
+            try {
+                GeneratedQuestionDraftDto draft = draftMapper.treeToValue(
+                        normalizeDraftNode(element), GeneratedQuestionDraftDto.class);
+                if (draft != null && draft.question() != null && !draft.question().isBlank()) {
+                    drafts.add(draft);
+                } else {
+                    skipped++;
+                }
+            } catch (Exception itemError) {
+                skipped++;
+                log.warn("Skipping unmappable question draft element ({}): {}",
+                        itemError.getMessage(),
+                        element.toString().length() > 180
+                                ? element.toString().substring(0, 180)
+                                : element.toString());
+            }
+        }
+        if (skipped > 0) {
+            log.warn("Skipped {} malformed question draft element(s); kept {}", skipped, drafts.size());
+        }
+        return drafts.isEmpty() ? null : drafts;
+    }
+
+    /**
+     * Drafts are editable suggestions, so a missing lesson mapping is
+     * repaired rather than discarded: match the suggested title against the
+     * certification's real lessons, otherwise distribute round-robin, and
+     * tell the admin to review the assignment.
+     */
+    private List<GeneratedQuestionDraftDto> assignMissingLessons(
+            List<GeneratedQuestionDraftDto> drafts, CertContext ctx, List<String> warnings) {
+        List<LessonRef> lessons = new ArrayList<>(ctx.lessonsById().values());
+        if (lessons.isEmpty()) return drafts;
+
+        boolean repaired = false;
+        List<GeneratedQuestionDraftDto> result = new ArrayList<>(drafts.size());
+        int roundRobin = 0;
+        for (GeneratedQuestionDraftDto draft : drafts) {
+            boolean validLesson = draft.suggestedLessonId() != null
+                    && ctx.lessonsById().containsKey(draft.suggestedLessonId());
+            if (validLesson) {
+                result.add(draft);
+                continue;
+            }
+
+            LessonRef assigned = null;
+            String suggestedTitle = draft.suggestedLessonTitle();
+            if (suggestedTitle != null && !suggestedTitle.isBlank()) {
+                String needle = suggestedTitle.toLowerCase(Locale.ROOT);
+                assigned = lessons.stream()
+                        .filter(lesson -> lesson.title() != null
+                                && lesson.title().toLowerCase(Locale.ROOT).contains(needle))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (assigned == null) {
+                assigned = lessons.get(roundRobin++ % lessons.size());
+            }
+            repaired = true;
+            result.add(new GeneratedQuestionDraftDto(
+                    draft.questionType(),
+                    assigned.lessonId(),
+                    assigned.title(),
+                    draft.question(),
+                    draft.difficulty(),
+                    draft.choices(),
+                    draft.correctChoiceIndex(),
+                    draft.correctAnswer(),
+                    draft.checkingMethod(),
+                    draft.rubricBasedAnswer(),
+                    draft.starterCode(),
+                    draft.testCases(),
+                    draft.diagramType(),
+                    draft.instructions(),
+                    draft.authoringNotes()
+            ));
+        }
+        if (repaired) {
+            warnings.add("Some lesson assignments were suggested automatically. "
+                    + "Review each question's lesson before saving.");
+        }
+        return result;
+    }
+
+    /**
+     * Rewrites common alternate AI output shapes into the canonical
+     * GeneratedQuestionDraftDto schema before mapping: key synonyms
+     * (type/question_type, difficultyLevel/level, answer/correct_answer),
+     * bare-string "options" arrays, and difficulty/type synonyms.
+     */
+    private JsonNode normalizeDraftNode(JsonNode element) {
+        if (!element.isObject()) return element;
+        com.fasterxml.jackson.databind.node.ObjectNode node =
+                ((com.fasterxml.jackson.databind.node.ObjectNode) element).deepCopy();
+
+        // question text synonyms
+        renameFirst(node, "question", "questionText", "prompt");
+
+        // correct answer synonyms
+        renameFirst(node, "correctAnswer", "answer", "correct_answer", "expectedAnswer");
+
+        // question type synonyms and normalization
+        renameFirst(node, "questionType", "type", "question_type");
+        String type = node.path("questionType").asText("").trim().toUpperCase(Locale.ROOT)
+                .replace(' ', '_').replace('-', '_');
+        type = switch (type) {
+            case "MULTIPLE_CHOICE", "MULTIPLECHOICE", "MC" -> "MCQ";
+            case "CODING", "CODE" -> "PROGRAMMING";
+            case "ESSAY" -> "DESCRIPTIVE";
+            case "SHORTANSWER" -> "SHORT_ANSWER";
+            default -> type;
+        };
+
+        // choices: accept "options" (strings or objects) as well as "choices"
+        JsonNode rawChoices = node.hasNonNull("choices") ? node.get("choices") : node.get("options");
+        node.remove("options");
+        if (rawChoices != null && rawChoices.isArray() && rawChoices.size() > 0) {
+            String correctAnswerText = node.path("correctAnswer").asText("");
+            int correctIndex = node.path("correctChoiceIndex").asInt(-1);
+            com.fasterxml.jackson.databind.node.ArrayNode choices = objectMapper.createArrayNode();
+            int index = 0;
+            for (JsonNode choice : rawChoices) {
+                com.fasterxml.jackson.databind.node.ObjectNode mapped = objectMapper.createObjectNode();
+                if (choice.isObject()) {
+                    String text = choice.path("choiceText").asText(
+                            choice.path("text").asText(choice.path("option").asText("")));
+                    mapped.put("choiceText", text);
+                    if (choice.has("explanation")) {
+                        mapped.set("explanation", choice.get("explanation"));
+                    }
+                    boolean correct = choice.path("isCorrect").asBoolean(
+                            choice.path("correct").asBoolean(false));
+                    mapped.put("isCorrect", correct || index == correctIndex);
+                    if (correct) correctIndex = index;
+                } else {
+                    String text = choice.asText("");
+                    boolean correct = index == correctIndex
+                            || (!correctAnswerText.isBlank() && text.equals(correctAnswerText));
+                    mapped.put("choiceText", text);
+                    mapped.put("isCorrect", correct);
+                    if (correct) correctIndex = index;
+                }
+                choices.add(mapped);
+                index++;
+            }
+            node.set("choices", choices);
+            if (correctIndex >= 0) {
+                node.put("correctChoiceIndex", correctIndex);
+                // The MCQ validator also requires a non-blank correctAnswer;
+                // backfill it from the correct choice when the model omitted it.
+                if (!node.hasNonNull("correctAnswer")
+                        || node.path("correctAnswer").asText("").isBlank()) {
+                    node.put("correctAnswer",
+                            choices.get(correctIndex).path("choiceText").asText(""));
+                }
+            }
+            if (type.isBlank()) type = "MCQ";
+        }
+        if (!type.isBlank()) node.put("questionType", type);
+
+        // Per-type field normalization: force the checking method the
+        // validator requires and map answer/config synonyms so more drafts
+        // survive validation.
+        switch (type) {
+            case "SHORT_ANSWER" -> {
+                renameFirst(node, "correctAnswer",
+                        "answer", "expectedAnswer", "sampleAnswer", "modelAnswer", "expectedOutput");
+                node.put("checkingMethod", "EXACT_MATCH");
+            }
+            case "DESCRIPTIVE" -> {
+                renameFirst(node, "rubricBasedAnswer",
+                        "rubric", "sampleAnswer", "modelAnswer", "referenceAnswer",
+                        "correctAnswer", "answer", "expectedAnswer");
+                node.put("checkingMethod", "AI_SEMANTIC");
+            }
+            case "PROGRAMMING" -> {
+                renameFirst(node, "testCases", "tests", "test_cases", "sampleTests");
+                renameFirst(node, "starterCode", "starter_code", "template", "boilerplate");
+                com.fasterxml.jackson.databind.node.ArrayNode mappedTests =
+                        objectMapper.createArrayNode();
+                JsonNode tests = node.get("testCases");
+                if (tests != null && tests.isArray()) {
+                    for (JsonNode test : tests) {
+                        if (!test.isObject()) continue;
+                        String expected = test.path("expectedOutput").asText(
+                                test.path("output").asText(test.path("expected").asText("")));
+                        if (expected.isBlank()) continue;
+                        com.fasterxml.jackson.databind.node.ObjectNode mapped =
+                                objectMapper.createObjectNode();
+                        mapped.put("inputData", test.path("inputData").asText(
+                                test.path("input").asText(test.path("in").asText(""))));
+                        mapped.put("expectedOutput", expected);
+                        mappedTests.add(mapped);
+                    }
+                }
+                // Drafts are admin-completed and there is no code execution, so
+                // seed one clearly-marked placeholder test case the author fills in.
+                if (mappedTests.isEmpty()) {
+                    com.fasterxml.jackson.databind.node.ObjectNode placeholder =
+                            objectMapper.createObjectNode();
+                    placeholder.put("inputData", "");
+                    placeholder.put("expectedOutput", "TODO: add expected output before saving");
+                    mappedTests.add(placeholder);
+                }
+                node.set("testCases", mappedTests);
+            }
+            case "DIAGRAM" -> {
+                renameFirst(node, "diagramType", "diagram_type");
+                renameFirst(node, "instructions", "instruction", "task", "requirements");
+                renameFirst(node, "authoringNotes",
+                        "authoring_notes", "notes", "referenceNotes", "solutionNotes");
+                String diagramType = node.path("diagramType").asText("").trim()
+                        .toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+                diagramType = switch (diagramType) {
+                    case "UML", "CLASS", "CLASS_DIAGRAM", "UMLCLASS" -> "UML_CLASS";
+                    case "ENTITY_RELATIONSHIP", "ENTITY_RELATIONSHIP_DIAGRAM" -> "ERD";
+                    case "DATA_FLOW", "DATA_FLOW_DIAGRAM", "DATAFLOW" -> "DFD";
+                    case "FLOW_CHART" -> "FLOWCHART";
+                    default -> diagramType;
+                };
+                // Infer the diagram type from the prompt when the model omits it.
+                if (diagramType.isBlank()
+                        || !java.util.Set.of("ERD", "UML_CLASS", "FLOWCHART", "DFD")
+                                .contains(diagramType)) {
+                    String q = node.path("question").asText("").toLowerCase(Locale.ROOT);
+                    if (q.contains("erd") || q.contains("entity") || q.contains("relationship")
+                            || q.contains("schema")) {
+                        diagramType = "ERD";
+                    } else if (q.contains("uml") || q.contains("class")) {
+                        diagramType = "UML_CLASS";
+                    } else if (q.contains("data flow") || q.contains("dfd")) {
+                        diagramType = "DFD";
+                    } else {
+                        diagramType = "FLOWCHART";
+                    }
+                }
+                node.put("diagramType", diagramType);
+                if (node.path("instructions").asText("").isBlank()) {
+                    node.put("instructions", node.path("question").asText(
+                            "Create the requested diagram."));
+                }
+                if (node.path("authoringNotes").asText("").isBlank()) {
+                    node.put("authoringNotes",
+                            "Create the reference diagram manually and review before saving.");
+                }
+                // Diagram reference data is admin-controlled only.
+                node.remove("referenceDiagramXml");
+                node.remove("referenceDiagramNodes");
+                node.remove("referenceDiagramEdges");
+            }
+            default -> { /* MCQ handled above */ }
+        }
+
+        // difficulty synonyms and normalization
+        renameFirst(node, "difficulty", "difficultyLevel", "level");
+        String difficulty = node.path("difficulty").asText("").trim().toLowerCase(Locale.ROOT);
+        difficulty = switch (difficulty) {
+            case "beginner", "basic", "easy" -> "easy";
+            case "avg", "medium", "moderate", "intermediate", "average", "" -> "average";
+            case "difficult", "advanced", "expert", "hard" -> "hard";
+            default -> "average";
+        };
+        node.put("difficulty", difficulty);
+
+        renameFirst(node, "suggestedLessonId", "lessonId");
+        renameFirst(node, "suggestedLessonTitle", "lessonTitle");
+        return node;
+    }
+
+    private void renameFirst(
+            com.fasterxml.jackson.databind.node.ObjectNode node,
+            String canonical, String... synonyms) {
+        if (node.hasNonNull(canonical)) return;
+        for (String synonym : synonyms) {
+            if (node.hasNonNull(synonym)) {
+                node.set(canonical, node.get(synonym));
+                node.remove(synonym);
+                return;
+            }
+        }
+    }
 }

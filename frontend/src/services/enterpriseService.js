@@ -83,6 +83,19 @@ export function getPartnershipMeetings() {
   return base("partnership-meetings")
 }
 
+// Transaction Three: submit a partnership request and all of its line items
+// atomically, with idempotency to prevent duplicate submissions.
+export function submitPartnershipRequestTransaction(request) {
+  return base("enterprise/partnership-requests", {
+    method: "POST",
+    data: request,
+  })
+}
+
+export function getPartnershipRequestTransactions(enterpriseId) {
+  return base(`enterprise/partnership-requests?enterpriseId=${enterpriseId}`)
+}
+
 // Renewals
 export function getRenewalRequestsByOrgCert(orgCertId) {
   return base(`enterprise-certification-renewal-requests/org-cert/${orgCertId}`)

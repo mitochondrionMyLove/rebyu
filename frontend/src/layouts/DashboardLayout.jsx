@@ -31,8 +31,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import DemoRoleSwitcher from "@/components/development/demo-role-switcher"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/context/auth-context.jsx"
 
 export default function DashboardLayout() {
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate("/login", { replace: true })
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -69,7 +79,7 @@ export default function DashboardLayout() {
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
+                <DropdownMenuItem variant="destructive" onClick={handleLogout}>
                   <LogOutIcon />
                   Log out
                 </DropdownMenuItem>

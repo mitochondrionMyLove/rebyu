@@ -1,0 +1,171 @@
+package com.capstone.rebyu.auth.service;
+
+import com.capstone.rebyu.auth.dto.CurrentUserDto;
+import com.capstone.rebyu.user.entity.Learner;
+import com.capstone.rebyu.user.entity.User;
+import com.capstone.rebyu.user.entity.UserType;
+import com.capstone.rebyu.user.repository.LearnerRepository;
+import com.capstone.rebyu.user.repository.UserRepository;
+import com.capstone.rebyu.user.repository.UserTypeRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserResponse;
+
+import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * Links a validated Cognito identity to the existing REBYU user model.
+ *
+ * The Cognito subject is the stable external identity; the local users table
+ * (and its learner profile, enrollments, results, and transactions) remains
+ * the application source of truth. Self-registration only ever provisions the
+ * lowest LEARNER access level.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CognitoAuthService {
+
+    public static final String LEARNER_USER_TYPE = "LEARNER";
+
+    private final UserRepository userRepository;
+    private final UserTypeRepository userTypeRepository;
+    private final LearnerRepository learnerRepository;
+    private final com.capstone.rebyu.organization.repository.EnterpriseMemberRepository enterpriseMemberRepository;
+    private final CognitoIdentityProviderClient cognitoClient;
+
+    @Transactional
+    public CurrentUserDto syncCurrentUser(Jwt jwt, String rawAccessToken) {
+        String cognitoSub = jwt.getSubject();
+
+        User existing = userRepository.findByCognitoSub(cognitoSub).orElse(null);
+        if (existing != null) {
+            return toDto(existing);
+        }
+
+        // First sign-in for this subject: fetch verified attributes from
+        // Cognito itself (never from frontend-supplied fields).
+        Map<String, String> attributes = fetchCognitoAttributes(rawAccessToken);
+        String email = attributes.get("email");
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException(
+                    "Cognito account has no email attribute; cannot link a REBYU user.");
+        }
+
+        try {
+            return toDto(linkOrProvision(cognitoSub, email, attributes));
+        } catch (DataIntegrityViolationException raceLost) {
+            // A parallel first-login request linked this subject already.
+            return userRepository.findByCognitoSub(cognitoSub)
+                    .map(this::toDto)
+                    .orElseThrow(() -> raceLost);
+        }
+    }
+
+    private User linkOrProvision(String cognitoSub, String email, Map<String, String> attributes) {
+        User byEmail = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (byEmail != null) {
+            if (byEmail.getCognitoSub() != null && !byEmail.getCognitoSub().equals(cognitoSub)) {
+                throw new IllegalStateException(
+                        "This email is already linked to a different sign-in identity.");
+            }
+            byEmail.setCognitoSub(cognitoSub);
+            return userRepository.save(byEmail);
+        }
+
+        UserType learnerType = userTypeRepository.findByUserTypeText(LEARNER_USER_TYPE)
+                .orElseGet(() -> {
+                    UserType type = new UserType();
+                    type.setUserTypeText(LEARNER_USER_TYPE);
+                    return userTypeRepository.save(type);
+                });
+
+        User user = User.builder()
+                .userType(learnerType)
+                .email(email)
+                // Authentication is delegated to Cognito; no local password.
+                .passwordHash("COGNITO")
+                .accountStatus(User.AccountStatus.active)
+                .joinedAt(LocalDateTime.now())
+                .cognitoSub(cognitoSub)
+                .build();
+        user = userRepository.save(user);
+
+        Learner learner = Learner.builder()
+                .user(user)
+                .username(uniqueUsernameFrom(email))
+                .firstName(attributes.getOrDefault("given_name", ""))
+                .lastName(attributes.getOrDefault("family_name", ""))
+                // @Builder ignores the entity's field defaults, and these
+                // columns are NOT NULL — set them explicitly.
+                .readinessScore(java.math.BigDecimal.ZERO)
+                .confidenceLevel(java.math.BigDecimal.ZERO)
+                .build();
+        learnerRepository.save(learner);
+
+        log.info("Provisioned learner account for new Cognito user userId={}", user.getUserId());
+        return user;
+    }
+
+    private Map<String, String> fetchCognitoAttributes(String rawAccessToken) {
+        GetUserResponse response = cognitoClient.getUser(
+                GetUserRequest.builder().accessToken(rawAccessToken).build());
+        return response.userAttributes().stream()
+                .collect(Collectors.toMap(AttributeType::name, AttributeType::value, (a, b) -> a));
+    }
+
+    private String uniqueUsernameFrom(String email) {
+        String base = email.split("@")[0]
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9._-]", "");
+        if (base.isBlank()) {
+            base = "learner";
+        }
+        base = base.substring(0, Math.min(base.length(), 40));
+        String candidate = base;
+        while (learnerRepository.existsByUsername(candidate)) {
+            candidate = base + "-" + UUID.randomUUID().toString().substring(0, 6);
+        }
+        return candidate;
+    }
+
+    private CurrentUserDto toDto(User user) {
+        Learner learner = learnerRepository.findByUser_UserId(user.getUserId()).orElse(null);
+        String firstName = learner != null ? learner.getFirstName() : "";
+        String lastName = learner != null ? learner.getLastName() : "";
+        String displayName = (firstName + " " + lastName).trim();
+        if (displayName.isBlank()) {
+            displayName = learner != null ? learner.getUsername() : user.getEmail();
+        }
+
+        // Enterprise members carry their organization so the portal can scope
+        // to it; their role comes from the ENTERPRISE user type.
+        Long enterpriseId = enterpriseMemberRepository.findByUser_UserId(user.getUserId())
+                .stream()
+                .findFirst()
+                .map(member -> member.getEnterprise().getEnterpriseId())
+                .orElse(null);
+
+        return new CurrentUserDto(
+                user.getUserId(),
+                user.getEmail(),
+                user.getUserType() != null ? user.getUserType().getUserTypeText() : LEARNER_USER_TYPE,
+                learner != null ? learner.getLearnerId() : null,
+                enterpriseId,
+                firstName,
+                lastName,
+                displayName
+        );
+    }
+}

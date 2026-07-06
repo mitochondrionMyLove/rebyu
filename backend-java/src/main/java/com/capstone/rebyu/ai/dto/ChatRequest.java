@@ -1,6 +1,7 @@
 package com.capstone.rebyu.ai.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,7 @@ public class ChatRequest {
     @NotBlank
     private String sessionId;
 
-    @NotBlank
-    private int lessonId;
+    // Boxed so @NotNull applies correctly; @NotBlank is invalid on numeric types.
+    @NotNull
+    private Integer lessonId;
 }

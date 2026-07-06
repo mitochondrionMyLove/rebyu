@@ -52,4 +52,10 @@ public class OrganizationCertificate {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.active;
+
+    // Optimistic lock guarding concurrent slot reservation (Transaction 3) so
+    // two simultaneous invitation batches cannot oversubscribe the allocation.
+    @Version
+    @Column(name = "version")
+    private Long version;
 }

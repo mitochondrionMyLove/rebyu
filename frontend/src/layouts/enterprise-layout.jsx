@@ -1,7 +1,7 @@
 import { useMemo } from "react"
-import { Outlet } from "react-router-dom"
+import { Outlet, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { Bell, Building2Icon } from "lucide-react"
+import { Bell, Building2Icon, LogOutIcon, SettingsIcon, UserIcon } from "lucide-react"
 
 import { EnterpriseAppSidebar } from "@/components/enterprise/enterprise-sidebar.jsx"
 import DemoRoleSwitcher from "@/components/development/demo-role-switcher"
@@ -11,6 +11,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -20,7 +21,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { getAllEnterprises } from "@/services/enterpriseService.js"
+import { getAllEnterprises, getEnterpriseById } from "@/services/enterpriseService.js"
+import { useAuth } from "@/context/auth-context.jsx"
 
 function getInitials(name = "") {
   return (
@@ -34,39 +36,57 @@ function getInitials(name = "") {
 }
 
 export default function EnterpriseLayout() {
-  // Preview mode has no signed-in organization account, so the portal scopes
-  // itself to the first organization on record. Pages fall back to clean
-  // empty/error states when the backend requires authentication.
-  const enterprisesQuery = useQuery({
+  const navigate = useNavigate()
+  const { user, logout: authLogout } = useAuth()
+  // A signed-in enterprise account is scoped to its own organization via the
+  // enterpriseId from /api/auth/me. In DEV preview (no login) the portal falls
+  // back to the first organization on record.
+  const authEnterpriseId = user?.enterpriseId ?? null
+
+  const scopedQuery = useQuery({
+    queryKey: ["enterprise", authEnterpriseId],
+    queryFn: () => getEnterpriseById(authEnterpriseId),
+    enabled: authEnterpriseId != null,
+    staleTime: 60_000,
+    retry: 1,
+  })
+
+  const fallbackQuery = useQuery({
     queryKey: ["enterprises"],
     queryFn: getAllEnterprises,
+    enabled: authEnterpriseId == null,
     staleTime: 60_000,
     retry: 1,
   })
 
   const enterprise = useMemo(() => {
-    const list = Array.isArray(enterprisesQuery.data)
-      ? enterprisesQuery.data
-      : []
+    if (authEnterpriseId != null) {
+      return scopedQuery.data ?? null
+    }
+    const list = Array.isArray(fallbackQuery.data) ? fallbackQuery.data : []
     return list[0] ?? null
-  }, [enterprisesQuery.data])
+  }, [authEnterpriseId, scopedQuery.data, fallbackQuery.data])
+
+  const activeQuery = authEnterpriseId != null ? scopedQuery : fallbackQuery
 
   const outletContext = useMemo(
     () => ({
       enterprise,
-      enterpriseLoading: enterprisesQuery.isLoading,
-      enterpriseError: enterprisesQuery.isError,
-      refetchEnterprise: enterprisesQuery.refetch,
+      enterpriseLoading: activeQuery.isLoading,
+      enterpriseError: activeQuery.isError,
+      refetchEnterprise: activeQuery.refetch,
     }),
-    [
-      enterprise,
-      enterprisesQuery.isLoading,
-      enterprisesQuery.isError,
-      enterprisesQuery.refetch,
-    ]
+    [enterprise, activeQuery.isLoading, activeQuery.isError, activeQuery.refetch]
   )
 
   const orgName = enterprise?.enterpriseName ?? "Organization"
+
+  const logout = async () => {
+    await authLogout()
+    localStorage.removeItem("enterprise_id")
+    localStorage.removeItem("organizationId")
+    navigate("/login", { replace: true })
+  }
 
   return (
     <SidebarProvider>
@@ -111,9 +131,45 @@ export default function EnterpriseLayout() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Avatar>
-              <AvatarFallback>{getInitials(orgName)}</AvatarFallback>
-            </Avatar>
+           <DropdownMenu>
+             <DropdownMenuTrigger asChild>
+               <button
+                 type="button"
+                 className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                 aria-label="Open account menu"
+               >
+                 <Avatar>
+                   <AvatarFallback>{getInitials(orgName)}</AvatarFallback>
+                 </Avatar>
+               </button>
+             </DropdownMenuTrigger>
+             <DropdownMenuContent
+               align="end"
+               sideOffset={10}
+               className="w-56 p-2"
+             >
+               <DropdownMenuLabel>
+                 <span className="block truncate">{orgName}</span>
+                 <span className="block truncate text-xs font-normal text-muted-foreground">
+                   {user?.email || "Enterprise"}
+                 </span>
+               </DropdownMenuLabel>
+               <DropdownMenuSeparator />
+               <DropdownMenuItem onClick={() => navigate("/enterprise/organization")}>
+                 <UserIcon />
+                 Profile
+               </DropdownMenuItem>
+               <DropdownMenuItem onClick={() => navigate("/enterprise/settings")}>
+                 <SettingsIcon />
+                 Settings
+               </DropdownMenuItem>
+               <DropdownMenuSeparator />
+               <DropdownMenuItem variant="destructive" onClick={logout}>
+                 <LogOutIcon />
+                 Log out
+               </DropdownMenuItem>
+             </DropdownMenuContent>
+           </DropdownMenu>
           </div>
         </header>
 

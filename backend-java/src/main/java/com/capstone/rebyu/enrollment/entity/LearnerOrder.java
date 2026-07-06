@@ -54,4 +54,8 @@ public class LearnerOrder {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.pending;
+
+    /** Prevents duplicate purchase transactions from retried requests. */
+    @Column(name = "idempotency_key", length = 100, unique = true)
+    private String idempotencyKey;
 }

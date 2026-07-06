@@ -35,3 +35,4 @@ export async function generateLessonFromFiles(lessonId, files) {
     data: formData,
   })
 }
+

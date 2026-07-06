@@ -2,6 +2,7 @@ package com.capstone.rebyu.assessment.entity;
 
 
 import com.capstone.rebyu.certification.entity.Certification;
+import com.capstone.rebyu.certification.entity.Lesson;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "exams")
@@ -17,6 +19,11 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class Exam {
+
+    public enum Status {
+        DRAFT, PUBLISHED, ARCHIVED
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long examId;
@@ -43,4 +50,31 @@ public class Exam {
 
     @Column(name = "passing_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal passingScore = new BigDecimal("70.00");
+
+    // Lifecycle columns are nullable so ddl-auto=update can migrate the
+    // existing non-empty table; a null status is treated as DRAFT in code.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    private Status status;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "instructions", columnDefinition = "TEXT")
+    private String instructions;
+
+    /** Required for QUIZ-type exams, null for certification-level exams. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lesson_id")
+    private Lesson lesson;
+
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    public Status effectiveStatus() {
+        return status == null ? Status.DRAFT : status;
+    }
 }

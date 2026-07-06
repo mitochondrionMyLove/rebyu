@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -19,6 +20,7 @@ import java.util.List;
 public class LearnerInvitationService {
     private final LearnerInvitationRepository learnerInvitationRepository;
     private final LearnerInvitationMapper learnerInvitationMapper;
+    private final EmailService emailService;
 
     public List<LearnerInvitationDto> getAll() {
         log.debug("Fetching all learner invitations");
@@ -35,6 +37,8 @@ public class LearnerInvitationService {
         LearnerInvitation entity = learnerInvitationMapper.toEntity(dto);
         entity.setInvitationId(null);
         LearnerInvitationDto result = learnerInvitationMapper.toDto(learnerInvitationRepository.save(entity));
+
+        emailService.sendEnterpriseInvitation(dto.getEmail(),"Sample Hehe",String.valueOf(dto.getOrgCertId()),dto.getTokenHash());
         log.info("LearnerInvitation created with id: {}", result.getInvitationId());
         return result;
     }

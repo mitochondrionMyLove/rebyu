@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -40,4 +41,16 @@ public class ExamDto {
     @DecimalMin("0.0")
     @DecimalMax("100.0")
     private BigDecimal passingScore;
+
+    private String status;
+
+    private String description;
+
+    private String instructions;
+
+    private Long lessonId;
+
+    private LocalDateTime publishedAt;
+
+    private LocalDateTime updatedAt;
 }

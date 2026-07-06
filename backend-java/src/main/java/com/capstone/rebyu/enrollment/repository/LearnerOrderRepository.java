@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface LearnerOrderRepository extends JpaRepository<LearnerOrder, Long> {
     List<LearnerOrder> findByLearner_LearnerId(Long learnerId);
+
+    java.util.Optional<LearnerOrder> findByIdempotencyKey(String idempotencyKey);
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { useOutletContext } from "react-router-dom"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { MailPlusIcon } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Loader2, MailPlus, Ticket, X } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -14,8 +14,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
@@ -33,155 +35,186 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   EnterpriseEmptyState,
   EnterpriseErrorState,
   EnterpriseLoadingSkeleton,
   EnterprisePageHeader,
-  EnterpriseStatCard,
   EnterpriseStatusBadge,
   formatDateTime,
 } from "@/components/enterprise/enterprise-ui.jsx"
-import { useEnterpriseData } from "@/hooks/use-enterprise-data.js"
 import {
-  createLearnerInvitation,
-  updateLearnerInvitation,
-} from "@/services/enterpriseService.js"
+  cancelEnterpriseInvitation,
+  getEnterpriseCertificationAccess,
+  getEnterpriseInvitations,
+  sendEnterpriseInvitations,
+} from "@/services/partnershipService.js"
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// LocalDateTime-compatible timestamp (no timezone suffix).
-function toLocalDateTime(date) {
-  return date.toISOString().slice(0, 19)
-}
-
-function InviteLearnerDialog({ open, onOpenChange, data }) {
+function InviteDialog({ open, onOpenChange, enterpriseId, access }) {
   const queryClient = useQueryClient()
-  const [email, setEmail] = useState("")
   const [orgCertId, setOrgCertId] = useState("")
+  const [draft, setDraft] = useState("")
+  const [emails, setEmails] = useState([])
   const [error, setError] = useState("")
 
-  const availableOrgCerts = data.orgCerts.filter(
-    (orgCert) =>
-      orgCert.status === "active" &&
-      (orgCert.totalSlots ?? 0) - (orgCert.usedSlots ?? 0) > 0
-  )
+  const selectedAccess = access.find((a) => String(a.orgCertId) === orgCertId)
+  const remaining = selectedAccess?.remainingSlots ?? 0
 
-  const inviteMutation = useMutation({
-    mutationFn: createLearnerInvitation,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["learner-invitations"] })
-      toast.success("Invitation sent successfully.")
-      setEmail("")
-      setOrgCertId("")
-      setError("")
+  const reset = () => {
+    setOrgCertId("")
+    setDraft("")
+    setEmails([])
+    setError("")
+  }
+
+  const addEmail = (value) => {
+    const email = value.trim().toLowerCase()
+    if (!email) return
+    if (!EMAIL_PATTERN.test(email)) {
+      setError(`"${email}" is not a valid email.`)
+      return
+    }
+    if (emails.includes(email)) {
+      setError("That email is already in the list.")
+      return
+    }
+    if (emails.length >= remaining) {
+      setError(`Only ${remaining} slot(s) remaining for this certification.`)
+      return
+    }
+    setEmails((current) => [...current, email])
+    setDraft("")
+    setError("")
+  }
+
+  const sendMutation = useMutation({
+    mutationFn: () =>
+      sendEnterpriseInvitations({
+        enterpriseId,
+        orgCertId: Number(orgCertId),
+        emails,
+      }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-invitations"] })
+      queryClient.invalidateQueries({ queryKey: ["enterprise-cert-access"] })
+      toast.success(
+        `${response.created} invitation(s) sent.` +
+          (response.skipped?.length ? ` ${response.skipped.length} skipped.` : "")
+      )
+      reset()
       onOpenChange(false)
     },
-    onError: () => {
-      toast.error("Unable to send the invitation. Please try again.")
+    onError: (err) => {
+      const message =
+        err?.response?.data?.message ?? "Unable to send invitations. Please try again."
+      setError(message)
+      toast.error(message)
     },
   })
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    const trimmed = email.trim().toLowerCase()
-
-    if (!EMAIL_PATTERN.test(trimmed)) {
-      setError("Enter a valid email address.")
-      return
-    }
     if (!orgCertId) {
-      setError("Select a certification for this invitation.")
+      setError("Select a certification.")
       return
     }
-    const duplicate = data.invitations.some(
-      (invitation) =>
-        invitation.email?.toLowerCase() === trimmed &&
-        invitation.orgCertId === Number(orgCertId) &&
-        invitation.status === "PENDING"
-    )
-    if (duplicate) {
-      setError("A pending invitation for this email already exists.")
+    if (emails.length === 0) {
+      setError("Add at least one learner email.")
       return
     }
-
-    setError("")
-    const now = new Date()
-    const expires = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
-    inviteMutation.mutate({
-      orgCertId: Number(orgCertId),
-      email: trimmed,
-      tokenHash: crypto.randomUUID(),
-      sentAt: toLocalDateTime(now),
-      expiresAt: toLocalDateTime(expires),
-      status: "PENDING",
-    })
+    sendMutation.mutate()
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset()
+        onOpenChange(next)
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Invite learner</DialogTitle>
+          <DialogTitle>Invite learners</DialogTitle>
           <DialogDescription>
-            Send an invitation and assign the learner to one of your
-            certification allocations.
+            Invitations reserve one learner slot each.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="invite-email">Email address</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="learner@example.com"
-              autoComplete="off"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="invite-cert">Certification</Label>
             <Select value={orgCertId} onValueChange={setOrgCertId}>
               <SelectTrigger id="invite-cert" className="w-full">
-                <SelectValue placeholder="Select a certification allocation" />
+                <SelectValue placeholder="Select certification access" />
               </SelectTrigger>
               <SelectContent>
-                {availableOrgCerts.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    No allocations with remaining slots.
-                  </div>
-                ) : (
-                  availableOrgCerts.map((orgCert) => {
-                    const certification = data.certificationById.get(
-                      orgCert.certificationId
-                    )
-                    const remaining =
-                      (orgCert.totalSlots ?? 0) - (orgCert.usedSlots ?? 0)
-                    return (
-                      <SelectItem
-                        key={orgCert.orgCertId}
-                        value={String(orgCert.orgCertId)}
-                      >
-                        {certification?.title ??
-                          `Certification #${orgCert.certificationId}`}{" "}
-                        · {remaining} slot(s) left
-                      </SelectItem>
-                    )
-                  })
-                )}
+                {access
+                  .filter((a) => a.status === "active")
+                  .map((a) => (
+                    <SelectItem key={a.orgCertId} value={String(a.orgCertId)}>
+                      {a.certificationTitle} · {a.remainingSlots} left
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {orgCertId ? (
+            <p className="text-xs text-muted-foreground">
+              {emails.length} selected · {Math.max(remaining - emails.length, 0)} slot(s)
+              still available
+            </p>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="invite-email">Learner emails</Label>
+            <div className="flex gap-2">
+              <Input
+                id="invite-email"
+                type="email"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault()
+                    addEmail(draft)
+                  }
+                }}
+                placeholder="learner@example.com"
+                disabled={!orgCertId}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => addEmail(draft)}
+                disabled={!orgCertId || !draft.trim()}
+              >
+                Add
+              </Button>
+            </div>
+            {emails.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {emails.map((email) => (
+                  <Badge key={email} variant="secondary" className="gap-1 py-1">
+                    {email}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEmails((current) => current.filter((e) => e !== email))
+                      }
+                      aria-label={`Remove ${email}`}
+                      className="rounded-full outline-none hover:text-destructive"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {error ? (
@@ -194,13 +227,23 @@ function InviteLearnerDialog({ open, onOpenChange, data }) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={inviteMutation.isPending}
+              onClick={() => {
+                reset()
+                onOpenChange(false)
+              }}
+              disabled={sendMutation.isPending}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={inviteMutation.isPending}>
-              {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
+            <Button type="submit" disabled={sendMutation.isPending}>
+              {sendMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  Sending invitations...
+                </>
+              ) : (
+                "Send Invitations"
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -212,201 +255,215 @@ function InviteLearnerDialog({ open, onOpenChange, data }) {
 export default function EnterpriseInvitationsPage() {
   const { enterprise, enterpriseLoading, enterpriseError, refetchEnterprise } =
     useOutletContext()
-  const data = useEnterpriseData(enterprise?.enterpriseId)
   const queryClient = useQueryClient()
-
+  const enterpriseId = enterprise?.enterpriseId
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [revokeTarget, setRevokeTarget] = useState(null)
+  const [cancelTarget, setCancelTarget] = useState(null)
 
-  const revokeMutation = useMutation({
+  const accessQuery = useQuery({
+    queryKey: ["enterprise-cert-access", enterpriseId],
+    queryFn: () => getEnterpriseCertificationAccess(enterpriseId),
+    enabled: enterpriseId != null,
+    retry: 1,
+  })
+
+  const invitationsQuery = useQuery({
+    queryKey: ["enterprise-invitations", enterpriseId],
+    queryFn: () => getEnterpriseInvitations(enterpriseId),
+    enabled: enterpriseId != null,
+    retry: 1,
+  })
+
+  const cancelMutation = useMutation({
     mutationFn: (invitation) =>
-      updateLearnerInvitation(invitation.invitationId, {
-        ...invitation,
-        status: "REVOKED",
-      }),
+      cancelEnterpriseInvitation(invitation.invitationId, enterpriseId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["learner-invitations"] })
-      toast.success("Invitation revoked.")
-      setRevokeTarget(null)
+      queryClient.invalidateQueries({ queryKey: ["enterprise-invitations"] })
+      queryClient.invalidateQueries({ queryKey: ["enterprise-cert-access"] })
+      toast.success("Invitation cancelled. Slot restored.")
+      setCancelTarget(null)
     },
-    onError: () => {
-      toast.error("Unable to revoke the invitation. Please try again.")
+    onError: (err) => {
+      toast.error(err?.response?.data?.message ?? "Unable to cancel the invitation.")
     },
   })
 
-  const sortedInvitations = useMemo(
+  const access = Array.isArray(accessQuery.data) ? accessQuery.data : []
+  const invitations = Array.isArray(invitationsQuery.data) ? invitationsQuery.data : []
+  const hasAccess = access.length > 0
+
+  const totals = useMemo(
     () =>
-      [...data.invitations].sort(
-        (a, b) => new Date(b.sentAt ?? 0) - new Date(a.sentAt ?? 0)
+      access.reduce(
+        (acc, a) => ({
+          total: acc.total + (a.totalSlots ?? 0),
+          used: acc.used + (a.usedSlots ?? 0),
+          remaining: acc.remaining + (a.remainingSlots ?? 0),
+        }),
+        { total: 0, used: 0, remaining: 0 }
       ),
-    [data.invitations]
+    [access]
   )
 
-  if (enterpriseLoading || (enterprise && data.isLoading)) {
-    return <EnterpriseLoadingSkeleton />
-  }
-  if (enterpriseError) {
-    return <EnterpriseErrorState onRetry={refetchEnterprise} />
-  }
+  if (enterpriseLoading) return <EnterpriseLoadingSkeleton />
+  if (enterpriseError) return <EnterpriseErrorState onRetry={refetchEnterprise} />
   if (!enterprise) {
     return (
       <EnterpriseEmptyState
         title="No organization found"
-        description="Invitations appear here once your organization is registered."
+        description="Learner invitations appear here once your organization is approved."
       />
     )
   }
 
-  const totalSlots = data.orgCerts.reduce(
-    (sum, cert) => sum + (cert.totalSlots ?? 0),
-    0
-  )
-  const usedSlots = data.orgCerts.reduce(
-    (sum, cert) => sum + (cert.usedSlots ?? 0),
-    0
-  )
-
   return (
     <div className="space-y-6">
       <EnterprisePageHeader
-        title="Invitations"
-        subtitle="Invite learners to join your organization's certification programs."
+        title="Learner Invitations"
+        subtitle="Invite learners to your organization's certifications using available slots."
         actions={
-          <Button onClick={() => setInviteOpen(true)}>
-            <MailPlusIcon aria-hidden="true" />
-            Invite Learner
+          <Button onClick={() => setInviteOpen(true)} disabled={!hasAccess}>
+            <MailPlus aria-hidden="true" />
+            Invite Learners
           </Button>
         }
       />
 
-      {data.isError ? (
-        <EnterpriseErrorState onRetry={data.refetchAll} />
+      {accessQuery.isError ? (
+        <EnterpriseErrorState onRetry={accessQuery.refetch} />
+      ) : !hasAccess ? (
+        <EnterpriseEmptyState
+          icon={Ticket}
+          title="No active certification access yet"
+          description="Once an approved partnership grants your organization certification slots, you can invite learners here."
+        />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <EnterpriseStatCard
-              label="Total slots"
-              value={totalSlots}
-              hint="Across all certification allocations"
-            />
-            <EnterpriseStatCard
-              label="Used slots"
-              value={usedSlots}
-              hint={`${Math.max(totalSlots - usedSlots, 0)} remaining`}
-            />
-            <EnterpriseStatCard
-              label="Pending invitations"
-              value={
-                sortedInvitations.filter((inv) => inv.status === "PENDING")
-                  .length
-              }
-              hint={`${sortedInvitations.length} sent in total`}
-            />
+          {/* Certification access cards */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {access.map((a) => {
+              const used = a.usedSlots ?? 0
+              const total = a.totalSlots ?? 0
+              const pct = total > 0 ? (used / total) * 100 : 0
+              return (
+                <Card key={a.orgCertId}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-base">{a.certificationTitle}</CardTitle>
+                      <EnterpriseStatusBadge status={a.status} />
+                    </div>
+                    <CardDescription>
+                      {a.remainingSlots} of {total} slots available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Progress value={pct} aria-label="Slot usage" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{used} used</span>
+                      <span>{a.remainingSlots} remaining</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
 
-          {sortedInvitations.length === 0 ? (
-            <EnterpriseEmptyState
-              icon={MailPlusIcon}
-              title="No invitations yet"
-              description="Invitations you send will appear here with their status."
-              action={
-                <Button size="sm" onClick={() => setInviteOpen(true)}>
-                  Invite Learner
-                </Button>
-              }
-            />
-          ) : (
-            <Card>
-              <CardContent className="p-0">
+          {/* Invitation list */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Invitations ({invitations.length})
+              </CardTitle>
+              <CardDescription>
+                {totals.used} slot(s) reserved across {access.length} certification(s).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {invitationsQuery.isLoading ? (
+                <div className="space-y-2 p-4">
+                  <EnterpriseLoadingSkeleton rows={3} />
+                </div>
+              ) : invitations.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No invitations sent yet.
+                </p>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Email</TableHead>
                       <TableHead>Certification</TableHead>
                       <TableHead>Sent</TableHead>
-                      <TableHead>Expires</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedInvitations.map((invitation) => {
-                      const orgCert = data.orgCertById.get(invitation.orgCertId)
-                      const certification = orgCert
-                        ? data.certificationById.get(orgCert.certificationId)
-                        : null
-                      return (
-                        <TableRow key={invitation.invitationId}>
-                          <TableCell className="font-medium">
-                            {invitation.email}
-                          </TableCell>
-                          <TableCell className="max-w-[220px] truncate">
-                            {certification?.title ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDateTime(invitation.sentAt)}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDateTime(invitation.expiresAt)}
-                          </TableCell>
-                          <TableCell>
-                            <EnterpriseStatusBadge status={invitation.status} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {invitation.status === "PENDING" ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setRevokeTarget(invitation)}
-                              >
-                                Revoke
-                              </Button>
-                            ) : null}
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
+                    {invitations.map((inv) => (
+                      <TableRow key={inv.invitationId}>
+                        <TableCell className="font-medium">{inv.email}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {inv.certificationTitle}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDateTime(inv.sentAt)}
+                        </TableCell>
+                        <TableCell>
+                          <EnterpriseStatusBadge status={inv.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {inv.status === "PENDING" ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setCancelTarget(inv)}
+                            >
+                              Cancel
+                            </Button>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
 
-      <InviteLearnerDialog
+      <InviteDialog
         open={inviteOpen}
         onOpenChange={setInviteOpen}
-        data={data}
+        enterpriseId={enterpriseId}
+        access={access}
       />
 
       <AlertDialog
-        open={revokeTarget != null}
-        onOpenChange={(open) => {
-          if (!open) setRevokeTarget(null)
-        }}
+        open={cancelTarget != null}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke this invitation?</AlertDialogTitle>
+            <AlertDialogTitle>Cancel this invitation?</AlertDialogTitle>
             <AlertDialogDescription>
-              {revokeTarget?.email} will no longer be able to accept this
-              invitation. This action cannot be undone.
+              {cancelTarget?.email} will no longer be able to accept this invitation,
+              and its reserved slot will be restored.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={revokeMutation.isPending}>
-              Cancel
+            <AlertDialogCancel disabled={cancelMutation.isPending}>
+              Keep invitation
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault()
-                revokeMutation.mutate(revokeTarget)
+              onClick={(e) => {
+                e.preventDefault()
+                cancelMutation.mutate(cancelTarget)
               }}
-              disabled={revokeMutation.isPending}
+              disabled={cancelMutation.isPending}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {revokeMutation.isPending ? "Revoking..." : "Revoke Invitation"}
+              {cancelMutation.isPending ? "Cancelling invitation..." : "Cancel Invitation"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
