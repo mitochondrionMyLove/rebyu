@@ -3,33 +3,51 @@ package com.capstone.rebyu.ai.service;
 import com.capstone.rebyu.ai.collector.LessonDraftCollector;
 import com.capstone.rebyu.ai.context.LessonGenerationExecutionContext;
 import com.capstone.rebyu.ai.dto.AccordionToolInputDto;
+import com.capstone.rebyu.ai.dto.ContentAccordionBlockToolInputDto;
+import com.capstone.rebyu.ai.dto.ContentTabsBlockToolInputDto;
 import com.capstone.rebyu.ai.dto.DescriptionToolInputDto;
 import com.capstone.rebyu.ai.dto.FlipGridToolInputDto;
 import com.capstone.rebyu.ai.dto.GeneratedLessonSectionDraftDto;
 import com.capstone.rebyu.ai.dto.GeneratedLessonToolDraftDto;
+import com.capstone.rebyu.ai.dto.GridItemInputDto;
+import com.capstone.rebyu.ai.dto.HeaderDescriptionGridToolInputDto;
 import com.capstone.rebyu.ai.dto.HeadingToolInputDto;
+import com.capstone.rebyu.ai.dto.ImageFeatureGridToolInputDto;
 import com.capstone.rebyu.ai.dto.ImageLeftTextToolInputDto;
 import com.capstone.rebyu.ai.dto.ImageRightTextToolInputDto;
 import com.capstone.rebyu.ai.dto.ImageToolInputDto;
+import com.capstone.rebyu.ai.dto.IntroImageCardToolInputDto;
 import com.capstone.rebyu.ai.dto.LessonListItemInputDto;
 import com.capstone.rebyu.ai.dto.LessonSectionDraftInputDto;
 import com.capstone.rebyu.ai.dto.LessonTabItemInputDto;
+import com.capstone.rebyu.ai.dto.MediaTextBlockToolInputDto;
 import com.capstone.rebyu.ai.dto.OrderedListToolInputDto;
+import com.capstone.rebyu.ai.dto.ReviewCardGridToolInputDto;
+import com.capstone.rebyu.ai.dto.ReviewCardInputDto;
 import com.capstone.rebyu.ai.dto.SubheadingToolInputDto;
 import com.capstone.rebyu.ai.dto.TabsToolInputDto;
 import com.capstone.rebyu.ai.dto.UnorderedListToolInputDto;
 import com.capstone.rebyu.ai.dto.VideoToolInputDto;
 import com.capstone.rebyu.ai.dto.lesson.data.AccordionItemDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.AccordionToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ContentAccordionBlockToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ContentTabsBlockToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.DescriptionToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.FlipGridCardDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.FlipGridToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.GridItemDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.HeaderDescriptionGridToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.HeadingToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ImageFeatureGridToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ImageLeftTextToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ImageRightTextToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ImageToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.IntroImageCardToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ListItemDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.MediaTextBlockToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.OrderedListToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ReviewCardDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ReviewCardGridToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.SubheadingToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.TabItemDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.TabsToolDataDto;
@@ -39,6 +57,7 @@ import com.capstone.rebyu.common.InvalidAiResponseException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -168,6 +187,82 @@ public class LessonToolDraftValidator {
         generationExecutionContext.validateEvidence(input.evidence());
     }
 
+    // ──────────────────────────────────────────────
+    // Combined tool input validators
+    // ──────────────────────────────────────────────
+
+    public void validateIntroImageCard(
+            IntroImageCardToolInputDto input,
+            LessonGenerationExecutionContext ctx
+    ) {
+        requireSection(input.sectionDraftId());
+        requireNonBlank(input.smallHeader(), "smallHeader");
+        requireNonBlank(input.description(), "description");
+    }
+
+    public void validateHeaderDescriptionGrid(
+            HeaderDescriptionGridToolInputDto input,
+            LessonGenerationExecutionContext ctx
+    ) {
+        requireSection(input.sectionDraftId());
+        requireNonBlank(input.smallHeader(), "smallHeader");
+        requireNonBlank(input.description(), "description");
+        validateGridItems(input.gridItems());
+    }
+
+    public void validateImageFeatureGrid(
+            ImageFeatureGridToolInputDto input,
+            LessonGenerationExecutionContext ctx
+    ) {
+        requireSection(input.sectionDraftId());
+        requireNonBlank(input.smallHeader(), "smallHeader");
+        requireNonBlank(input.description(), "description");
+        validateGridItems(input.gridItems());
+    }
+
+    public void validateReviewCardGrid(
+            ReviewCardGridToolInputDto input,
+            LessonGenerationExecutionContext ctx
+    ) {
+        requireSection(input.sectionDraftId());
+        requireNonBlank(input.smallHeader(), "smallHeader");
+        requireNonBlank(input.description(), "description");
+        validateReviewCards(input.cards());
+    }
+
+    public void validateContentAccordionBlock(
+            ContentAccordionBlockToolInputDto input,
+            LessonGenerationExecutionContext ctx
+    ) {
+        requireSection(input.sectionDraftId());
+        requireNonBlank(input.smallHeader(), "smallHeader");
+        requireNonBlank(input.description(), "description");
+        validateAccordionItems(input.items());
+    }
+
+    public void validateContentTabsBlock(
+            ContentTabsBlockToolInputDto input,
+            LessonGenerationExecutionContext ctx
+    ) {
+        requireSection(input.sectionDraftId());
+        requireNonBlank(input.smallHeader(), "smallHeader");
+        requireNonBlank(input.description(), "description");
+        validateTabItems(input.items());
+    }
+
+    public void validateMediaTextBlock(
+            MediaTextBlockToolInputDto input,
+            LessonGenerationExecutionContext ctx
+    ) {
+        requireSection(input.sectionDraftId());
+        requireNonBlank(input.smallHeader(), "smallHeader");
+        requireNonBlank(input.description(), "description");
+        String mediaType = input.mediaType() != null ? input.mediaType().trim() : "";
+        if (!Set.of("image", "video").contains(mediaType)) {
+            throw new InvalidAiResponseException("mediaType must be 'image' or 'video'.");
+        }
+    }
+
     public void validateCollectedDrafts(List<GeneratedLessonSectionDraftDto> sections) {
         if (sections == null || sections.isEmpty()) {
             throw new InvalidAiResponseException("The AI did not create any lesson sections.");
@@ -230,6 +325,44 @@ public class LessonToolDraftValidator {
             case "image-right-text" -> {
                 validateImageRightTextData(asType(tool.data(), ImageRightTextToolDataDto.class), toolLabel);
                 requireAuthoringNotes(tool.authoringNotes(), toolLabel);
+            }
+            case "intro-image-card" -> validateCombinedHeaderDesc(
+                    asType(tool.data(), IntroImageCardToolDataDto.class), toolLabel
+            );
+            case "header-description-grid" -> {
+                var gridData = asType(tool.data(), HeaderDescriptionGridToolDataDto.class);
+                validateCombinedSmallHeader(gridData != null ? gridData.smallHeader() : null,
+                        gridData != null ? gridData.description() : null, toolLabel);
+                validateGridItemData(gridData != null ? gridData.gridItems() : null, toolLabel);
+            }
+            case "image-feature-grid" -> {
+                var ifgData = asType(tool.data(), ImageFeatureGridToolDataDto.class);
+                validateCombinedSmallHeader(ifgData != null ? ifgData.smallHeader() : null,
+                        ifgData != null ? ifgData.description() : null, toolLabel);
+                validateGridItemData(ifgData != null ? ifgData.gridItems() : null, toolLabel);
+            }
+            case "review-card-grid" -> {
+                var rcgData = asType(tool.data(), ReviewCardGridToolDataDto.class);
+                validateCombinedSmallHeader(rcgData != null ? rcgData.smallHeader() : null,
+                        rcgData != null ? rcgData.description() : null, toolLabel);
+                validateReviewCardData(rcgData != null ? rcgData.cards() : null, toolLabel);
+            }
+            case "content-accordion-block" -> {
+                var cabData = asType(tool.data(), ContentAccordionBlockToolDataDto.class);
+                validateCombinedSmallHeader(cabData != null ? cabData.smallHeader() : null,
+                        cabData != null ? cabData.description() : null, toolLabel);
+                validateAccordionData(cabData != null ? new AccordionToolDataDto(cabData.items()) : null, toolLabel);
+            }
+            case "content-tabs-block" -> {
+                var ctbData = asType(tool.data(), ContentTabsBlockToolDataDto.class);
+                validateCombinedSmallHeader(ctbData != null ? ctbData.smallHeader() : null,
+                        ctbData != null ? ctbData.description() : null, toolLabel);
+                validateTabsData(ctbData != null ? new TabsToolDataDto(ctbData.items()) : null, toolLabel);
+            }
+            case "media-text-block" -> {
+                var mtbData = asType(tool.data(), MediaTextBlockToolDataDto.class);
+                validateCombinedSmallHeader(mtbData != null ? mtbData.smallHeader() : null,
+                        mtbData != null ? mtbData.description() : null, toolLabel);
             }
             default -> throw new InvalidAiResponseException(
                     toolLabel + " uses unsupported tool type '" + tool.type() + "'."
@@ -390,6 +523,78 @@ public class LessonToolDraftValidator {
             }
         }
     }
+
+    // ──────────────────────────────────────────────
+    // Combined tool data validators
+    // ──────────────────────────────────────────────
+
+    private void validateCombinedHeaderDesc(IntroImageCardToolDataDto data, String toolLabel) {
+        if (data == null) {
+            throw new InvalidAiResponseException(toolLabel + ": intro-image-card data is missing.");
+        }
+        validateCombinedSmallHeader(data.smallHeader(), data.description(), toolLabel);
+    }
+
+    private void validateCombinedSmallHeader(String smallHeader, String description, String toolLabel) {
+        if (isBlank(smallHeader)) {
+            throw new InvalidAiResponseException(toolLabel + ": smallHeader is required.");
+        }
+        if (isBlank(description)) {
+            throw new InvalidAiResponseException(toolLabel + ": description is required.");
+        }
+    }
+
+    private void validateGridItemData(List<GridItemDataDto> items, String toolLabel) {
+        if (items == null || items.isEmpty()) {
+            throw new InvalidAiResponseException(toolLabel + ": at least one grid item is required.");
+        }
+        for (GridItemDataDto item : items) {
+            if (item == null || isBlank(item.title()) || isBlank(item.description())) {
+                throw new InvalidAiResponseException(toolLabel + ": every grid item needs a title and description.");
+            }
+        }
+    }
+
+    private void validateReviewCardData(List<ReviewCardDataDto> cards, String toolLabel) {
+        if (cards == null || cards.isEmpty()) {
+            throw new InvalidAiResponseException(toolLabel + ": at least one review card is required.");
+        }
+        for (ReviewCardDataDto card : cards) {
+            if (card == null || isBlank(card.frontTitle()) || isBlank(card.backTitle()) || isBlank(card.description())) {
+                throw new InvalidAiResponseException(
+                        toolLabel + ": every review card needs frontTitle, backTitle, and description."
+                );
+            }
+        }
+    }
+
+    private void validateGridItems(List<GridItemInputDto> items) {
+        if (items == null || items.size() < 2) {
+            throw new InvalidAiResponseException("Grid tools require at least two items.");
+        }
+        for (GridItemInputDto item : items) {
+            if (item == null || isBlank(item.title()) || isBlank(item.description())) {
+                throw new InvalidAiResponseException("Every grid item must include title and description.");
+            }
+        }
+    }
+
+    private void validateReviewCards(List<ReviewCardInputDto> cards) {
+        if (cards == null || cards.isEmpty()) {
+            throw new InvalidAiResponseException("Review-card-grid requires at least one card.");
+        }
+        for (ReviewCardInputDto card : cards) {
+            if (card == null || isBlank(card.frontTitle()) || isBlank(card.backTitle()) || isBlank(card.description())) {
+                throw new InvalidAiResponseException(
+                        "Every review card needs frontTitle, backTitle, and description."
+                );
+            }
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // Shared helpers
+    // ──────────────────────────────────────────────
 
     private void requireSection(UUID sectionDraftId) {
         if (sectionDraftId == null || !lessonDraftCollector.sectionExists(sectionDraftId)) {

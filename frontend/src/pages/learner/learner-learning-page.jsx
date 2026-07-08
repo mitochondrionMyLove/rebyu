@@ -3,10 +3,12 @@ import { useNavigate, useOutletContext } from "react-router-dom"
 import {
   Award,
   BookOpen,
+  ClipboardCheck,
   CheckCircle2,
   CirclePlay,
   Grid2X2,
   List,
+  LockKeyhole,
   Search,
   Trophy,
 } from "lucide-react"
@@ -76,6 +78,141 @@ function getCourseStatus(progress, completedLessons) {
   return "READY TO START"
 }
 
+function getCertificationId(certification) {
+  return String(
+      certification?.certificationId ??
+      certification?.id ??
+      certification?.certification?.certificationId ??
+      ""
+  )
+}
+
+function collectArrays(...sources) {
+  return sources.flatMap((source) => (Array.isArray(source) ? source : []))
+}
+
+function getAssessmentTypeText(assessment) {
+  return String(
+      assessment?.assessmentType ??
+      assessment?.assessmentTypeText ??
+      assessment?.assessmentTypeName ??
+      assessment?.examType ??
+      assessment?.examTypeText ??
+      assessment?.type ??
+      assessment?.typeText ??
+      assessment?.category ??
+      ""
+  ).toLowerCase()
+}
+
+function assessmentBelongsToCertification(assessment, certificationId) {
+  if (!certificationId) {
+    return true
+  }
+
+  const assessmentCertificationId = String(
+      assessment?.certificationId ??
+      assessment?.certification?.certificationId ??
+      assessment?.courseId ??
+      ""
+  )
+
+  return !assessmentCertificationId || assessmentCertificationId === certificationId
+}
+
+function isDiagnosticAssessment(assessment) {
+  const typeText = getAssessmentTypeText(assessment)
+  const titleText = String(
+      assessment?.title ??
+      assessment?.name ??
+      assessment?.examName ??
+      assessment?.assessmentTitle ??
+      ""
+  ).toLowerCase()
+
+  return typeText.includes("diagnostic") || titleText.includes("diagnostic")
+}
+
+function getDiagnosticAssessment(certification, data) {
+  const certificationId = getCertificationId(certification)
+
+  const assessments = collectArrays(
+      certification?.assessments,
+      certification?.exams,
+      certification?.diagnosticExams,
+      data?.assessments,
+      data?.exams,
+      data?.diagnosticExams,
+      data?.learnerAssessments,
+      data?.availableAssessments
+  )
+
+  return (
+      assessments.find(
+          (assessment) =>
+              assessmentBelongsToCertification(assessment, certificationId) &&
+              isDiagnosticAssessment(assessment)
+      ) ?? null
+  )
+}
+
+function isDiagnosticCompleted(certification, data) {
+  const certificationId = getCertificationId(certification)
+
+  if (
+      certification?.diagnosticCompleted ||
+      certification?.hasCompletedDiagnostic ||
+      certification?.diagnosticTaken
+  ) {
+    return true
+  }
+
+  const results = collectArrays(
+      certification?.assessmentResults,
+      certification?.examResults,
+      certification?.diagnosticResults,
+      data?.assessmentResults,
+      data?.examResults,
+      data?.diagnosticResults,
+      data?.learnerExamResults
+  )
+
+  return results.some((result) => {
+    const resultCertificationId = String(
+        result?.certificationId ??
+        result?.certification?.certificationId ??
+        result?.courseId ??
+        ""
+    )
+
+    const matchesCertification =
+        !certificationId || !resultCertificationId || resultCertificationId === certificationId
+
+    const typeText = getAssessmentTypeText(result)
+    const titleText = String(
+        result?.title ??
+        result?.name ??
+        result?.examName ??
+        result?.assessmentTitle ??
+        ""
+    ).toLowerCase()
+
+    const diagnostic =
+        typeText.includes("diagnostic") || titleText.includes("diagnostic")
+
+    const completed = Boolean(
+        result?.completed ??
+        result?.submitted ??
+        result?.submittedAt ??
+        result?.dateTaken ??
+        result?.finishedAt ??
+        result?.score !== undefined
+    )
+
+    return matchesCertification && diagnostic && completed
+  })
+}
+
 function CourseCard({ course, onOpen }) {
   const {
     certification,
@@ -83,10 +220,13 @@ function CourseCard({ course, onOpen }) {
     totalLessons,
     completedLessons,
     nextLesson,
+    diagnosticCompleted,
+    diagnosticAssessment,
   } = course
 
   const imageUrl = getCertificationImage(certification)
   const status = getCourseStatus(progress, completedLessons)
+  const needsDiagnostic = !diagnosticCompleted
 
   return (
       <article className="group overflow-hidden border border-border bg-card transition hover:border-primary/40 hover:shadow-md">
@@ -107,8 +247,15 @@ function CourseCard({ course, onOpen }) {
           ) : null}
 
           <span className="absolute left-3 top-3 rounded-sm bg-primary px-2 py-1 text-[10px] font-semibold tracking-wide text-primary-foreground">
-          {status}
+          {needsDiagnostic ? "DIAGNOSTIC REQUIRED" : status}
         </span>
+
+          {needsDiagnostic ? (
+              <span className="absolute right-3 top-3 flex items-center gap-1 rounded-sm bg-background/95 px-2 py-1 text-[10px] font-semibold tracking-wide text-foreground shadow-sm">
+                <LockKeyhole className="size-3" />
+                Locked
+              </span>
+          ) : null}
 
           <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition group-hover:opacity-100">
             <div className="flex size-12 items-center justify-center rounded-full border-2 border-white bg-black/20 text-white backdrop-blur-sm">
@@ -146,20 +293,27 @@ function CourseCard({ course, onOpen }) {
 
           <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
             <p className="truncate text-xs text-muted-foreground">
-              {nextLesson
-                  ? `Next: ${nextLesson.name ?? nextLesson.title}`
-                  : progress >= 100
-                      ? "Course completed"
-                      : "Start learning"}
+              {needsDiagnostic
+                  ? diagnosticAssessment
+                      ? "Take the diagnostic before learning"
+                      : "Diagnostic exam is not configured yet"
+                  : nextLesson
+                      ? `Next: ${nextLesson.name ?? nextLesson.title}`
+                      : progress >= 100
+                          ? "Course completed"
+                          : "Start learning"}
             </p>
 
             <Button
                 size="sm"
-                variant="ghost"
-                className="shrink-0 text-primary hover:text-primary"
+                variant={needsDiagnostic ? "default" : "ghost"}
+                className={needsDiagnostic ? "shrink-0 gap-1" : "shrink-0 text-primary hover:text-primary"}
                 onClick={onOpen}
             >
-              {progress >= 100 ? "Review" : "Continue"}
+              {needsDiagnostic ? (
+                  <ClipboardCheck className="size-3.5" />
+              ) : null}
+              {needsDiagnostic ? "Start" : progress >= 100 ? "Review" : "Continue"}
             </Button>
           </div>
         </div>
@@ -249,6 +403,9 @@ export default function LearnerLearningPage() {
       const nextLesson =
           lessons.find((lesson) => !lesson.completed) ?? lessons[0] ?? null
 
+      const diagnosticAssessment = getDiagnosticAssessment(certification, data)
+      const diagnosticCompleted = isDiagnosticCompleted(certification, data)
+
       return {
         certification,
         lessons,
@@ -256,10 +413,14 @@ export default function LearnerLearningPage() {
         totalLessons,
         progress,
         nextLesson,
-        status: getCourseStatus(progress, completedLessons),
+        diagnosticAssessment,
+        diagnosticCompleted,
+        status: diagnosticCompleted
+            ? getCourseStatus(progress, completedLessons)
+            : "DIAGNOSTIC REQUIRED",
       }
     })
-  }, [allLessons, enrolledCertifications])
+  }, [allLessons, enrolledCertifications, data])
 
   const filteredCourses = useMemo(() => {
     return courses.filter((course) => {
@@ -283,12 +444,26 @@ export default function LearnerLearningPage() {
   }, [courses, query, selectedIndustry, selectedStatus])
 
   function openCertification(course) {
+    const certificationId = getCertificationId(course.certification)
+
+    if (!course.diagnosticCompleted) {
+      navigate(`/learner/learning/${certificationId}/diagnostic`, {
+        state: {
+          certification: course.certification,
+          lessons: course.lessons,
+          diagnosticAssessment: course.diagnosticAssessment,
+          nextLesson: course.nextLesson,
+        },
+      })
+      return
+    }
+
     if (course.nextLesson?.lessonId) {
       navigate(`/learner/lessons/${course.nextLesson.lessonId}`)
       return
     }
 
-    navigate(`/learner/certifications/${course.certification.certificationId}`)
+    navigate(`/learner/certifications/${certificationId}`)
   }
 
   return (
@@ -360,6 +535,7 @@ export default function LearnerLearningPage() {
                         className="h-10 min-w-[130px] border border-input bg-background px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                     >
                       <option value="ALL">All Types</option>
+                      <option value="DIAGNOSTIC REQUIRED">Diagnostic Required</option>
                       <option value="IN PROGRESS">In Progress</option>
                       <option value="READY TO START">Ready to Start</option>
                       <option value="COMPLETED">Completed</option>

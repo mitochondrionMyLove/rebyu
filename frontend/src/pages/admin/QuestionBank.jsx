@@ -132,6 +132,68 @@ const difficultyLabels = {
     hard: "Hard",
 };
 
+const diagramTypeOptions = [
+    {
+        value: "ACTIVITY_DIAGRAM",
+        label: "Activity Diagram",
+        description: "Process flow with actions, decisions, start, and end nodes.",
+    },
+    {
+        value: "UML_CLASS",
+        label: "Class Diagram",
+        description: "Classes, attributes, methods, inheritance, and relationships.",
+    },
+    {
+        value: "UML_COMPONENT",
+        label: "Component Diagram",
+        description: "System components, interfaces, dependencies, and services.",
+    },
+    {
+        value: "ERD",
+        label: "ER Diagram",
+        description: "Entities, attributes, primary keys, foreign keys, and relationships.",
+    },
+    {
+        value: "FLOWCHART",
+        label: "Flowchart",
+        description: "Algorithm or business-process steps with decisions and outputs.",
+    },
+    {
+        value: "SEQUENCE_DIAGRAM",
+        label: "Sequence Diagram",
+        description: "Actors, objects, lifelines, and message order over time.",
+    },
+    {
+        value: "UI_DESIGN",
+        label: "UI Design",
+        description: "Screen layout, wireframe, prototype, or interface structure.",
+    },
+    {
+        value: "USE_CASE",
+        label: "Use Case Diagram",
+        description: "Actors, use cases, system boundary, includes, and extends.",
+    },
+];
+
+const diagramTypeLabels = Object.fromEntries(
+    diagramTypeOptions.map((diagramType) => [diagramType.value, diagramType.label]),
+);
+
+const diagramTypeDescriptions = Object.fromEntries(
+    diagramTypeOptions.map((diagramType) => [
+        diagramType.value,
+        diagramType.description,
+    ]),
+);
+
+function getDiagramTypeLabel(value) {
+    return diagramTypeLabels[value] ?? "Diagram";
+}
+
+function getDiagramTypeDescription(value) {
+    return diagramTypeDescriptions[value] ?? "Create the correct reference diagram.";
+}
+
 const questionTypes = [
     {
         id: "MCQ",
@@ -228,7 +290,7 @@ const questionTypes = [
     {
         id: "DIAGRAM",
         title: "Diagram",
-        description: "ERD, UML, flowchart, or DFD problem",
+        description: "Activity, class, component, ERD, flowchart, sequence, UI, or use case problem",
         icon: Workflow,
         component: Diagram,
         data: {
@@ -665,28 +727,25 @@ function DiagramTypeSelect({ questionKey, value, onValueChange }) {
                     position="popper"
                     align="start"
                     sideOffset={6}
-                    className="max-h-60 w-[min(320px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                    className="max-h-72 w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
                 >
-                    <SelectItem value="ERD" className="min-h-10">
-                        ERD
-                    </SelectItem>
-
-                    <SelectItem value="UML_CLASS" className="min-h-10">
-                        UML Class Diagram
-                    </SelectItem>
-
-                    <SelectItem value="FLOWCHART" className="min-h-10">
-                        Flowchart
-                    </SelectItem>
-
-                    <SelectItem value="DFD" className="min-h-10">
-                        Data Flow Diagram
-                    </SelectItem>
+                    <SelectGroup>
+                        {diagramTypeOptions.map((diagramType) => (
+                            <SelectItem
+                                key={diagramType.value}
+                                value={diagramType.value}
+                                className="min-h-10"
+                            >
+                                {diagramType.label}
+                            </SelectItem>
+                        ))}
+                    </SelectGroup>
                 </SelectContent>
             </Select>
         </>
     );
 }
+
 
 function QuestionMetaFields({ questionKey, data, onFieldChange }) {
     return (
@@ -1523,13 +1582,8 @@ function Diagram({
         }, 600);
     }
 
-    const diagramTypeLabel =
-        {
-            ERD: "Entity Relationship Diagram",
-            UML_CLASS: "UML Class Diagram",
-            FLOWCHART: "Flowchart",
-            DFD: "Data Flow Diagram",
-        }[data.diagramType] ?? "Diagram";
+    const diagramTypeLabel = getDiagramTypeLabel(data.diagramType);
+    const diagramTypeDescription = getDiagramTypeDescription(data.diagramType);
 
     const hasDiagram = hasSavedDiagram(data.referenceDiagramXml);
 
@@ -1607,13 +1661,12 @@ function Diagram({
                                 </p>
 
                                 <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  {data.diagramType}
+                  {diagramTypeLabel}
                 </span>
                             </div>
 
                             <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                                Create the correct {diagramTypeLabel.toLowerCase()} that
-                                learners will be compared against.
+                                {diagramTypeDescription} Create the correct reference diagram that learners will be compared against.
                             </p>
 
                             <p
@@ -1640,6 +1693,7 @@ function Diagram({
                         content={
                             <div className="h-full w-full overflow-hidden rounded-lg border border-border bg-white shadow-sm">
                                 <DiagramArea
+                                    diagramType={data.diagramType}
                                     initialXml={data.referenceDiagramXml || undefined}
                                     onChange={handleReferenceDiagramChange}
                                 />
@@ -1913,7 +1967,7 @@ function QuestionFileGeneratorDialog({
 
                                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
                                     Diagram questions appear only when the material supports
-                                    ERD, UML class, flowchart, or DFD activities.
+                                    activity diagrams, class diagrams, component diagrams, ER diagrams, flowcharts, sequence diagrams, UI designs, or use case diagrams.
                                 </p>
                             </div>
 
@@ -2999,7 +3053,7 @@ CERTIFICATION-SPECIFIC RULES:
   Do not generate SHORT_ANSWER for TOPCIT. TOPCIT written-response questions must use DESCRIPTIVE.
   Map TOPCIT Multiple Choice to MCQ.
   Map TOPCIT Descriptive to DESCRIPTIVE.
-  Map TOPCIT Performance to PROGRAMMING and/or DIAGRAM only when the source supports coding, SQL, algorithms, UML, ERD, DFD, flowcharts, architecture, database design, system design, or implementation tasks.
+  Map TOPCIT Performance to PROGRAMMING and/or DIAGRAM only when the source supports coding, SQL, algorithms, activity diagrams, class diagrams, component diagrams, ER diagrams, flowcharts, sequence diagrams, UI design, use case diagrams, architecture, database design, system design, or implementation tasks.
   Map TOPCIT Integrated Performance to complex DESCRIPTIVE, PROGRAMMING, or DIAGRAM tasks only when the source supports cross-topic problem-solving.
   For TOPCIT, approximate the official distribution across the generated target. If a performance type is unsupported by the source, redistribute those questions to MCQ and DESCRIPTIVE rather than inventing unsupported performance tasks.
 
@@ -3020,7 +3074,7 @@ QUESTION TYPE RULES:
 - SHORT_ANSWER: Do not use for TOPCIT. Generate only when a non-TOPCIT certification explicitly allows exact one-answer factual questions. Use it for acronym expansions, terms, simple definitions, formulas, commands, standards, names, dates, single values, or one-phrase answers. Example: question "What does SQL stand for?" correctAnswer "Structured Query Language". Do not use SHORT_ANSWER for "explain", "describe", "compare", "why", "how", scenario analysis, or multi-sentence answers; use DESCRIPTIVE instead. Return a non-blank correctAnswer, checkingMethod EXACT_MATCH, explanation, difficulty, and lesson.
 - DESCRIPTIVE: Generate only when the certification allows explanation-based answers. Return a non-blank rubricBasedAnswer, checkingMethod AI_SEMANTIC, difficulty, and lesson.
 - PROGRAMMING: Generate only when BOTH conditions are true: the certification allows programming/performance-based questions, and the source contains code, algorithms, SQL/query writing, debugging, implementation tasks, or programming logic. Return starterCode when useful and testCases with expected outputs.
-- DIAGRAM: Generate only when BOTH conditions are true: the certification allows diagram/performance-based questions, and the source contains workflows, ERD, UML, DFD, flowcharts, database/schema design, architecture, network diagrams, or process modeling material. Return diagramType, instructions, authoringNotes, difficulty, and lesson.
+- DIAGRAM: Generate only when BOTH conditions are true: the certification allows diagram/performance-based questions, and the source contains workflows, activity diagrams, class diagrams, component diagrams, ER diagrams, flowcharts, sequence diagrams, UI designs, use case diagrams, database/schema design, architecture, network diagrams, or process modeling material. Return diagramType, instructions, authoringNotes, difficulty, and lesson.
 
 QUANTITY RULES:
 - Generate at least ${DEFAULT_GENERATION_TARGET} total high-quality draft questions when the source content can support it.

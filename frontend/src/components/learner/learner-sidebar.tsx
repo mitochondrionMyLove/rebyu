@@ -11,6 +11,7 @@ import {
   GraduationCapIcon,
   TerminalIcon,
   TrophyIcon,
+    CalendarIcon,
 } from "lucide-react"
 
 import { NavProjects } from "@/components/nav-projects"
@@ -32,6 +33,11 @@ const learnerNav = {
         name: "Progress",
         url: "/learner/progress",
         icon: BarChart3Icon,
+      },
+      {
+        name: "Study Plan",
+        url: "/learner/plan",
+        icon: CalendarIcon,
       },
       {
         name: "Learning",

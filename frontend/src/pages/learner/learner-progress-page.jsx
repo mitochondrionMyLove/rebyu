@@ -16,6 +16,13 @@ import { Bar, Doughnut, Line } from "react-chartjs-2"
 import { BookOpen, Target } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { LearnerEmptyState } from "@/components/learner/learner-ui.jsx"
 
 ChartJS.register(
@@ -666,30 +673,29 @@ export default function LearnerProgressPage() {
   const studyStreak = getNumber(stats.studyStreak, 0)
 
   return (
-      <div className="space-y-6">
+      <div className="space-y-6 font-sans">
         <div className="flex items-center">
-          <div className="relative">
-            <select
-                value={selectedCertificationId}
-                onChange={(event) =>
-                    setSelectedCertificationId(event.target.value)
-                }
-                className="h-8 appearance-none bg-transparent pr-6 text-sm font-semibold uppercase text-zinc-700 outline-none"
-            >
+          <Select
+              value={selectedCertificationId}
+              onValueChange={setSelectedCertificationId}
+              disabled={enrolledCertifications.length === 0}
+          >
+            <SelectTrigger className="h-8 w-auto min-w-[190px] border-0 bg-transparent px-0 pr-2 text-sm font-semibold uppercase text-zinc-700 shadow-none focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder="Select certification" />
+            </SelectTrigger>
+
+            <SelectContent align="start">
               {enrolledCertifications.map((certification) => (
-                  <option
+                  <SelectItem
                       key={certification.certificationId}
-                      value={certification.certificationId}
+                      value={String(certification.certificationId)}
+                      className="text-sm"
                   >
                     {certification.title}
-                  </option>
+                  </SelectItem>
               ))}
-            </select>
-
-            <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
-            ▼
-          </span>
-          </div>
+            </SelectContent>
+          </Select>
         </div>
 
         {enrolledCertifications.length === 0 ? (

@@ -548,7 +548,7 @@ export default function LearnerCertificationDetailPage() {
             </div>
 
             {/* RIGHT COLUMN - Sticky Buy Box */}
-            <div className="lg:sticky lg:top-8 min-w-0">
+            <aside className="min-w-0 self-start lg:sticky lg:top-6 lg:h-fit">
               <Card className="overflow-hidden border shadow-lg">
                 <CardHeader className="bg-muted/30 pb-4">
                   <div className="flex flex-col space-y-1">
@@ -644,7 +644,7 @@ export default function LearnerCertificationDetailPage() {
                   </ul>
                 </CardContent>
               </Card>
-            </div>
+            </aside>
           </main>
 
           {/* Checkout Simulation Dialog */}

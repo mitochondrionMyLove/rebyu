@@ -53,4 +53,11 @@ public class Certification {
 
     @Column(name = "date_updated")
     private LocalDateTime dateUpdated;
+
+    @Column(name = "status")
+    private CertificationStatus status = CertificationStatus.DRAFT;
+
+    enum CertificationStatus{
+        PUBLISHED, DRAFT
+    }
 }

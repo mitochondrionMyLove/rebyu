@@ -3,16 +3,23 @@ package com.capstone.rebyu.ai.tools;
 import com.capstone.rebyu.ai.collector.LessonDraftCollector;
 import com.capstone.rebyu.ai.context.LessonGenerationExecutionContext;
 import com.capstone.rebyu.ai.dto.AccordionToolInputDto;
+import com.capstone.rebyu.ai.dto.ContentAccordionBlockToolInputDto;
+import com.capstone.rebyu.ai.dto.ContentTabsBlockToolInputDto;
 import com.capstone.rebyu.ai.dto.DescriptionToolInputDto;
 import com.capstone.rebyu.ai.dto.FlipGridToolInputDto;
 import com.capstone.rebyu.ai.dto.GeneratedLessonSectionReferenceDto;
 import com.capstone.rebyu.ai.dto.GeneratedLessonToolDraftDto;
+import com.capstone.rebyu.ai.dto.HeaderDescriptionGridToolInputDto;
 import com.capstone.rebyu.ai.dto.HeadingToolInputDto;
+import com.capstone.rebyu.ai.dto.ImageFeatureGridToolInputDto;
 import com.capstone.rebyu.ai.dto.ImageLeftTextToolInputDto;
 import com.capstone.rebyu.ai.dto.ImageRightTextToolInputDto;
 import com.capstone.rebyu.ai.dto.ImageToolInputDto;
+import com.capstone.rebyu.ai.dto.IntroImageCardToolInputDto;
 import com.capstone.rebyu.ai.dto.LessonSectionDraftInputDto;
+import com.capstone.rebyu.ai.dto.MediaTextBlockToolInputDto;
 import com.capstone.rebyu.ai.dto.OrderedListToolInputDto;
+import com.capstone.rebyu.ai.dto.ReviewCardGridToolInputDto;
 import com.capstone.rebyu.ai.dto.SubheadingToolInputDto;
 import com.capstone.rebyu.ai.dto.TabsToolInputDto;
 import com.capstone.rebyu.ai.dto.UnorderedListToolInputDto;
@@ -34,6 +41,10 @@ public class LessonComponentDraftTools {
     private final GeneratedLessonToolDraftMapper lessonToolDraftMapper;
     private final LessonGenerationExecutionContext generationExecutionContext;
 
+    // ──────────────────────────────────────────────
+    // Section
+    // ──────────────────────────────────────────────
+
     @Tool("""
             Create one editable lesson section.
 
@@ -54,6 +65,10 @@ public class LessonComponentDraftTools {
                 input.sectionName().trim()
         );
     }
+
+    // ──────────────────────────────────────────────
+    // Individual tools
+    // ──────────────────────────────────────────────
 
     @Tool("""
             Add a main heading to an editable lesson section.
@@ -310,6 +325,156 @@ public class LessonComponentDraftTools {
         lessonToolDraftValidator.validateVideo(input, generationExecutionContext);
 
         GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.video(
+                input,
+                createLocalDraftId()
+        );
+
+        lessonDraftCollector.addTool(input.sectionDraftId(), draft);
+        return draft;
+    }
+
+    // ──────────────────────────────────────────────
+    // Combined tools
+    // ──────────────────────────────────────────────
+
+    @Tool("""
+            Add an intro image card to a lesson section.
+
+            Use this as a visual introduction block with a header, description, and a
+            placeholder image the admin uploads later. Do not provide any image file,
+            image key, or URL.
+            """)
+    public GeneratedLessonToolDraftDto createIntroImageCardTool(
+            IntroImageCardToolInputDto input
+    ) {
+        lessonToolDraftValidator.validateIntroImageCard(input, generationExecutionContext);
+
+        GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.introImageCard(
+                input,
+                createLocalDraftId()
+        );
+
+        lessonDraftCollector.addTool(input.sectionDraftId(), draft);
+        return draft;
+    }
+
+    @Tool("""
+            Add a header-description grid to a lesson section.
+
+            Use this for a titled grid of feature points, concepts, or categories.
+            Provide a header, description, and at least two grid items each with
+            a title and description.
+            """)
+    public GeneratedLessonToolDraftDto createHeaderDescriptionGridTool(
+            HeaderDescriptionGridToolInputDto input
+    ) {
+        lessonToolDraftValidator.validateHeaderDescriptionGrid(input, generationExecutionContext);
+
+        GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.headerDescriptionGrid(
+                input,
+                createLocalDraftId()
+        );
+
+        lessonDraftCollector.addTool(input.sectionDraftId(), draft);
+        return draft;
+    }
+
+    @Tool("""
+            Add an image-feature grid to a lesson section.
+
+            Use this for a visual feature section with an image placeholder plus a grid
+            of feature items. Do not provide any image file, image key, or URL.
+            """)
+    public GeneratedLessonToolDraftDto createImageFeatureGridTool(
+            ImageFeatureGridToolInputDto input
+    ) {
+        lessonToolDraftValidator.validateImageFeatureGrid(input, generationExecutionContext);
+
+        GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.imageFeatureGrid(
+                input,
+                createLocalDraftId()
+        );
+
+        lessonDraftCollector.addTool(input.sectionDraftId(), draft);
+        return draft;
+    }
+
+    @Tool("""
+            Add a review card grid to a lesson section.
+
+            Use this for flashcard-style review with front/back cards. Each card has
+            a frontTitle, backTitle, and description. Good for term-definition pairs,
+            Q&A, or concept summaries.
+            """)
+    public GeneratedLessonToolDraftDto createReviewCardGridTool(
+            ReviewCardGridToolInputDto input
+    ) {
+        lessonToolDraftValidator.validateReviewCardGrid(input, generationExecutionContext);
+
+        GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.reviewCardGrid(
+                input,
+                createLocalDraftId()
+        );
+
+        lessonDraftCollector.addTool(input.sectionDraftId(), draft);
+        return draft;
+    }
+
+    @Tool("""
+            Add a content accordion block to a lesson section.
+
+            Use this for a titled, described accordion with expandable items.
+            Each item needs a title and content. Good for definitions, FAQs,
+            or grouped explanations with a header.
+            """)
+    public GeneratedLessonToolDraftDto createContentAccordionBlockTool(
+            ContentAccordionBlockToolInputDto input
+    ) {
+        lessonToolDraftValidator.validateContentAccordionBlock(input, generationExecutionContext);
+
+        GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.contentAccordionBlock(
+                input,
+                createLocalDraftId()
+        );
+
+        lessonDraftCollector.addTool(input.sectionDraftId(), draft);
+        return draft;
+    }
+
+    @Tool("""
+            Add a content tabs block to a lesson section.
+
+            Use this for a titled, described tab layout. Each tab needs a label,
+            title, and description. Good for categorized or compared content
+            with a header.
+            """)
+    public GeneratedLessonToolDraftDto createContentTabsBlockTool(
+            ContentTabsBlockToolInputDto input
+    ) {
+        lessonToolDraftValidator.validateContentTabsBlock(input, generationExecutionContext);
+
+        GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.contentTabsBlock(
+                input,
+                createLocalDraftId()
+        );
+
+        lessonDraftCollector.addTool(input.sectionDraftId(), draft);
+        return draft;
+    }
+
+    @Tool("""
+            Add a media-text block to a lesson section.
+
+            Use this for a media item (image or video placeholder) alongside supporting
+            text, with a configurable layout. Do not provide any image or video files,
+            keys, or URLs.
+            """)
+    public GeneratedLessonToolDraftDto createMediaTextBlockTool(
+            MediaTextBlockToolInputDto input
+    ) {
+        lessonToolDraftValidator.validateMediaTextBlock(input, generationExecutionContext);
+
+        GeneratedLessonToolDraftDto draft = lessonToolDraftMapper.mediaTextBlock(
                 input,
                 createLocalDraftId()
         );
