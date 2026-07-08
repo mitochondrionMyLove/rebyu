@@ -86,6 +86,18 @@ export default function LoginPage() {
       }
 
       toast.success(`Welcome back, ${user.displayName || user.email}.`)
+
+      // Resume a pending invitation acceptance if the learner was sent here
+      // from the invitation page after a 401.
+      const pendingToken = sessionStorage.getItem("rebyu_pending_invitation_token")
+      if (pendingToken) {
+        sessionStorage.removeItem("rebyu_pending_invitation_token")
+        navigate(`/invitations/accept?token=${encodeURIComponent(pendingToken)}`, {
+          replace: true,
+        })
+        return
+      }
+
       navigate(roleHomePath(user.role), { replace: true })
     } catch (err) {
       // eslint-disable-next-line no-console

@@ -34,7 +34,7 @@ public class EnterpriseInvitationController {
 
     @PostMapping("/invitations")
     public SendInvitationsResponse send(
-            @Valid @RequestBody SendInvitationsRequest request) {
+            @Valid @RequestBody SendInvitationsRequest request) throws Exception {
         return invitationService.sendInvitations(request);
     }
 
