@@ -30,6 +30,11 @@ public class SecurityConfig {
                         // Current-user synchronization always requires a
                         // validated Cognito access token.
                         .requestMatchers("/api/auth/**").authenticated()
+                        // Accepting an invitation must identify the learner
+                        // from a validated token (never from the request body),
+                        // so a missing/invalid token returns 401.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/learners/accept-invitation").authenticated()
                         // Existing application routes keep their current
                         // public behavior; tokens are validated when present.
                         .anyRequest().permitAll()

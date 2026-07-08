@@ -3,6 +3,7 @@ package com.capstone.rebyu.partnership.service;
 import com.capstone.rebyu.common.BusinessRuleException;
 import com.capstone.rebyu.notification.entity.LearnerInvitation;
 import com.capstone.rebyu.notification.repository.LearnerInvitationRepository;
+import com.capstone.rebyu.notification.service.EmailService;
 import com.capstone.rebyu.organization.entity.OrganizationCertificate;
 import com.capstone.rebyu.organization.repository.OrganizationCertificateRepository;
 import com.capstone.rebyu.partnership.dto.EnterpriseInvitationDtos.CertificationAccessDto;
@@ -16,11 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -42,6 +39,9 @@ public class EnterpriseInvitationService {
 
     private final OrganizationCertificateRepository organizationCertificateRepository;
     private final LearnerInvitationRepository invitationRepository;
+    private final EmailService emailService;
+    private final com.capstone.rebyu.notification.service.InvitationTokenService invitationTokenService;
+
 
     @Transactional(readOnly = true)
     public List<CertificationAccessDto> certificationAccess(Long enterpriseId) {
@@ -51,17 +51,34 @@ public class EnterpriseInvitationService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<InvitationDto> listInvitations(Long enterpriseId) {
-        return invitationRepository
-                .findByOrgCert_Enterprise_EnterpriseIdOrderBySentAtDesc(enterpriseId)
-                .stream()
-                .map(this::toInvitationDto)
-                .toList();
+        List<LearnerInvitation> invitations = invitationRepository
+                .findByOrgCert_Enterprise_EnterpriseIdOrderBySentAtDesc(enterpriseId);
+
+        // Lazy expiration: no scheduler in this codebase, so overdue PENDING
+        // invitations are expired (and their reserved slot restored) whenever
+        // they are read. Acceptance applies the same rule (see LearnerService).
+        LocalDateTime now = LocalDateTime.now();
+        for (LearnerInvitation invitation : invitations) {
+            if (invitation.getStatus() == LearnerInvitation.Status.PENDING
+                    && invitation.getExpiresAt() != null
+                    && invitation.getExpiresAt().isBefore(now)) {
+                invitation.setStatus(LearnerInvitation.Status.EXPIRED);
+                invitationRepository.save(invitation);
+                OrganizationCertificate orgCert = invitation.getOrgCert();
+                orgCert.setUsedSlots(Math.max(0, orgCert.getUsedSlots() - 1));
+                organizationCertificateRepository.save(orgCert);
+                log.info("Invitation {} expired; 1 slot restored on orgCert {}",
+                        invitation.getInvitationId(), orgCert.getOrgCertId());
+            }
+        }
+
+        return invitations.stream().map(this::toInvitationDto).toList();
     }
 
     @Transactional
-    public SendInvitationsResponse sendInvitations(SendInvitationsRequest request) {
+    public SendInvitationsResponse sendInvitations(SendInvitationsRequest request) throws Exception {
         OrganizationCertificate orgCert = organizationCertificateRepository
                 .findById(request.orgCertId())
                 .orElseThrow(() -> new EntityNotFoundException(
@@ -110,15 +127,35 @@ public class EnterpriseInvitationService {
         LocalDateTime now = LocalDateTime.now();
         List<InvitationDto> created = new ArrayList<>();
         for (String email : toInvite) {
+
+            // Raw token is emailed only; the DB stores SHA-256(rawToken).
+            String rawToken = invitationTokenService.generateRawToken();
+            String tokenHash = invitationTokenService.hashToken(rawToken);
+
             LearnerInvitation invitation = LearnerInvitation.builder()
                     .orgCert(orgCert)
                     .email(email)
-                    .tokenHash(UUID.randomUUID().toString())
+                    .tokenHash(tokenHash)
                     .sentAt(now)
                     .expiresAt(now.plusDays(INVITATION_VALID_DAYS))
                     .status(LearnerInvitation.Status.PENDING)
                     .build();
-            created.add(toInvitationDto(invitationRepository.save(invitation)));
+
+            LearnerInvitation savedInvitation =
+                    invitationRepository.save(invitation);
+
+            created.add(toInvitationDto(savedInvitation));
+
+            log.debug("Invitation created id={} tokenFingerprint={}",
+                    savedInvitation.getInvitationId(),
+                    invitationTokenService.fingerprint(rawToken));
+
+            emailService.sendEnterpriseInvitation(
+                    savedInvitation.getEmail(),
+                    orgCert.getEnterprise().getEnterpriseName(),
+                    orgCert.getCertification().getTitle(),
+                    rawToken
+            );
         }
 
         // Reserve slots. The @Version lock makes this safe under concurrency;

@@ -5,10 +5,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 @RequiredArgsConstructor
 public class EmailService {
+
     private final JavaMailSender mailSender;
 
     @Value("${app.mail.from}")
@@ -23,28 +25,23 @@ public class EmailService {
             String certificationTitle,
             String invitationToken
     ) {
-        String invitationLink =
-                frontendUrl
-                        + "/invitations/accept?token="
-                        + invitationToken;
+        String invitationLink = buildInvitationLink(invitationToken);
 
         SimpleMailMessage message = new SimpleMailMessage();
-
         message.setFrom(mailFrom);
         message.setTo(recipientEmail);
-        message.setSubject(
-                "Invitation to join " + certificationTitle + " on REBYU"
-        );
+        message.setSubject("You're invited to join " + certificationTitle + " on REBYU");
 
         message.setText("""
                 Hello,
 
                 %s invited you to join the %s certification review on REBYU.
 
-                Open this link to accept your invitation:
+                Accept your invitation here:
                 %s
 
-                This invitation expires in 7 days.
+                This invitation link will expire in 7 days.
+                Please do not share this link with anyone else.
 
                 REBYU Team
                 """.formatted(
@@ -54,5 +51,21 @@ public class EmailService {
         ));
 
         mailSender.send(message);
+    }
+
+    private String buildInvitationLink(String invitationToken) {
+        if (invitationToken == null || invitationToken.isBlank()) {
+            throw new IllegalArgumentException("Invitation token must not be blank.");
+        }
+
+        String cleanFrontendUrl = frontendUrl.replaceAll("/+$", "");
+
+        return UriComponentsBuilder
+                .fromUriString(cleanFrontendUrl)
+                .path("/invitations/accept")
+                .queryParam("token", invitationToken)
+                .build()
+                .encode()
+                .toUriString();
     }
 }

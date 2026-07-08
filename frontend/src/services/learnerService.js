@@ -193,6 +193,8 @@ export async function getLearnerPortalData() {
     activityLogs,
     exams,
     examResults,
+    orgCertLearners,
+    orgCertificates,
   ] = await Promise.all([
     getAllLearners(),
     getAllUsers(),
@@ -204,6 +206,11 @@ export async function getLearnerPortalData() {
     getAllActivityLogs(),
     getAllExams(),
     getAllExamResults(),
+    // Enterprise-assigned enrollments (created when a learner accepts an
+    // organization invitation) plus the org allocations that map an
+    // orgCertId to a certificationId.
+    base("organization-certification-learners").catch(() => []),
+    base("organization-certificates").catch(() => []),
   ])
 
   const learner =
@@ -216,9 +223,34 @@ export async function getLearnerPortalData() {
   const user =
     asArray(users).find((item) => isSameId(item.userId, userId)) ?? null
 
-  const enrollments = asArray(learnerCertifications).filter((item) =>
+  const purchaseEnrollments = asArray(learnerCertifications).filter((item) =>
     isSameId(item.learnerId, learnerId)
   )
+
+  // Enterprise-assigned access: map this learner's active
+  // organization_certification_learners rows to their certificationId via the
+  // organization_certificates allocation, then treat them as enrollments.
+  const orgCertIdToCertificationId = new Map(
+    asArray(orgCertificates).map((orgCert) => [
+      String(orgCert.orgCertId),
+      orgCert.certificationId,
+    ])
+  )
+  const enterpriseEnrollments = asArray(orgCertLearners)
+    .filter(
+      (item) =>
+        isSameId(item.learnerId, learnerId) && item.status === "active"
+    )
+    .map((item) => ({
+      certificationId: orgCertIdToCertificationId.get(String(item.orgCertId)),
+      learnerId,
+      status: "active",
+      source: "enterprise",
+      assignedAt: item.assignedAt,
+    }))
+    .filter((item) => item.certificationId != null)
+
+  const enrollments = [...purchaseEnrollments, ...enterpriseEnrollments]
 
   const enrolledCertificationIds = new Set(
     enrollments.map((item) => String(item.certificationId))

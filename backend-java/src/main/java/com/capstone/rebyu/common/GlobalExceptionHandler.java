@@ -70,6 +70,15 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), null));
     }
 
+    @ExceptionHandler(InvitationAcceptanceException.class)
+    public ResponseEntity<InvitationErrorResponse> handleInvitationAcceptance(
+            InvitationAcceptanceException ex) {
+        log.warn("Invitation acceptance failed [{}]: {}", ex.code(), ex.getMessage());
+        return ResponseEntity.status(ex.status())
+                .body(new InvitationErrorResponse(
+                        ex.status().value(), ex.code().name(), ex.getMessage()));
+    }
+
     @ExceptionHandler(InvalidAiResponseException.class)
     public ResponseEntity<ErrorResponse> handleInvalidAiResponse(InvalidAiResponseException ex) {
         log.warn("Invalid AI response: {}", ex.getMessage());
@@ -114,5 +123,9 @@ public class GlobalExceptionHandler {
 
     public record ErrorResponse(int status, String message, Map<String, String> fieldErrors) {
         private static final LocalDateTime timestamp = LocalDateTime.now();
+    }
+
+    /** Structured error for invitation acceptance so React can switch on code. */
+    public record InvitationErrorResponse(int status, String errorCode, String message) {
     }
 }

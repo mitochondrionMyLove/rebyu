@@ -38,7 +38,7 @@ public class LearnerInvitationService {
         entity.setInvitationId(null);
         LearnerInvitationDto result = learnerInvitationMapper.toDto(learnerInvitationRepository.save(entity));
 
-        emailService.sendEnterpriseInvitation(dto.getEmail(),"Sample Hehe",String.valueOf(dto.getOrgCertId()),dto.getTokenHash());
+
         log.info("LearnerInvitation created with id: {}", result.getInvitationId());
         return result;
     }
