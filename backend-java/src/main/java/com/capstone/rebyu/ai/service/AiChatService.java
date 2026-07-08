@@ -15,8 +15,8 @@ public class AiChatService {
     private final ReviewAssistant reviewAssistant;
 
     public ChatResponse chat(ChatRequest request) {
-        log.debug("Chat request from session={}, lessonId={}", request.getSessionId(), request.getLessonId());
-        String reply = reviewAssistant.chat(request.getSessionId(), request.getMessage(), request.getLessonId());
+        log.debug("Chat request from session={}, lessonId={}", request.getSessionId(), request.getLessonName());
+        String reply = reviewAssistant.chat(request.getSessionId(), request.getMessage(), request.getLessonName());
         return new ChatResponse(reply, request.getSessionId());
     }
 }

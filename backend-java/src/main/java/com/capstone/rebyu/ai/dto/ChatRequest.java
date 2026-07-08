@@ -19,5 +19,5 @@ public class ChatRequest {
 
     // Boxed so @NotNull applies correctly; @NotBlank is invalid on numeric types.
     @NotNull
-    private Integer lessonId;
+    private String lessonName;
 }

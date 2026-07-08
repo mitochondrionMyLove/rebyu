@@ -1,12 +1,6 @@
 import { base } from "./base"
 
-const DEFAULT_GENERATION_COUNTS = {
-    MCQ: 1,
-    SHORT_ANSWER: 1,
-    DESCRIPTIVE: 1,
-    PROGRAMMING: 1,
-    DIAGRAM: 1,
-}
+export const DEFAULT_GENERATION_TARGET = 100
 
 export async function saveQuestion(question) {
     return await base("questions", {

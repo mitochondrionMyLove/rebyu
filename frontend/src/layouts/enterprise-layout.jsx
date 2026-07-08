@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query"
 import { Bell, Building2Icon, LogOutIcon, SettingsIcon, UserIcon } from "lucide-react"
 
 import { EnterpriseAppSidebar } from "@/components/enterprise/enterprise-sidebar.jsx"
-import DemoRoleSwitcher from "@/components/development/demo-role-switcher"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,7 +20,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { getAllEnterprises, getEnterpriseById } from "@/services/enterpriseService.js"
+import { getEnterpriseById } from "@/services/enterpriseService.js"
 import { useAuth } from "@/context/auth-context.jsx"
 
 function getInitials(name = "") {
@@ -39,8 +38,7 @@ export default function EnterpriseLayout() {
   const navigate = useNavigate()
   const { user, logout: authLogout } = useAuth()
   // A signed-in enterprise account is scoped to its own organization via the
-  // enterpriseId from /api/auth/me. In DEV preview (no login) the portal falls
-  // back to the first organization on record.
+  // enterpriseId from /api/auth/me.
   const authEnterpriseId = user?.enterpriseId ?? null
 
   const scopedQuery = useQuery({
@@ -51,32 +49,21 @@ export default function EnterpriseLayout() {
     retry: 1,
   })
 
-  const fallbackQuery = useQuery({
-    queryKey: ["enterprises"],
-    queryFn: getAllEnterprises,
-    enabled: authEnterpriseId == null,
-    staleTime: 60_000,
-    retry: 1,
-  })
-
   const enterprise = useMemo(() => {
     if (authEnterpriseId != null) {
       return scopedQuery.data ?? null
     }
-    const list = Array.isArray(fallbackQuery.data) ? fallbackQuery.data : []
-    return list[0] ?? null
-  }, [authEnterpriseId, scopedQuery.data, fallbackQuery.data])
-
-  const activeQuery = authEnterpriseId != null ? scopedQuery : fallbackQuery
+    return null
+  }, [authEnterpriseId, scopedQuery.data])
 
   const outletContext = useMemo(
     () => ({
       enterprise,
-      enterpriseLoading: activeQuery.isLoading,
-      enterpriseError: activeQuery.isError,
-      refetchEnterprise: activeQuery.refetch,
+      enterpriseLoading: scopedQuery.isLoading,
+      enterpriseError: scopedQuery.isError,
+      refetchEnterprise: scopedQuery.refetch,
     }),
-    [enterprise, activeQuery.isLoading, activeQuery.isError, activeQuery.refetch]
+    [enterprise, scopedQuery.isLoading, scopedQuery.isError, scopedQuery.refetch]
   )
 
   const orgName = enterprise?.enterpriseName ?? "Organization"
@@ -107,7 +94,6 @@ export default function EnterpriseLayout() {
           </div>
 
           <div className="flex items-center gap-2 px-4">
-            <DemoRoleSwitcher />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

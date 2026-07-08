@@ -1,6 +1,7 @@
 package com.capstone.rebyu.common;
 
 import jakarta.persistence.EntityNotFoundException;
+import com.capstone.rebyu.ai.common.AiProviderRateLimitException;
 import com.capstone.rebyu.ai.common.InvalidAiGeneratedQuestionException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -91,6 +92,13 @@ public class GlobalExceptionHandler {
         log.warn("Invalid generated question draft: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(new ErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(AiProviderRateLimitException.class)
+    public ResponseEntity<ErrorResponse> handleAiProviderRateLimit(AiProviderRateLimitException ex) {
+        log.warn("AI provider rate limited generation: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ErrorResponse(HttpStatus.TOO_MANY_REQUESTS.value(), ex.getMessage(), null));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

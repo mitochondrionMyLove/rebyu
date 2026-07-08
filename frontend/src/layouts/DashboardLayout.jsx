@@ -30,7 +30,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import DemoRoleSwitcher from "@/components/development/demo-role-switcher"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/auth-context.jsx"
 
@@ -56,7 +55,6 @@ export default function DashboardLayout() {
             />
           </div>
           <div className="flex items-center gap-2 px-4">
-            <DemoRoleSwitcher />
             <Bell />
             <DropdownMenu className="w-48 p-2">
               <DropdownMenuTrigger asChild>

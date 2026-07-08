@@ -74,6 +74,30 @@ export function useAssessmentData(certificationId) {
     const examQuestions = Array.isArray(examQuestionsQuery.data)
       ? examQuestionsQuery.data
       : []
+    const persistedExamQuestions = exams.flatMap((exam) =>
+      Array.isArray(exam.questionIds)
+        ? exam.questionIds.map((questionId, index) => ({
+            examQuestionId: `${exam.examId}-${questionId}`,
+            examId: exam.examId,
+            questionId,
+            displayOrder: index + 1,
+          }))
+        : []
+    )
+    const existingExamQuestionKeys = new Set(
+      examQuestions.map(
+        (examQuestion) => `${examQuestion.examId}-${examQuestion.questionId}`
+      )
+    )
+    const displayedExamQuestions = [
+      ...examQuestions,
+      ...persistedExamQuestions.filter(
+        (examQuestion) =>
+          !existingExamQuestionKeys.has(
+            `${examQuestion.examId}-${examQuestion.questionId}`
+          )
+      ),
+    ]
     const questionById = new Map(
       (Array.isArray(questionsQuery.data) ? questionsQuery.data : []).map(
         (question) => [question.questionId, question]
@@ -82,7 +106,7 @@ export function useAssessmentData(certificationId) {
     return {
       exams,
       examTypeByIdText,
-      examQuestions,
+      examQuestions: displayedExamQuestions,
       questionById,
       isLoading:
         examsQuery.isLoading ||

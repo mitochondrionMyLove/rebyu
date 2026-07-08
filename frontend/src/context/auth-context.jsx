@@ -46,7 +46,6 @@ export function AuthProvider({ children }) {
       }
       if (currentUser?.role) {
         localStorage.setItem("role", currentUser.role.toLowerCase())
-        localStorage.setItem("rebyu_demo_role", currentUser.role.toUpperCase())
       }
       return currentUser
     } catch (error) {
@@ -118,6 +117,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("learnerId")
     localStorage.removeItem("email")
     localStorage.removeItem("name")
+    localStorage.removeItem("role")
+    localStorage.removeItem("rebyu_demo_role")
     setUser(null)
     setStatus("anonymous")
   }, [])

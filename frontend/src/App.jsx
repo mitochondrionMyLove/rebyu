@@ -1,10 +1,8 @@
 import { Navigate, Routes, Route } from "react-router-dom"
 import ProtectedRoute from "./components/ProtectedRoute"
 import DashboardLayout from "./layouts/DashboardLayout"
-import ChallengesLayout from "./layouts/ChallengesLayout"
 import LearnerLayout from "./layouts/learner-layout.jsx"
 import EnterpriseLayout from "./layouts/enterprise-layout.jsx"
-import { getDemoRoleHome } from "./lib/demo-role"
 import { roleHomePath, useAuth } from "./context/auth-context.jsx"
 import LoginPage from "./pages/auth/login-page.jsx"
 import RegisterPage from "./pages/auth/register-page.jsx"
@@ -55,9 +53,6 @@ function RoleHomeRedirect() {
   if (status === "loading") return null
   if (status === "authenticated") {
     return <Navigate to={roleHomePath(user?.role)} replace />
-  }
-  if (import.meta.env.DEV) {
-    return <Navigate to={getDemoRoleHome()} replace />
   }
   return <Navigate to="/login" replace />
 }
@@ -151,8 +146,6 @@ export function App() {
           <Route path="settings" element={<EnterpriseSettingsPage />} />
         </Route>
       </Route>
-
-      <Route path="/challenges" element={<ChallengesLayout />} />
 
       <Route path="*" element={<RoleHomeRedirect />} />
     </Routes>

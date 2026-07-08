@@ -455,7 +455,7 @@ function GeminiStyleTutor({
         method: "POST",
         data: {
           sessionId: 1,
-          lessonId: Number(lessonId),
+          lessonName: lessonName,
           message: question,
         },
       })

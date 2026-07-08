@@ -35,7 +35,7 @@ import java.util.List;
         - suggestedLessonId
         - suggestedLessonTitle
         - question
-        - difficulty
+        - difficulty ("easy", "average", or "hard")
 
         suggestedLessonId and suggestedLessonTitle must come only from the availableLessons
         list in the request. Never invent lesson ids or lesson titles.
@@ -59,12 +59,22 @@ import java.util.List;
         - correctChoiceIndex must match the zero-based correct choice
 
         SHORT_ANSWER rules:
+        - Use only for exact one-answer factual questions such as acronym
+          expansions, terms, simple definitions, formulas, commands, standards,
+          names, dates, single values, or one-phrase answers.
+        - Example: question "What does SQL stand for?" correctAnswer
+          "Structured Query Language".
+        - Do not use SHORT_ANSWER for explain, describe, compare, why/how,
+          scenario analysis, or multi-sentence answers; use DESCRIPTIVE instead.
+        - correctAnswer must be a non-blank concise exact answer
         - checkingMethod must be EXACT_MATCH
 
         DESCRIPTIVE rules:
+        - rubricBasedAnswer must be a non-blank reference answer or grading rubric
         - checkingMethod must be AI_SEMANTIC
 
         PROGRAMMING rules:
+        - starterCode should be included when useful
         - at least one test case
         - every test case must have non-blank expectedOutput
 
@@ -74,11 +84,32 @@ import java.util.List;
         - authoringNotes must tell the author how to manually recreate the reference diagram
         - do not generate XML, nodes, edges, referenceDiagramXml, referenceDiagramNodes, or referenceDiagramEdges
 
+        TOPCIT exam-style rules:
+        - TOPCIT has four official categories: Multiple Choice (30%),
+          Descriptive (21%), Performance (25%), and Integrated Performance (24%).
+        - Do not generate SHORT_ANSWER for TOPCIT.
+        - Map TOPCIT Multiple Choice to MCQ.
+        - Map TOPCIT Descriptive to DESCRIPTIVE.
+        - Map TOPCIT Performance to PROGRAMMING and/or DIAGRAM only when the
+          source supports coding, SQL, algorithms, UML, ERD, DFD, flowcharts,
+          architecture, database design, system design, or implementation tasks.
+        - Map TOPCIT Integrated Performance to complex DESCRIPTIVE, PROGRAMMING,
+          or DIAGRAM tasks only when the source supports cross-topic problem-solving.
+
         Do not generate duplicate questions.
         When questionCounts is provided, generate exactly those numbers per type.
-        When targetQuestionCount is provided instead, choose only question types
-        genuinely supported by the reference context and generate up to that many
-        grounded questions; return fewer when the material is insufficient.
+        When targetQuestionCount is provided instead, generate a mixed question
+        set with at least 3 different supported question types when the source
+        material can support that variety. Do not return only one question type.
+        Use PROGRAMMING only when the source contains code, algorithms, query
+        writing, or implementation tasks. Use DIAGRAM only when the source
+        contains workflows, database/schema design, architecture, UML/ERD/DFD,
+        or process modeling material. Generate exactly targetQuestionCount
+        grounded questions for the current request whenever possible.
+        Return fewer only if the provided source has been fully exhausted.
+        When batchMode is true, targetQuestionCount is the size of the current
+        batch only; do not try to generate the full final total in one response.
+        Never repeat or rephrase questions listed in avoidDuplicateQuestions.
         """)
 public interface QuestionGenerationAssistant {
 

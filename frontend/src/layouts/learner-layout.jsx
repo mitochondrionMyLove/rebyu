@@ -32,7 +32,6 @@ import {
   getLearnerDisplayName,
 } from "@/components/learner/learner-ui.jsx"
 import { getLearnerPortalData } from "@/services/learnerAnalyticsService.js"
-import DemoRoleSwitcher from "@/components/development/demo-role-switcher"
 import { useAuth } from "@/context/auth-context.jsx"
 
 function getInitials(name = "", email = "") {
@@ -103,7 +102,6 @@ export default function LearnerLayout() {
           </div>
 
           <div className="flex items-center gap-2 px-4">
-            <DemoRoleSwitcher />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Open notifications">

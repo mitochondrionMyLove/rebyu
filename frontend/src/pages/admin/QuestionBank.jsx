@@ -72,6 +72,7 @@ import BigDialog from "../../components/commons/dialog.jsx";
 import AiGenerationProgress from "../../components/commons/ai-generation-progress.jsx";
 import { extractDiagramData } from "../../utils/diagram-graph.js";
 import {
+    DEFAULT_GENERATION_TARGET,
     deleteQuestion,
     generateQuestionsFromFiles,
     getQuestions,
@@ -88,6 +89,14 @@ import {
 
 function getBackendErrorMessage(error, fallbackMessage) {
     const responseData = error?.response?.data;
+    const status = error?.response?.status;
+
+    if (status === 429) {
+        return (
+            responseData?.message ||
+            "The AI provider is temporarily rate limiting question generation. Please wait a minute and try again."
+        );
+    }
 
     return (
         (typeof responseData === "string" && responseData) ||
@@ -2958,6 +2967,76 @@ function QuestionBank() {
             const generationResponse = await generateQuestionsFromFiles(
                 certificationId,
                 selectedDocuments,
+                null,
+                {
+                    targetQuestionCount: DEFAULT_GENERATION_TARGET,
+                    additionalInstructions: `
+You are REBYU's Certification-Aware Question Bank Generation AI.
+
+Before generating questions, analyze the selected certification and determine the correct exam style.
+
+SELECTED CERTIFICATION:
+- Name: ${getCertificationTitle(selectedCertification)}
+- Description: ${selectedCertification?.description ?? "No description provided"}
+- Industry: ${selectedCertification?.industry ?? "No industry provided"}
+
+CERTIFICATION-AWARE RULES:
+1. Identify what the certification is about.
+2. Determine appropriate question types based on the certification style.
+3. Do not blindly generate every question type.
+4. Generate only question types that match the certification and are supported by the uploaded file, certification content, or lesson/module content.
+5. Every question must be based only on the uploaded files, certification content, or lesson/module content.
+6. Do not invent topics that are not found in the uploaded/source content.
+
+CERTIFICATION-SPECIFIC RULES:
+- If the certification is TOPCIT:
+  TOPCIT measures practical knowledge and real-world problem-solving ability.
+  TOPCIT has 75 questions across these official categories:
+  - Multiple Choice: 30%
+  - Descriptive: 21%
+  - Performance: 25%
+  - Integrated Performance: 24%
+  Do not generate SHORT_ANSWER for TOPCIT. TOPCIT written-response questions must use DESCRIPTIVE.
+  Map TOPCIT Multiple Choice to MCQ.
+  Map TOPCIT Descriptive to DESCRIPTIVE.
+  Map TOPCIT Performance to PROGRAMMING and/or DIAGRAM only when the source supports coding, SQL, algorithms, UML, ERD, DFD, flowcharts, architecture, database design, system design, or implementation tasks.
+  Map TOPCIT Integrated Performance to complex DESCRIPTIVE, PROGRAMMING, or DIAGRAM tasks only when the source supports cross-topic problem-solving.
+  For TOPCIT, approximate the official distribution across the generated target. If a performance type is unsupported by the source, redistribute those questions to MCQ and DESCRIPTIVE rather than inventing unsupported performance tasks.
+
+- If the certification is PhilNITS IT Passport, IT Passport, or IP:
+  Generate MCQ questions only.
+  Do not generate SHORT_ANSWER, DESCRIPTIVE, PROGRAMMING, or DIAGRAM questions.
+
+- If the certification is PhilNITS FE, FE Exam, or Fundamental Information Technology Engineer:
+  Generate MCQ questions only.
+  Even if the topic is programming-related, convert it into MCQ format unless the admin explicitly allows performance-based practice.
+
+- For other certifications:
+  Analyze the certification name, description, and uploaded/source content first.
+  Then choose only the question types that match the certification style and source material.
+
+QUESTION TYPE RULES:
+- MCQ: Use for concepts, definitions, processes, laws, calculations, terminology, scenarios, and exam-style review questions. Return exactly 4 choices, exactly 1 correct choice, correctChoiceIndex, explanation, difficulty, and lesson.
+- SHORT_ANSWER: Do not use for TOPCIT. Generate only when a non-TOPCIT certification explicitly allows exact one-answer factual questions. Use it for acronym expansions, terms, simple definitions, formulas, commands, standards, names, dates, single values, or one-phrase answers. Example: question "What does SQL stand for?" correctAnswer "Structured Query Language". Do not use SHORT_ANSWER for "explain", "describe", "compare", "why", "how", scenario analysis, or multi-sentence answers; use DESCRIPTIVE instead. Return a non-blank correctAnswer, checkingMethod EXACT_MATCH, explanation, difficulty, and lesson.
+- DESCRIPTIVE: Generate only when the certification allows explanation-based answers. Return a non-blank rubricBasedAnswer, checkingMethod AI_SEMANTIC, difficulty, and lesson.
+- PROGRAMMING: Generate only when BOTH conditions are true: the certification allows programming/performance-based questions, and the source contains code, algorithms, SQL/query writing, debugging, implementation tasks, or programming logic. Return starterCode when useful and testCases with expected outputs.
+- DIAGRAM: Generate only when BOTH conditions are true: the certification allows diagram/performance-based questions, and the source contains workflows, ERD, UML, DFD, flowcharts, database/schema design, architecture, network diagrams, or process modeling material. Return diagramType, instructions, authoringNotes, difficulty, and lesson.
+
+QUANTITY RULES:
+- Generate at least ${DEFAULT_GENERATION_TARGET} total high-quality draft questions when the source content can support it.
+- Do not stop after a small sample. Produce a full batch for each backend request.
+- Use at least 3 different question types when the certification style and source content support them.
+- If the certification is MCQ-only, generate MCQ questions only.
+- If the source content is not enough to create ${DEFAULT_GENERATION_TARGET} high-quality questions, generate the maximum valid number and include a warning.
+- Do not create duplicate or near-duplicate questions.
+
+OUTPUT RULES:
+- Follow the backend's canonical question draft fields exactly.
+- Return valid JSON only.
+- Do not include markdown.
+- Do not include explanations outside JSON.
+                    `.trim(),
+                },
             );
 
             const generatedDrafts = Array.isArray(generationResponse)

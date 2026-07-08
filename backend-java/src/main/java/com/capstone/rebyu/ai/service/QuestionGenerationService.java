@@ -1,6 +1,7 @@
 package com.capstone.rebyu.ai.service;
 
 import com.capstone.rebyu.ai.assistant.QuestionGenerationAssistant;
+import com.capstone.rebyu.ai.common.AiProviderRateLimitException;
 import com.capstone.rebyu.ai.dto.AiQuestionGenerationRequest;
 import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftDto;
 import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftResponseDto;
@@ -30,20 +31,25 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
 public class QuestionGenerationService {
 
-    private static final int MAX_DOC_CHARS = 10_000;
+    private static final int MAX_DOC_CHARS = 50_000;
     private static final int MAX_QUESTIONS_PER_TYPE = 50;
-    private static final int DEFAULT_TARGET = 10;
-    private static final int MAX_TARGET = 100;
-    private static final int RETRIEVAL_MAX_RESULTS = 12;
+    private static final int DEFAULT_TARGET = 100;
+    private static final int MAX_TARGET = 250;
+    private static final int TARGET_BATCH_SIZE = 20;
+    private static final int MAX_TARGET_BATCH_ATTEMPTS = 25;
+    private static final int MAX_EMPTY_BATCH_ATTEMPTS = 8;
+    private static final int RETRIEVAL_MAX_RESULTS = 24;
     private static final java.util.Set<String> SUPPORTED_TYPES = java.util.Set.of(
             "MCQ", "SHORT_ANSWER", "DESCRIPTIVE", "PROGRAMMING", "DIAGRAM"
     );
@@ -180,43 +186,12 @@ public class QuestionGenerationService {
                     : Math.max(1, Math.min(MAX_TARGET, request.getTargetQuestionCount()));
         }
 
-        String requestJson = buildRequestJson(request, ctx, requestedCounts, target);
-
         log.info("Generating question drafts for certificationId={} mode={} target={}",
                 request.getCertificationId(), mode, target);
 
-        List<GeneratedQuestionDraftDto> generatedDrafts = null;
-        InvalidAiGeneratedQuestionException lastParseError = null;
-        for (int attempt = 1; attempt <= 2 && generatedDrafts == null; attempt++) {
-            try {
-                String aiResponse = questionGenerationAssistant.generateQuestions(
-                        requestJson, referenceContext);
-                generatedDrafts = parseGeneratedQuestionDrafts(aiResponse);
-            } catch (InvalidAiGeneratedQuestionException e) {
-                lastParseError = e;
-                log.warn("Attempt {}/2: unparseable question draft response for certificationId={}: {}",
-                        attempt, request.getCertificationId(), e.getMessage());
-            } catch (Exception e) {
-                log.error("Failed to deserialize AI question draft response for certificationId={}",
-                        request.getCertificationId(), e);
-                throw new InvalidAiGeneratedQuestionException(
-                        "The AI returned invalid question drafts. Please check the format and try again.", e);
-            }
-        }
-        if (generatedDrafts == null) {
-            throw lastParseError != null
-                    ? lastParseError
-                    : new InvalidAiGeneratedQuestionException(
-                            "The AI returned malformed question draft JSON. Please try again.");
-        }
-
-        generatedDrafts = assignMissingLessons(generatedDrafts, ctx, warnings);
-
-        // Always validate leniently: keep every valid draft, skip the rest
-        // with warnings, and never fail the whole batch over one bad item.
-        List<GeneratedQuestionDraftDto> validDrafts =
-                generatedQuestionDraftValidator.validateLenient(
-                        generatedDrafts, ctx.lessonsById(), warnings);
+        List<GeneratedQuestionDraftDto> validDrafts = requestedCounts != null
+                ? generateStrictCountDrafts(request, ctx, requestedCounts, target, referenceContext, warnings)
+                : generateTargetDrafts(request, ctx, target, referenceContext, warnings);
 
         if (requestedCounts != null) {
             Map<String, Long> producedByType = validDrafts.stream()
@@ -233,6 +208,17 @@ public class QuestionGenerationService {
         } else if (validDrafts.size() < target) {
             warnings.add("The grounded source material supported "
                     + validDrafts.size() + " of the " + target + " requested questions.");
+        }
+
+        if (requestedCounts == null && validDrafts.size() >= 3) {
+            long typeCount = validDrafts.stream()
+                    .map(draft -> draft.questionType().name())
+                    .distinct()
+                    .count();
+            if (typeCount < 3) {
+                warnings.add("The AI returned limited question-type variety. "
+                        + "Regenerate or add more varied source material to get at least 3 question types.");
+            }
         }
 
         log.info("Generated {} valid question draft(s) for certificationId={}",
@@ -356,11 +342,249 @@ public class QuestionGenerationService {
         return normalized;
     }
 
+    private List<GeneratedQuestionDraftDto> generateStrictCountDrafts(
+            AiQuestionGenerationRequest request,
+            CertContext ctx,
+            Map<String, Integer> requestedCounts,
+            int target,
+            String referenceContext,
+            List<String> warnings
+    ) throws IOException {
+        String requestJson = buildRequestJson(request, ctx, requestedCounts, target, List.of());
+        List<GeneratedQuestionDraftDto> generatedDrafts =
+                requestDraftBatch(request, requestJson, referenceContext, 2);
+        generatedDrafts = assignMissingLessons(generatedDrafts, ctx, warnings);
+        generatedDrafts = normalizeQuestionTypeDrafts(generatedDrafts, ctx, warnings);
+        return generatedQuestionDraftValidator.validateLenient(
+                generatedDrafts, ctx.lessonsById(), warnings);
+    }
+
+    private List<GeneratedQuestionDraftDto> generateTargetDrafts(
+            AiQuestionGenerationRequest request,
+            CertContext ctx,
+            int target,
+            String referenceContext,
+            List<String> warnings
+    ) throws IOException {
+        List<GeneratedQuestionDraftDto> accepted = new ArrayList<>();
+        Set<String> acceptedQuestions = new HashSet<>();
+        int maxAttempts = Math.min(
+                MAX_TARGET_BATCH_ATTEMPTS,
+                Math.max(8, (int) Math.ceil((double) target / TARGET_BATCH_SIZE) * 3)
+        );
+        int emptyAttempts = 0;
+
+        for (int attempt = 1; attempt <= maxAttempts && accepted.size() < target; attempt++) {
+            int remaining = target - accepted.size();
+            int batchTarget = Math.min(TARGET_BATCH_SIZE, remaining);
+            String requestJson = buildRequestJson(
+                    request,
+                    ctx,
+                    null,
+                    batchTarget,
+                    accepted.stream().map(GeneratedQuestionDraftDto::question).toList()
+            );
+
+            List<GeneratedQuestionDraftDto> generatedDrafts;
+            try {
+                generatedDrafts = requestDraftBatch(request, requestJson, referenceContext, 2);
+            } catch (AiProviderRateLimitException e) {
+                if (!accepted.isEmpty()) {
+                    warnings.add(e.getMessage() + " Returning " + accepted.size()
+                            + " questions generated before the provider limit was reached.");
+                    break;
+                }
+                throw e;
+            } catch (InvalidAiGeneratedQuestionException e) {
+                warnings.add("One generation batch was skipped because the AI returned malformed drafts.");
+                emptyAttempts++;
+                if (emptyAttempts >= MAX_EMPTY_BATCH_ATTEMPTS && !accepted.isEmpty()) break;
+                continue;
+            }
+
+            generatedDrafts = assignMissingLessons(generatedDrafts, ctx, warnings);
+            generatedDrafts = normalizeQuestionTypeDrafts(generatedDrafts, ctx, warnings);
+            List<GeneratedQuestionDraftDto> validBatch;
+            try {
+                validBatch = generatedQuestionDraftValidator.validateLenient(
+                        generatedDrafts, ctx.lessonsById(), warnings);
+            } catch (InvalidAiGeneratedQuestionException e) {
+                emptyAttempts++;
+                if (emptyAttempts >= MAX_EMPTY_BATCH_ATTEMPTS && !accepted.isEmpty()) break;
+                continue;
+            }
+
+            int added = 0;
+            for (GeneratedQuestionDraftDto draft : validBatch) {
+                String normalizedQuestion = normalizeQuestionText(draft.question());
+                if (!acceptedQuestions.add(normalizedQuestion)) {
+                    warnings.add("Skipped a duplicate generated question.");
+                    continue;
+                }
+                accepted.add(draft);
+                added++;
+                if (accepted.size() >= target) break;
+            }
+
+            if (added == 0) {
+                emptyAttempts++;
+                if (emptyAttempts >= MAX_EMPTY_BATCH_ATTEMPTS) break;
+            } else {
+                emptyAttempts = 0;
+            }
+        }
+
+        if (accepted.isEmpty()) {
+            throw new InvalidAiGeneratedQuestionException(
+                    "The AI did not return any valid question drafts. Please try again.");
+        }
+        if (accepted.size() < target) {
+            warnings.add("Generated " + accepted.size() + " of " + target
+                    + " requested questions after " + maxAttempts
+                    + " batch attempt(s). Add more source material or regenerate to continue.");
+        }
+        return accepted;
+    }
+
+    private List<GeneratedQuestionDraftDto> requestDraftBatch(
+            AiQuestionGenerationRequest request,
+            String requestJson,
+            String referenceContext,
+            int maxAttempts
+    ) {
+        InvalidAiGeneratedQuestionException lastParseError = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                String aiResponse = questionGenerationAssistant.generateQuestions(
+                        requestJson, referenceContext);
+                return parseGeneratedQuestionDrafts(aiResponse);
+            } catch (InvalidAiGeneratedQuestionException e) {
+                lastParseError = e;
+                log.warn("Attempt {}/{}: unparseable question draft response for certificationId={}: {}",
+                        attempt, maxAttempts, request.getCertificationId(), e.getMessage());
+            } catch (Exception e) {
+                if (isRateLimitException(e)) {
+                    throw new AiProviderRateLimitException(
+                            "The AI provider is temporarily rate limiting question generation. "
+                                    + "Please wait a minute and try again.", e);
+                }
+                log.error("Failed to deserialize AI question draft response for certificationId={}",
+                        request.getCertificationId(), e);
+                throw new InvalidAiGeneratedQuestionException(
+                        "The AI returned invalid question drafts. Please check the format and try again.", e);
+            }
+        }
+        throw lastParseError != null
+                ? lastParseError
+                : new InvalidAiGeneratedQuestionException(
+                        "The AI returned malformed question draft JSON. Please try again.");
+    }
+
+    private boolean isRateLimitException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String className = current.getClass().getName().toLowerCase(Locale.ROOT);
+            String message = current.getMessage() == null
+                    ? ""
+                    : current.getMessage().toLowerCase(Locale.ROOT);
+            if (className.contains("ratelimit")
+                    || message.contains("too many requests")
+                    || message.contains("rate limit")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private List<GeneratedQuestionDraftDto> normalizeQuestionTypeDrafts(
+            List<GeneratedQuestionDraftDto> drafts,
+            CertContext ctx,
+            List<String> warnings
+    ) {
+        if (drafts == null || drafts.isEmpty()) {
+            return drafts;
+        }
+
+        boolean convertedTopcitShortAnswer = false;
+        boolean convertedNonExactShortAnswer = false;
+        List<GeneratedQuestionDraftDto> normalized = new ArrayList<>(drafts.size());
+        for (GeneratedQuestionDraftDto draft : drafts) {
+            if (draft != null
+                    && draft.questionType() == com.capstone.rebyu.ai.dto.GeneratedQuestionType.SHORT_ANSWER
+                    && (isTopcit(ctx.certTitle()) || !isExactShortAnswerPrompt(draft.question()))) {
+                if (isTopcit(ctx.certTitle())) {
+                    convertedTopcitShortAnswer = true;
+                } else {
+                    convertedNonExactShortAnswer = true;
+                }
+                normalized.add(toDescriptiveDraft(draft));
+            } else {
+                normalized.add(draft);
+            }
+        }
+        if (convertedTopcitShortAnswer) {
+            warnings.add("Converted TOPCIT short-answer drafts to descriptive questions to match the TOPCIT exam style.");
+        }
+        if (convertedNonExactShortAnswer) {
+            warnings.add("Converted non-exact short-answer drafts to descriptive questions.");
+        }
+        return normalized;
+    }
+
+    private GeneratedQuestionDraftDto toDescriptiveDraft(GeneratedQuestionDraftDto draft) {
+        String rubric = draft.rubricBasedAnswer();
+        if (rubric == null || rubric.isBlank()) {
+            rubric = draft.correctAnswer();
+        }
+        if (rubric == null || rubric.isBlank()) {
+            rubric = "Evaluate the response for conceptual correctness, completeness, and relevance to the source material.";
+        }
+        return new GeneratedQuestionDraftDto(
+                com.capstone.rebyu.ai.dto.GeneratedQuestionType.DESCRIPTIVE,
+                draft.suggestedLessonId(),
+                draft.suggestedLessonTitle(),
+                draft.question(),
+                draft.difficulty(),
+                null,
+                null,
+                null,
+                com.capstone.rebyu.ai.dto.GeneratedCheckingMethod.AI_SEMANTIC,
+                rubric,
+                draft.starterCode(),
+                draft.testCases(),
+                draft.diagramType(),
+                draft.instructions(),
+                draft.authoringNotes()
+        );
+    }
+
+    private boolean isExactShortAnswerPrompt(String question) {
+        if (question == null || question.isBlank()) return false;
+        String normalized = question.trim().toLowerCase(Locale.ROOT);
+        return !(normalized.startsWith("explain ")
+                || normalized.startsWith("describe ")
+                || normalized.startsWith("compare ")
+                || normalized.startsWith("contrast ")
+                || normalized.startsWith("why ")
+                || normalized.startsWith("how ")
+                || normalized.contains(" explain ")
+                || normalized.contains(" describe ")
+                || normalized.contains(" compare ")
+                || normalized.contains(" discuss ")
+                || normalized.contains("analyze "));
+    }
+
+    private boolean isTopcit(String certTitle) {
+        return certTitle != null && certTitle.toLowerCase(Locale.ROOT).contains("topcit");
+    }
+
     private String buildRequestJson(
             AiQuestionGenerationRequest request,
             CertContext ctx,
             Map<String, Integer> requestedCounts,
-            int target
+            int target,
+            List<String> existingQuestions
     ) throws IOException {
         List<Map<String, Object>> availableLessons = ctx.lessonsById().values().stream()
                 .map(l -> Map.<String, Object>of("lessonId", l.lessonId(), "lessonTitle", l.title()))
@@ -374,14 +598,38 @@ public class QuestionGenerationService {
             requestData.put("questionCounts", requestedCounts);
         } else {
             requestData.put("targetQuestionCount", target);
+            requestData.put("batchMode", true);
+            requestData.put("batchInstruction",
+                    "Generate only targetQuestionCount questions for this batch. "
+                            + "The backend will request additional batches until the full total is reached.");
             requestData.put("typeSelection",
-                    "Choose only question types genuinely supported by the reference context. "
-                            + "Return fewer questions when the material is insufficient.");
+                    "Generate a mixed question set using at least 3 different supported question types "
+                            + "when the source material can support that variety. Do not return only one "
+                            + "question type. Use PROGRAMMING only when the source contains code, algorithms, "
+                            + "query writing, or implementation tasks. Use DIAGRAM only when the source "
+                            + "contains workflows, database/schema design, architecture, UML/ERD/DFD, "
+                            + "or process modeling material. Return fewer questions only when the material "
+                            + "is insufficient.");
+        }
+        if (existingQuestions != null && !existingQuestions.isEmpty()) {
+            requestData.put("avoidDuplicateQuestions", existingQuestions.stream()
+                    .filter(question -> question != null && !question.isBlank())
+                    .limit(80)
+                    .toList());
+            requestData.put("continuationInstruction",
+                    "This is a continuation batch. Do not repeat or rephrase any avoidDuplicateQuestions.");
         }
         if (request.getAdditionalInstructions() != null && !request.getAdditionalInstructions().isBlank()) {
             requestData.put("additionalInstructions", request.getAdditionalInstructions());
         }
         return objectMapper.writeValueAsString(requestData);
+    }
+
+    private String normalizeQuestionText(String text) {
+        if (text == null) return "";
+        return java.util.regex.Pattern.compile("\\s+")
+                .matcher(text.trim().toLowerCase(Locale.ROOT))
+                .replaceAll(" ");
     }
 
     /**
@@ -605,12 +853,18 @@ public class QuestionGenerationService {
         renameFirst(node, "question", "questionText", "prompt");
 
         // correct answer synonyms
-        renameFirst(node, "correctAnswer", "answer", "correct_answer", "expectedAnswer");
+        renameFirst(node, "correctAnswer", "answer", "correct_answer", "expectedAnswer",
+                "sampleAnswer", "modelAnswer", "referenceAnswer");
+        boolean hadCanonicalCorrectChoiceIndex = node.hasNonNull("correctChoiceIndex");
+        renameFirst(node, "correctChoiceIndex", "correctIndex", "answerIndex",
+                "correctOptionIndex", "correct_choice_index");
+        canonicalizeCorrectChoiceIndex(node, !hadCanonicalCorrectChoiceIndex);
 
         // question type synonyms and normalization
         renameFirst(node, "questionType", "type", "question_type");
         String type = node.path("questionType").asText("").trim().toUpperCase(Locale.ROOT)
                 .replace(' ', '_').replace('-', '_');
+        type = type.replaceAll("(_)?QUESTION$", "");
         type = switch (type) {
             case "MULTIPLE_CHOICE", "MULTIPLECHOICE", "MC" -> "MCQ";
             case "CODING", "CODE" -> "PROGRAMMING";
@@ -621,6 +875,14 @@ public class QuestionGenerationService {
 
         // choices: accept "options" (strings or objects) as well as "choices"
         JsonNode rawChoices = node.hasNonNull("choices") ? node.get("choices") : node.get("options");
+        if (type.isBlank()) {
+            if (rawChoices != null && rawChoices.isArray() && rawChoices.size() > 0) {
+                type = "MCQ";
+            } else if (node.hasNonNull("correctAnswer")
+                    && !node.path("correctAnswer").asText("").isBlank()) {
+                type = "SHORT_ANSWER";
+            }
+        }
         node.remove("options");
         if (rawChoices != null && rawChoices.isArray() && rawChoices.size() > 0) {
             String correctAnswerText = node.path("correctAnswer").asText("");
@@ -637,13 +899,21 @@ public class QuestionGenerationService {
                         mapped.set("explanation", choice.get("explanation"));
                     }
                     boolean correct = choice.path("isCorrect").asBoolean(
-                            choice.path("correct").asBoolean(false));
+                            choice.path("correct").asBoolean(
+                                    choice.path("is_correct").asBoolean(false)));
+                    if (!correct && !correctAnswerText.isBlank()) {
+                        correct = text.equalsIgnoreCase(correctAnswerText)
+                                || java.util.Objects.equals(
+                                        choice.path("label").asText(""),
+                                        correctAnswerText);
+                    }
                     mapped.put("isCorrect", correct || index == correctIndex);
                     if (correct) correctIndex = index;
                 } else {
                     String text = choice.asText("");
                     boolean correct = index == correctIndex
-                            || (!correctAnswerText.isBlank() && text.equals(correctAnswerText));
+                            || (!correctAnswerText.isBlank()
+                                    && text.equalsIgnoreCase(correctAnswerText));
                     mapped.put("choiceText", text);
                     mapped.put("isCorrect", correct);
                     if (correct) correctIndex = index;
@@ -673,6 +943,9 @@ public class QuestionGenerationService {
             case "SHORT_ANSWER" -> {
                 renameFirst(node, "correctAnswer",
                         "answer", "expectedAnswer", "sampleAnswer", "modelAnswer", "expectedOutput");
+                if (node.path("correctAnswer").asText("").isBlank()) {
+                    node.put("correctAnswer", "TODO: add correct answer before saving");
+                }
                 node.put("checkingMethod", "EXACT_MATCH");
             }
             case "DESCRIPTIVE" -> {
@@ -773,6 +1046,42 @@ public class QuestionGenerationService {
         renameFirst(node, "suggestedLessonId", "lessonId");
         renameFirst(node, "suggestedLessonTitle", "lessonTitle");
         return node;
+    }
+
+    private void canonicalizeCorrectChoiceIndex(
+            com.fasterxml.jackson.databind.node.ObjectNode node,
+            boolean allowOneBasedIndex
+    ) {
+        JsonNode value = node.get("correctChoiceIndex");
+        if (value == null || value.isNull()) return;
+
+        Integer index = null;
+        boolean numericIndex = false;
+        if (value.isNumber()) {
+            index = value.asInt();
+            numericIndex = true;
+        } else if (value.isTextual()) {
+            String text = value.asText("").trim();
+            if (text.matches("\\d+")) {
+                index = Integer.parseInt(text);
+                numericIndex = true;
+            } else if (text.length() == 1) {
+                char letter = Character.toUpperCase(text.charAt(0));
+                if (letter >= 'A' && letter <= 'D') {
+                    index = letter - 'A';
+                }
+            }
+        }
+
+        if (index == null) return;
+
+        JsonNode rawChoices = node.hasNonNull("choices") ? node.get("choices") : node.get("options");
+        if (numericIndex && rawChoices != null && rawChoices.isArray()
+                && (index == rawChoices.size()
+                        || (allowOneBasedIndex && index >= 1 && index <= rawChoices.size()))) {
+            index--;
+        }
+        node.put("correctChoiceIndex", index);
     }
 
     private void renameFirst(
