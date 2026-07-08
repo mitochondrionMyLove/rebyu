@@ -5,8 +5,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: puffpower177@gmail.com
-    password: {$GOOGLE_APP_PASS}
+    username: nezer.resora@gmail.com
+    password: ${GOOGLE_APP_PASS}
     properties:
       mail:
         smtp:
@@ -77,7 +77,7 @@ app:
     user-pool-id: ${COGNITO_USER_POOL_ID:us-east-1_YhXCAZ9HF}
   frontend-url: http://localhost:5173
   mail:
-    from: puffpower177@gmail.com
+    from: nezer.resora@gmail.com
 
 server:
   port: 8080
@@ -137,12 +137,10 @@ aws:
 
 langchain4j:
   open-ai:
-    api-key: ${GROQ_API_KEY}
-    base-url: https://api.groq.com/openai/v1
+    api-key: ${GITHUB_TOKEN}
+    base-url: https://models.github.ai/inference
     chat-model:
-      # Groq rate limits are model-specific. Use a lower-cost default so draft generation
-      # is less likely to hit the daily token cap during normal authoring workflows.
-      model-name: ${GROQ_MODEL:llama-3.3-70b-versatile}
+      model-name: ${GITHUB_MODEL:openai/gpt-4o-mini}
       temperature: 0.7
 
 db:

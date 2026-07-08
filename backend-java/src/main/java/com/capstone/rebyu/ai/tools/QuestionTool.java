@@ -9,10 +9,13 @@ import dev.langchain4j.agent.tool.Tool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+// NOTE: no @Transactional here — a Spring AOP (CGLIB) proxy would hide the @Tool
+// annotations from LangChain4j's reflection scan and break startup
+// ("does not have any methods annotated with @Tool"). Each method only reads
+// basic fields right after a repository call, so no surrounding transaction is needed.
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -23,7 +26,6 @@ public class QuestionTool {
     private final CertificationRepository certificationRepository;
 
     @Tool("Get all existing questions for a lesson — use this to avoid generating duplicate questions")
-    @Transactional(readOnly = true)
     public String getExistingQuestions(@P("lessonId") long lessonId) {
         log.debug("Tool: getExistingQuestions({})", lessonId);
         List<Question> questions = questionRepository.findByLesson_LessonId(lessonId);
@@ -40,7 +42,6 @@ public class QuestionTool {
     }
 
     @Tool("Get the lesson's content structure and title — use this to base questions on the actual lesson material")
-    @Transactional(readOnly = true)
     public String getLessonContent(@P("lessonId") long lessonId) {
         log.debug("Tool: getLessonContent({})", lessonId);
         return lessonRepository.findById(lessonId).map(lesson -> {
@@ -53,7 +54,6 @@ public class QuestionTool {
     }
 
     @Tool("Get certification details by certification ID — use this to understand the full scope and industry context for question generation")
-    @Transactional(readOnly = true)
     public String getCertificationDetails(@P("certificationId") long certificationId) {
         log.debug("Tool: getCertificationDetails({})", certificationId);
         return certificationRepository.findById(certificationId).map(cert -> {
