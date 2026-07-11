@@ -30,6 +30,7 @@ import LearnerDiagnosticGatePage from "./pages/learner/learner-diagnostic-page.j
 import LearnerLessonPage from "./pages/learner/learner-lesson-page.jsx"
 import LearnerSubscriptionPage from "./pages/learner/learner-subscription-page.jsx"
 import LearnerCertificationDetailPage from "./pages/learner/learner-certification-detail-page.jsx"
+import LearnerCertificationsPage from "./pages/learner/learner-certifications-page.jsx"
 import LearnerChallengesPage from "./pages/learner/learner-challenges-page.jsx"
 import LearnerFilesPage from "./pages/learner/learner-files-page.jsx"
 import LearnerAccountPage from "./pages/learner/learner-account-page.jsx"
@@ -75,8 +76,8 @@ function RoleHomeRedirect() {
 export function App() {
     return (
         <Routes>
-            <Route path="/" element={<RoleHomeRedirect />} />
-            <Route path="/welcome" element={<LandingPage />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/welcome" element={<Navigate to="/" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -130,6 +131,10 @@ export function App() {
                     />
                     <Route path="lessons/:lessonId" element={<LearnerLessonPage />} />
                     <Route path="plan" element={<LearningStudyPlan />} />
+                    <Route
+                        path="certifications"
+                        element={<LearnerCertificationsPage />}
+                    />
                     <Route
                         path="certifications/:certificationId"
                         element={<LearnerCertificationDetailPage />}

@@ -6,8 +6,12 @@ import { AlertCircle, Loader2, UserPlus } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { registerAccount, toSafeAuthMessage } from "@/services/authService.js"
 import AuthShell from "./auth-shell.jsx"
 
@@ -58,8 +62,9 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
+      split
       title="Create your account"
-      description="Start reviewing for your certification with REBYU."
+      description="Create a learner account and begin preparing with REBYU."
       footer={
         <>
           Already have an account?{" "}
@@ -69,33 +74,34 @@ export default function RegisterPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="register-first">First name</Label>
-            <Input
-              id="register-first"
-              autoComplete="given-name"
-              required
-              value={form.firstName}
-              onChange={setField("firstName")}
-              className="h-10"
-            />
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <FieldGroup>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="register-first">First name</FieldLabel>
+              <Input
+                id="register-first"
+                autoComplete="given-name"
+                required
+                value={form.firstName}
+                onChange={setField("firstName")}
+                className="h-10"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="register-last">Last name</FieldLabel>
+              <Input
+                id="register-last"
+                autoComplete="family-name"
+                required
+                value={form.lastName}
+                onChange={setField("lastName")}
+                className="h-10"
+              />
+            </Field>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="register-last">Last name</Label>
-            <Input
-              id="register-last"
-              autoComplete="family-name"
-              required
-              value={form.lastName}
-              onChange={setField("lastName")}
-              className="h-10"
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="register-email">Email</Label>
+        <Field>
+          <FieldLabel htmlFor="register-email">Email</FieldLabel>
           <Input
             id="register-email"
             type="email"
@@ -106,9 +112,12 @@ export default function RegisterPage() {
             placeholder="you@example.com"
             className="h-10"
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="register-password">Password</Label>
+          <FieldDescription>
+            We use your email for sign-in, verification, and account updates.
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="register-password">Password</FieldLabel>
           <Input
             id="register-password"
             type="password"
@@ -119,13 +128,13 @@ export default function RegisterPage() {
             onChange={setField("password")}
             className="h-10"
           />
-          <p className="text-xs text-muted-foreground">
+          <FieldDescription>
             At least 8 characters, with upper and lower case letters and a
             number.
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="register-confirm">Confirm password</Label>
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="register-confirm">Confirm password</FieldLabel>
           <Input
             id="register-confirm"
             type="password"
@@ -135,7 +144,8 @@ export default function RegisterPage() {
             onChange={setField("confirmPassword")}
             className="h-10"
           />
-        </div>
+          <FieldDescription>Enter the same password again.</FieldDescription>
+        </Field>
 
         {error ? (
           <Alert variant="destructive">
@@ -144,21 +154,22 @@ export default function RegisterPage() {
           </Alert>
         ) : null}
 
-        <Button type="submit" className="h-10 w-full" disabled={pending}>
-          {pending ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Creating account...
-            </>
-          ) : (
-            <>
-              <UserPlus className="size-4" />
-              Create account
-            </>
-          )}
-        </Button>
-
-        <Separator />
+        <Field>
+          <Button type="submit" className="h-10 w-full" disabled={pending}>
+            {pending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              <>
+                <UserPlus className="size-4" />
+                Create account
+              </>
+            )}
+          </Button>
+        </Field>
+        </FieldGroup>
       </form>
     </AuthShell>
   )

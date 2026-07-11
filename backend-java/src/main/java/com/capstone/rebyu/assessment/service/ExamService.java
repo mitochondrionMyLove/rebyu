@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -63,6 +64,7 @@ public class ExamService {
 
     public ExamDto create(ExamDto dto) {
         log.info("Creating new exam");
+        enforceUniqueness(dto);
         Exam entity = examMapper.toEntity(dto);
         entity.setExamId(null);
         normalizeForSave(entity, dto);
@@ -221,6 +223,47 @@ public class ExamService {
         exam.setUpdatedAt(LocalDateTime.now());
         examRepository.save(exam);
         return toDtoWithQuestions(exam);
+    }
+
+    /**
+     * One required assessment per curriculum scope (spec §5): a lesson gets one
+     * quiz, a middle one middle exam, a major one major exam, and a certification
+     * one diagnostic + one mock. Enforced only on create; edits keep their scope.
+     */
+    private void enforceUniqueness(ExamDto dto) {
+        String scope = dto.getTargetScope();
+        if ("LESSON".equals(scope) && dto.getLessonId() != null
+                && examRepository.existsByLesson_LessonId(dto.getLessonId())) {
+            throw new BusinessRuleException.AssessmentAlreadyExistsException(
+                    "A quiz already exists for this lesson. Edit the existing one instead.");
+        }
+        if ("MIDDLE_CATEGORY".equals(scope) && dto.getMiddleCategoryId() != null
+                && examRepository.existsByMiddleCategory_MiddleCategoryId(dto.getMiddleCategoryId())) {
+            throw new BusinessRuleException.AssessmentAlreadyExistsException(
+                    "A middle exam already exists for this middle category.");
+        }
+        if ("MAJOR_CATEGORY".equals(scope) && dto.getMajorCategoryId() != null
+                && examRepository.existsByMajorCategory_MajorCategoryId(dto.getMajorCategoryId())) {
+            throw new BusinessRuleException.AssessmentAlreadyExistsException(
+                    "A major exam already exists for this major category.");
+        }
+        if (dto.getCertificationId() != null && dto.getExamTypeId() != null) {
+            String typeText = examTypeRepository.findById(dto.getExamTypeId())
+                    .map(ExamType::getExamTypeText).orElse("");
+            String upper = typeText.toUpperCase(Locale.ROOT);
+            if (upper.contains("DIAGNOSTIC")
+                    && examRepository.existsByCertification_CertificationIdAndExamType_ExamTypeText(
+                            dto.getCertificationId(), typeText)) {
+                throw new BusinessRuleException.AssessmentAlreadyExistsException(
+                        "A diagnostic exam already exists for this certification.");
+            }
+            if (upper.contains("MOCK")
+                    && examRepository.existsByCertification_CertificationIdAndExamType_ExamTypeText(
+                            dto.getCertificationId(), typeText)) {
+                throw new BusinessRuleException.AssessmentAlreadyExistsException(
+                        "A mock exam already exists for this certification.");
+            }
+        }
     }
 
     private Exam findEntity(Long id) {

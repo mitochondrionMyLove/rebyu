@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react"
 import { useNavigate, useOutletContext } from "react-router-dom"
-import { toast } from "sonner"
 import {
   Award,
   BookOpen,
@@ -19,7 +18,6 @@ import {
   LearnerEmptyState,
   ProgressBar,
 } from "@/components/learner/learner-ui.jsx"
-import { purchaseCertification } from "@/services/assessmentService.js"
 
 function getCertificationTitle(certification) {
   return certification?.title ?? "Untitled Certification"
@@ -215,7 +213,7 @@ function isDiagnosticCompleted(certification, data) {
   })
 }
 
-function CourseCard({ course, onOpen, isEnrolling }) {
+function CourseCard({ course, onOpen }) {
   const {
     certification,
     progress,
@@ -311,18 +309,15 @@ function CourseCard({ course, onOpen, isEnrolling }) {
                 variant={needsDiagnostic ? "default" : "ghost"}
                 className={needsDiagnostic ? "shrink-0 gap-1" : "shrink-0 text-primary hover:text-primary"}
                 onClick={onOpen}
-                disabled={isEnrolling}
             >
               {needsDiagnostic ? (
                   <ClipboardCheck className="size-3.5" />
               ) : null}
-              {isEnrolling
-                  ? "Enrolling..."
-                  : needsDiagnostic
-                      ? "Start"
-                      : progress >= 100
-                          ? "Review"
-                          : "Continue"}
+              {needsDiagnostic
+                  ? "Start"
+                  : progress >= 100
+                      ? "Review"
+                      : "Continue"}
             </Button>
           </div>
         </div>
@@ -365,12 +360,10 @@ function AchievementItem({ achievement }) {
 
 export default function LearnerLearningPage() {
   const navigate = useNavigate()
-  const { data, searchValue, refetch } = useOutletContext()
+  const { data, searchValue } = useOutletContext()
 
-  const publishedCertifications = data?.certifications ?? []
+  const enrolledCertifications = data?.enrolledCertifications ?? []
   const allLessons = data?.lessons ?? []
-  const learnerId = data?.learnerId ?? null
-  const enrollments = data?.enrollments ?? []
 
   const achievements = Array.isArray(data?.latestAchievements)
       ? data.latestAchievements
@@ -382,22 +375,21 @@ export default function LearnerLearningPage() {
   const [selectedIndustry, setSelectedIndustry] = useState("ALL")
   const [selectedStatus, setSelectedStatus] = useState("ALL")
   const [viewMode, setViewMode] = useState("GRID")
-  const [enrollingCertificationId, setEnrollingCertificationId] = useState(null)
 
   const query = (localSearch || searchValue || "").trim().toLowerCase()
 
   const industries = useMemo(() => {
     return [
       ...new Set(
-          publishedCertifications
+          enrolledCertifications
               .map((certification) => certification.industry)
               .filter(Boolean)
       ),
     ]
-  }, [publishedCertifications])
+  }, [enrolledCertifications])
 
   const courses = useMemo(() => {
-    return publishedCertifications.map((certification) => {
+    return enrolledCertifications.map((certification) => {
       const lessons = allLessons.filter(
           (lesson) =>
               String(lesson.certificationId) ===
@@ -432,7 +424,7 @@ export default function LearnerLearningPage() {
             : "DIAGNOSTIC REQUIRED",
       }
     })
-  }, [allLessons, publishedCertifications, data])
+  }, [allLessons, enrolledCertifications, data])
 
   const filteredCourses = useMemo(() => {
     return courses.filter((course) => {
@@ -455,46 +447,8 @@ export default function LearnerLearningPage() {
     })
   }, [courses, query, selectedIndustry, selectedStatus])
 
-  async function openCertification(course) {
+  function openCertification(course) {
     const certificationId = getCertificationId(course.certification)
-    const isEnrolled = enrollments.some(
-        (enrollment) =>
-            String(enrollment.certificationId) === certificationId
-    )
-
-    if (!isEnrolled) {
-      if (learnerId == null) {
-        toast.error("Your learner account could not be identified.")
-        return
-      }
-
-      setEnrollingCertificationId(certificationId)
-
-      try {
-        const transaction = await purchaseCertification(
-            certificationId,
-            learnerId,
-            crypto.randomUUID()
-        )
-
-        if (transaction?.requiresPayment) {
-          toast.error("This certification requires payment before enrollment.")
-          return
-        }
-
-        await refetch?.()
-        toast.success("You are now enrolled in this certification.")
-      } catch (error) {
-        toast.error(
-            error?.response?.data?.message ??
-            error?.message ??
-            "The enrollment could not be completed. Please try again."
-        )
-        return
-      } finally {
-        setEnrollingCertificationId(null)
-      }
-    }
 
     if (!course.diagnosticCompleted) {
       navigate(`/learner/learning/${certificationId}/diagnostic`, {
@@ -527,23 +481,28 @@ export default function LearnerLearningPage() {
             </h1>
 
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Explore all published certification reviews and track your progress.
+              Track your progress across the certifications you are enrolled in.
             </p>
           </div>
         </div>
 
-        {publishedCertifications.length === 0 ? (
+        {enrolledCertifications.length === 0 ? (
             <LearnerEmptyState
                 icon={BookOpen}
-                title="No published certifications yet"
-                description="Published certifications will appear here when they become available."
+                title="No enrolled certifications yet"
+                description="Browse the Certifications page and enroll in a certification review to start learning."
+                action={
+                  <Button onClick={() => navigate("/learner/certifications")}>
+                    Browse Certifications
+                  </Button>
+                }
             />
         ) : (
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
               <main className="min-w-0">
                 <div className="mb-4">
                   <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-                    Published Certifications
+                    Enrolled Certifications
                   </h2>
                 </div>
 
@@ -654,10 +613,6 @@ export default function LearnerLearningPage() {
                               key={course.certification.certificationId}
                               course={course}
                               onOpen={() => openCertification(course)}
-                              isEnrolling={
-                                enrollingCertificationId ===
-                                getCertificationId(course.certification)
-                              }
                           />
                       ))}
                     </div>

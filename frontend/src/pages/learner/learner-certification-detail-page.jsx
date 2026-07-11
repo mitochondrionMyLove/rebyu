@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useNavigate, useOutletContext, useParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -10,20 +10,9 @@ import {
   Layers3,
   LockKeyhole,
   Target,
-  PlayCircle
+  PlayCircle,
 } from "lucide-react"
 import { toast } from "sonner"
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 import {
   Accordion,
@@ -44,9 +33,7 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 
 import { Progress } from "@/components/ui/progress"
@@ -67,21 +54,6 @@ import {
 
 const DEFAULT_IMAGE =
     "https://www.eclosio.ong/wp-content/uploads/2018/08/default.png"
-
-function formatCurrency(value) {
-  const amount = Number(value ?? 0)
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return "Free"
-  }
-
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
 
 function getCertificationImageUrl(certification) {
   if (!certification?.imageKey) {
@@ -135,19 +107,6 @@ function formatDuration(minutes) {
   return `${hours} hr ${remainingMinutes} min`
 }
 
-function buildChapters(modules) {
-  return modules.flatMap((major, majorIndex) =>
-      (major.middleCategory ?? []).map((middle, middleIndex) => ({
-        id:
-            middle.middleCategoryId ??
-            `${major.majorCategoryId ?? majorIndex}-${middleIndex}`,
-        majorTitle: major.title ?? "Module",
-        title: middle.title ?? "Untitled Chapter",
-        lessons: middle.lessons ?? [],
-      }))
-  )
-}
-
 function ProductMetaItem({ icon: Icon, children }) {
   return (
       <div className="flex min-w-0 items-center gap-3 text-sm text-foreground">
@@ -183,8 +142,6 @@ export default function LearnerCertificationDetailPage() {
   const enrolledCertifications = data.enrolledCertifications ?? []
   const completedLessonItems = data.completedLessons ?? []
   const learnerLessons = data.lessons ?? []
-
-  const [pendingPurchase, setPendingPurchase] = useState(null)
 
   const enrollmentsQuery = useQuery({
     queryKey: ["learner-enrollments", learnerId],
@@ -234,16 +191,28 @@ export default function LearnerCertificationDetailPage() {
     )
   }, [certificationId, examsQuery.data, examTypesQuery.data])
 
-  const purchaseMutation = useMutation({
-    mutationFn: () =>
-        purchaseCertification(certificationId, learnerId, crypto.randomUUID()),
+  // Enrollment is free: any payment transaction the backend still creates is
+  // confirmed automatically so the learner is enrolled in a single click.
+  const enrollMutation = useMutation({
+    mutationFn: async () => {
+      const transaction = await purchaseCertification(
+          certificationId,
+          learnerId,
+          crypto.randomUUID()
+      )
 
-    onSuccess: (transaction) => {
-      if (transaction.requiresPayment) {
-        setPendingPurchase(transaction)
-        return
+      if (transaction?.requiresPayment && transaction?.transactionId) {
+        await confirmPurchase(
+            transaction.transactionId,
+            learnerId,
+            `AUTO-${transaction.transactionReference ?? transaction.transactionId}`
+        )
       }
 
+      return transaction
+    },
+
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["learner-enrollments"],
       })
@@ -251,42 +220,16 @@ export default function LearnerCertificationDetailPage() {
         queryKey: ["learner-portal-data"],
       })
 
-      toast.success("You are now enrolled in this certification.")
+      toast.success(
+          "You are now enrolled. This certification was added to My Learning."
+      )
+      navigate("/learner/learning")
     },
 
     onError: (error) => {
       toast.error(
           error?.response?.data?.message ??
           "The enrollment could not be completed. Please try again."
-      )
-    },
-  })
-
-  const confirmMutation = useMutation({
-    mutationFn: () =>
-        confirmPurchase(
-            pendingPurchase.transactionId,
-            learnerId,
-            `SIM-${pendingPurchase.transactionReference}`
-        ),
-
-    onSuccess: () => {
-      setPendingPurchase(null)
-
-      queryClient.invalidateQueries({
-        queryKey: ["learner-enrollments"],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["learner-portal-data"],
-      })
-
-      toast.success("Payment verified. You are now enrolled.")
-    },
-
-    onError: (error) => {
-      toast.error(
-          error?.response?.data?.message ??
-          "The payment could not be verified. Please try again."
       )
     },
   })
@@ -306,8 +249,8 @@ export default function LearnerCertificationDetailPage() {
             title="Certification not found"
             description="The requested certification is not available from the backend."
             action={
-              <Button onClick={() => navigate("/learner/learning")}>
-                Go to My Learning
+              <Button onClick={() => navigate("/learner/certifications")}>
+                Go to Certifications
               </Button>
             }
         />
@@ -335,8 +278,6 @@ export default function LearnerCertificationDetailPage() {
       (major.middleCategory ?? []).flatMap((middle) => middle.lessons ?? [])
   )
 
-  const chapters = buildChapters(modules)
-
   function isLessonCompleted(lesson) {
     return (
         Boolean(lesson.completed) ||
@@ -355,7 +296,10 @@ export default function LearnerCertificationDetailPage() {
 
   const imageUrl = getCertificationImageUrl(certification)
 
-  const sectionCount = chapters.length
+  const moduleCount = modules.reduce(
+      (total, major) => total + (major.middleCategory?.length ?? 0),
+      0
+  )
   const lessonCount = allLessons.length
 
   const totalMinutes = allLessons.reduce(
@@ -368,12 +312,10 @@ export default function LearnerCertificationDetailPage() {
           ? "Start Diagnostic"
           : "Continue Learning"
       : learnerId == null
-          ? "Sign In to Start"
-          : purchaseMutation.isPending
-              ? "Processing..."
-              : "Start Learning"
-
-  const primaryActionDisabled = purchaseMutation.isPending
+          ? "Sign In to Enroll"
+          : enrollMutation.isPending
+              ? "Enrolling..."
+              : "Rebyu Certificate"
 
   function handlePrimaryAction() {
     if (enrolled) {
@@ -392,7 +334,7 @@ export default function LearnerCertificationDetailPage() {
       return
     }
 
-    purchaseMutation.mutate()
+    enrollMutation.mutate()
   }
 
   return (
@@ -405,46 +347,78 @@ export default function LearnerCertificationDetailPage() {
                 type="button"
                 variant="link"
                 className="h-auto p-0 text-muted-foreground hover:text-primary"
-                onClick={() => navigate("/learner/learning")}
+                onClick={() => navigate("/learner/certifications")}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to My Learning
+              Back to Certifications
             </Button>
           </div>
 
-          <main className="grid min-w-0 items-start gap-10 lg:grid-cols-[minmax(0,1.8fr)_minmax(380px,1fr)]">
+          {/* Hero header (mirrors the admin certification view) */}
+          <header className="relative isolate overflow-hidden rounded-3xl border border-border bg-muted px-6 py-12 sm:px-10 lg:py-16">
+            <img
+                src={imageUrl}
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 h-full w-full scale-105 object-cover blur-sm brightness-[0.55]"
+                onError={(event) => {
+                  event.currentTarget.style.display = "none"
+                }}
+            />
 
-            {/* LEFT COLUMN - Product Showcase */}
-            <div className="flex flex-col space-y-10 min-w-0">
+            <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-background/10"
+            />
 
-              {/* Product Header */}
-              <div className="space-y-4">
-                <Badge className="bg-primary/10 text-primary hover:bg-primary/20">
-                  {certification.industry || "Certification Program"}
-                </Badge>
-                <h1 className="max-w-full break-words text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl [overflow-wrap:anywhere]">
-                  {certification.title}
-                </h1>
-                <p className="max-w-3xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                  {certification.description || "A comprehensive certification review designed to build your expertise, prepare you for the examination, and accelerate your career."}
-                </p>
+            <div className="relative z-10">
+              <Badge
+                  variant="secondary"
+                  className="mb-5 border border-black/10 bg-white/85 px-3 py-1 text-xs font-semibold text-black shadow-sm backdrop-blur-sm hover:bg-white/85"
+              >
+                {certification.industry || "Certification Program"}
+              </Badge>
+
+              <h1 className="max-w-3xl break-words font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl [overflow-wrap:anywhere]">
+                {certification.title}
+              </h1>
+
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/85 sm:text-base">
+                {certification.description ||
+                    "A comprehensive certification review designed to build your expertise, prepare you for the examination, and accelerate your career."}
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-3 text-sm">
+                <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-white/90 backdrop-blur-sm">
+                  <Layers3 className="h-4 w-4" />
+                  <span>
+                    {modules.length} major{" "}
+                    {modules.length === 1 ? "category" : "categories"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-white/90 backdrop-blur-sm">
+                  <BookOpen className="h-4 w-4" />
+                  <span>
+                    {moduleCount} modules · {lessonCount} lessons
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-white/90 backdrop-blur-sm">
+                  <Clock3 className="h-4 w-4" />
+                  <span>{formatDuration(totalMinutes)}</span>
+                </div>
               </div>
+            </div>
+          </header>
 
-              {/* Hero Image */}
-              <div className="overflow-hidden rounded-2xl border bg-muted shadow-sm">
-                <img
-                    src={imageUrl}
-                    alt={certification.title}
-                    className="aspect-video w-full object-cover"
-                    onError={(event) => {
-                      event.currentTarget.onerror = null
-                      event.currentTarget.src = DEFAULT_IMAGE
-                    }}
-                />
-              </div>
+          <main className="mt-10 grid min-w-0 items-start gap-10 lg:grid-cols-[minmax(0,1.8fr)_minmax(380px,1fr)]">
+
+            {/* LEFT COLUMN - About & Curriculum */}
+            <div className="flex min-w-0 flex-col space-y-10">
 
               {/* What You'll Learn (Features) */}
-              <div className="rounded-xl border bg-card p-6 sm:p-8 shadow-sm">
+              <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">
                 <h2 className="mb-6 text-xl font-bold">What you'll learn</h2>
                 <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
                   <ProductFeature>
@@ -462,98 +436,147 @@ export default function LearnerCertificationDetailPage() {
                 </div>
               </div>
 
-              {/* Course Curriculum */}
+              {/* Course Curriculum grouped by major category */}
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold">Course Content</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {sectionCount} sections • {lessonCount} lessons • {formatDuration(totalMinutes)} total length
+                    {modules.length} major {modules.length === 1 ? "category" : "categories"} •{" "}
+                    {moduleCount} modules • {lessonCount} lessons •{" "}
+                    {formatDuration(totalMinutes)} total length
                   </p>
                 </div>
 
-                {chapters.length === 0 ? (
+                {modules.length === 0 ? (
                     <LearnerEmptyState
                         icon={BookOpen}
                         title="No curriculum available"
                         description="This certification does not have modules or lessons yet."
                     />
                 ) : (
-                    <Accordion
-                        type="multiple"
-                        defaultValue={chapters[0] ? [String(chapters[0].id)] : []}
-                        className="space-y-4"
-                    >
-                      {chapters.map((chapter, index) => {
-                        const chapterMinutes = chapter.lessons.reduce(
-                            (total, lesson) => total + getLessonDurationMinutes(lesson), 0
-                        )
+                    <div className="space-y-8">
+                      {modules.map((major, majorIndex) => {
+                        const middleCategories = major.middleCategory ?? []
 
                         return (
-                            <AccordionItem
-                                key={chapter.id}
-                                value={String(chapter.id)}
-                                className="overflow-hidden rounded-xl border bg-card px-2"
+                            <section
+                                key={major.majorCategoryId ?? majorIndex}
+                                className="space-y-3"
                             >
-                              <AccordionTrigger className="px-4 py-5 hover:no-underline hover:bg-muted/50 rounded-lg transition-colors">
-                                <div className="flex flex-col items-start text-left">
-                                  <span className="font-semibold text-foreground">
-                                    Section {index + 1}: {chapter.title}
-                                  </span>
-                                  <span className="mt-1 text-sm font-normal text-muted-foreground">
-                                    {chapter.lessons.length} lessons • {formatDuration(chapterMinutes)}
-                                  </span>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent className="pt-2 pb-4">
-                                <div className="space-y-1">
-                                  {chapter.lessons.map((lesson) => {
-                                    const unlocked = enrolled && !diagnosticRequired
-                                    const completed = isLessonCompleted(lesson)
+                              <h3 className="font-heading text-lg font-bold text-foreground">
+                                <span className="text-primary">
+                                  Major Category {majorIndex + 1}:
+                                </span>{" "}
+                                {major.title ?? "Untitled"}
+                              </h3>
 
-                                    return (
-                                        <div
-                                            key={lesson.lessonId}
-                                            className="flex items-center justify-between gap-4 rounded-md px-4 py-3 hover:bg-muted/50"
-                                        >
-                                          <div className="flex items-start gap-3 min-w-0">
-                                            <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                                            <div className="min-w-0 flex flex-col">
-                                              <span className="truncate text-sm font-medium text-foreground">
-                                                {lesson.name}
-                                              </span>
-                                              {completed && (
-                                                  <span className="text-xs text-green-600 font-medium">Completed</span>
+                              {middleCategories.length === 0 ? (
+                                  <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">
+                                    No modules under this major category yet.
+                                  </div>
+                              ) : (
+                                  <Accordion
+                                      type="multiple"
+                                      className="space-y-3"
+                                  >
+                                    {middleCategories.map((middle, middleIndex) => {
+                                      const middleLessons = middle.lessons ?? []
+                                      const middleMinutes = middleLessons.reduce(
+                                          (total, lesson) =>
+                                              total + getLessonDurationMinutes(lesson),
+                                          0
+                                      )
+
+                                      const itemValue = String(
+                                          middle.middleCategoryId ??
+                                          `${majorIndex}-${middleIndex}`
+                                      )
+
+                                      return (
+                                          <AccordionItem
+                                              key={itemValue}
+                                              value={itemValue}
+                                              className="overflow-hidden rounded-xl border bg-card px-2"
+                                          >
+                                            <AccordionTrigger className="rounded-lg px-4 py-5 transition-colors hover:bg-muted/50 hover:no-underline">
+                                              <div className="flex flex-col items-start text-left">
+                                                <span className="font-semibold text-foreground">
+                                                  {middle.title ?? "Untitled Module"}
+                                                </span>
+                                                <span className="mt-1 text-sm font-normal text-muted-foreground">
+                                                  {middleLessons.length}{" "}
+                                                  {middleLessons.length === 1
+                                                      ? "lesson"
+                                                      : "lessons"}{" "}
+                                                  • {formatDuration(middleMinutes)}
+                                                </span>
+                                              </div>
+                                            </AccordionTrigger>
+                                            <AccordionContent className="pb-4 pt-2">
+                                              {middleLessons.length === 0 ? (
+                                                  <p className="px-4 py-2 text-sm text-muted-foreground">
+                                                    No lessons have been added yet.
+                                                  </p>
+                                              ) : (
+                                                  <div className="space-y-1">
+                                                    {middleLessons.map((lesson) => {
+                                                      const completed =
+                                                          isLessonCompleted(lesson)
+
+                                                      return (
+                                                          <div
+                                                              key={lesson.lessonId}
+                                                              className="flex items-center justify-between gap-4 rounded-md px-4 py-3 hover:bg-muted/50"
+                                                          >
+                                                            <div className="flex min-w-0 items-start gap-3">
+                                                              <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                                              <div className="flex min-w-0 flex-col">
+                                                                <span className="truncate text-sm font-medium text-foreground">
+                                                                  {lesson.name}
+                                                                </span>
+                                                                {completed && (
+                                                                    <span className="text-xs font-medium text-green-600">
+                                                                      Completed
+                                                                    </span>
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                            <span className="shrink-0 text-xs text-muted-foreground">
+                                                              {getLessonDurationMinutes(lesson) > 0
+                                                                  ? formatDuration(
+                                                                      getLessonDurationMinutes(lesson)
+                                                                  )
+                                                                  : "Self-paced"}
+                                                            </span>
+                                                          </div>
+                                                      )
+                                                    })}
+                                                  </div>
                                               )}
-                                            </div>
-                                          </div>
-                                          <span className="shrink-0 text-xs text-muted-foreground">
-                                            {getLessonDurationMinutes(lesson) > 0
-                                                ? formatDuration(getLessonDurationMinutes(lesson))
-                                                : "Self-paced"}
-                                          </span>
-                                        </div>
-                                    )
-                                  })}
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
+                                            </AccordionContent>
+                                          </AccordionItem>
+                                      )
+                                    })}
+                                  </Accordion>
+                              )}
+                            </section>
                         )
                       })}
-                    </Accordion>
+                    </div>
                 )}
               </div>
             </div>
 
-            {/* RIGHT COLUMN - Sticky Buy Box */}
+            {/* RIGHT COLUMN - Sticky Enrollment Box */}
             <aside className="min-w-0 self-start lg:sticky lg:top-6 lg:h-fit">
               <Card className="overflow-hidden border shadow-lg">
                 <CardHeader className="bg-muted/30 pb-4">
                   <div className="flex flex-col space-y-1">
                     <span className="text-sm font-medium text-muted-foreground">
-                      {enrolled ? "Enrollment Status" : "Total Price"}
+                      Enrollment Status
                     </span>
                     <span className="text-4xl font-extrabold tracking-tight text-foreground">
-                      {enrolled ? "Enrolled" : formatCurrency(price)}
+                      {enrolled ? "Enrolled" : "Free"}
                     </span>
                   </div>
                 </CardHeader>
@@ -577,15 +600,15 @@ export default function LearnerCertificationDetailPage() {
                     <Button
                         type="button"
                         size="lg"
-                        className="w-full text-base font-bold h-14"
+                        className="h-14 w-full text-base font-bold"
                         onClick={handlePrimaryAction}
-                        disabled={primaryActionDisabled}
+                        disabled={enrollMutation.isPending}
                     >
                       {primaryButtonLabel}
                     </Button>
-                    {!enrolled && price > 0 && (
+                    {!enrolled && (
                         <p className="text-center text-xs text-muted-foreground">
-                          30-Day Money-Back Guarantee
+                          Enrolling adds this certification to My Learning.
                         </p>
                     )}
                   </div>
@@ -615,10 +638,10 @@ export default function LearnerCertificationDetailPage() {
                   <div className="space-y-4">
                     <h4 className="font-semibold text-foreground">This course includes:</h4>
                     <ProductMetaItem icon={Clock3}>
-                      {formatDuration(totalMinutes)} on-demand video
+                      {formatDuration(totalMinutes)} of learning content
                     </ProductMetaItem>
                     <ProductMetaItem icon={Layers3}>
-                      {sectionCount} distinct learning modules
+                      {moduleCount} distinct learning modules
                     </ProductMetaItem>
                     <ProductMetaItem icon={BookOpen}>
                       {lessonCount} comprehensive lessons
@@ -632,9 +655,9 @@ export default function LearnerCertificationDetailPage() {
 
               {/* Auxiliary Info Card */}
               <Card className="mt-6 border shadow-sm">
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="space-y-4 p-6">
                   <h4 className="font-semibold text-foreground">Course Requirements</h4>
-                  <ul className="list-inside list-disc text-sm text-muted-foreground space-y-2">
+                  <ul className="list-inside list-disc space-y-2 text-sm text-muted-foreground">
                     <li>No prior experience required.</li>
                     <li>A stable internet connection.</li>
                     <li>Willingness to learn and complete the diagnostic.</li>
@@ -643,43 +666,6 @@ export default function LearnerCertificationDetailPage() {
               </Card>
             </aside>
           </main>
-
-          {/* Checkout Simulation Dialog */}
-          <AlertDialog
-              open={pendingPurchase != null}
-              onOpenChange={(open) => {
-                if (!open) setPendingPurchase(null)
-              }}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Simulated Checkout</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This is a development-mode payment simulation. No actual payment
-                  will be charged. Order{" "}
-                  <span className="font-mono text-foreground">{pendingPurchase?.transactionReference}</span> totals{" "}
-                  <span className="font-bold text-foreground">{formatCurrency(pendingPurchase?.amount ?? 0)}</span>.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={confirmMutation.isPending}>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction
-                    onClick={(event) => {
-                      event.preventDefault()
-                      confirmMutation.mutate()
-                    }}
-                    disabled={confirmMutation.isPending}
-                >
-                  {confirmMutation.isPending
-                      ? "Verifying..."
-                      : "Pay with Simulated Checkout"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
         </div>
       </div>
   )

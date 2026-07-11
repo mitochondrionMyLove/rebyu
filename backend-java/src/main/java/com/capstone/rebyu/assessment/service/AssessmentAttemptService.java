@@ -527,6 +527,14 @@ public class AssessmentAttemptService {
             return "Enroll in this certification before taking its assessments.";
         }
         String type = exam.getExamType().getExamTypeText();
+        // Mock exams are premium: lock them for learners without personal Pro or
+        // an eligible institution-sponsored entitlement (shown as locked upfront;
+        // startAttempt also hard-blocks with a structured 403).
+        if (TYPE_MOCK.equals(type)
+                && !learnerEntitlementService.hasLearnerEntitlement(
+                        learnerId, Entitlements.MOCK_EXAM_ACCESS, certificationId)) {
+            return "This mock exam requires REBYU Pro or an eligible institutional license.";
+        }
         if (!TYPE_DIAGNOSTIC.equals(type)
                 && enrollment.get().getDiagnosticCompletedAt() == null
                 && publishedDiagnosticExists(certificationId)) {

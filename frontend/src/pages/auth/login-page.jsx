@@ -7,7 +7,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { roleHomePath, useAuth } from "@/context/auth-context.jsx"
 import { resendVerificationCode, toSafeAuthMessage } from "@/services/authService.js"
 import AuthShell from "./auth-shell.jsx"
@@ -140,8 +139,9 @@ export default function LoginPage() {
 
   return (
       <AuthShell
+          split
           title="Sign in"
-          description="Continue your certification review."
+          description="Enter your account details to continue your certification review."
           footer={
             <>
               Don&apos;t have an account?{" "}
@@ -210,8 +210,6 @@ export default function LoginPage() {
                 </>
             )}
           </Button>
-
-          <Separator />
         </form>
       </AuthShell>
   )

@@ -75,4 +75,10 @@ public abstract class BusinessRuleException extends RuntimeException {
             super(message);
         }
     }
+
+    public static class AssessmentAlreadyExistsException extends BusinessRuleException {
+        public AssessmentAlreadyExistsException(String message) {
+            super(message);
+        }
+    }
 }

@@ -180,7 +180,7 @@ export default function EnterpriseRequestAccessPage() {
                 </p>
               </div>
               <Button asChild variant="outline" className="w-full">
-                <Link to="/welcome">Back to home</Link>
+                <Link to="/">Back to home</Link>
               </Button>
             </CardContent>
           </Card>
@@ -194,7 +194,7 @@ export default function EnterpriseRequestAccessPage() {
     <div className="min-h-dvh bg-muted/40 px-4 py-10">
       <div className="mx-auto max-w-3xl">
         <Button asChild variant="ghost" size="sm" className="mb-4">
-          <Link to="/welcome">
+          <Link to="/">
             <ArrowLeft aria-hidden="true" />
             Back to home
           </Link>

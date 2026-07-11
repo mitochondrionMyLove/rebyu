@@ -1,6 +1,7 @@
 import * as React from "react"
 import { NavLink } from "react-router-dom"
 import {
+  AwardIcon,
   BarChart3Icon,
   BookOpenCheckIcon,
   BrainCircuitIcon,
@@ -40,12 +41,16 @@ const learnerNav = {
         icon: CalendarDaysIcon,
       },
       {
+        name: "Certifications",
+        url: "/learner/certifications",
+        icon: AwardIcon,
+      },
+      {
         name: "My Learning",
         url: "/learner/learning",
         activeUrls: [
           "/learner/learning",
           "/learner/lessons",
-          "/learner/certifications",
         ],
         icon: BookOpenCheckIcon,
       },

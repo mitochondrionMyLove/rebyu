@@ -208,7 +208,7 @@ function CertificationCard({
               onClick={onAction}
               className="mt-auto h-11 w-full rounded-lg bg-zinc-950 text-sm font-semibold text-white transition hover:bg-zinc-700 active:scale-[0.99]"
           >
-            {enrolled ? "Continue Learning" : "Start Learning"}
+            {enrolled ? "Continue Learning" : "View Certification"}
           </button>
         </div>
       </article>

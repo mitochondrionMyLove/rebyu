@@ -17,6 +17,7 @@ import { getFileViewUrl } from "@/services/fileService.js"
 import CertificationFormDrawer from "@/components/certifications/certification-form-drawer"
 import AssessmentsTab from "@/components/assessments/admin/assessments-tab.jsx"
 import CertificationPublishingChecklist from "@/components/assessments/admin/certification-publishing-checklist.jsx"
+import AssessmentStructureView from "@/components/assessments/admin/assessment-structure-view.jsx"
 import { useQueryClient } from "@tanstack/react-query"
 
 function getCertification(location) {
@@ -269,13 +270,19 @@ export default function ViewCertificationAdmin() {
               </TabsContent>
 
               <TabsContent value="assessments">
-                <AssessmentsTab
-                    certification={certification}
-                    createRequest={createAssessmentRequest}
-                    onCreateRequestHandled={() =>
-                        setCreateAssessmentRequest(null)
-                    }
-                />
+                <div className="space-y-8">
+                  <AssessmentStructureView
+                      certification={certification}
+                      onCreateAssessment={handleCreateAssessment}
+                  />
+                  <AssessmentsTab
+                      certification={certification}
+                      createRequest={createAssessmentRequest}
+                      onCreateRequestHandled={() =>
+                          setCreateAssessmentRequest(null)
+                      }
+                  />
+                </div>
               </TabsContent>
             </Tabs>
 
