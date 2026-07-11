@@ -35,6 +35,27 @@ export async function getQuestions() {
 }
 
 /**
+ * Scope-derived eligible questions for an assessment, excluding any already
+ * assigned to `examId`. Pass only the scope ids relevant to the assessment
+ * type (lesson > middle > major > certification); the backend resolves scope.
+ */
+export async function getEligibleQuestions({
+    certificationId,
+    majorId,
+    middleId,
+    lessonId,
+    examId,
+} = {}) {
+    const params = new URLSearchParams()
+    if (certificationId != null) params.set("certificationId", certificationId)
+    if (majorId != null) params.set("majorId", majorId)
+    if (middleId != null) params.set("middleId", middleId)
+    if (lessonId != null) params.set("lessonId", lessonId)
+    if (examId != null) params.set("examId", examId)
+    return await base(`questions/eligible?${params.toString()}`, { method: "GET" })
+}
+
+/**
  * Generates editable question drafts (never saved automatically).
  * Returns { questions, analysis, warnings }.
  *

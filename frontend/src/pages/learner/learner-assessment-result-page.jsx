@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import CodeMirrorProgrammingWorkspace from "@/components/assessments/attempt/code-mirror-programming-workspace.jsx"
+import PerformanceBreakdown from "@/components/assessments/attempt/performance-breakdown.jsx"
 import { getCurrentLearnerIdentity } from "@/services/learnerService.js"
 import {
   getAssessmentTypeLabel,
@@ -186,6 +187,19 @@ export default function LearnerAssessmentResultPage() {
           </CardContent>
         </Card>
 
+        {result.assessmentType === "DIAGNOSTIC" ? (
+          <div className="flex items-start gap-2 rounded-xl border border-primary/40 bg-primary/5 p-3 text-sm">
+            <CheckCircle2Icon
+              className="mt-0.5 size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <p>
+              You've completed the diagnostic — your lesson content is now
+              unlocked. Focus first on the recommended review topics below.
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
             <Link to={`/learner/assessments/${result.assessmentId}`}>
@@ -196,6 +210,11 @@ export default function LearnerAssessmentResultPage() {
             <Link to="/learner/learning">Continue Learning</Link>
           </Button>
         </div>
+
+        <PerformanceBreakdown
+          lessonBreakdown={result.lessonBreakdown}
+          assessmentType={result.assessmentType}
+        />
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Answer review</h2>

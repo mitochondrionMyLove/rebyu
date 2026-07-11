@@ -1,5 +1,6 @@
 package com.capstone.rebyu.assessment.controller;
 
+import com.capstone.rebyu.assessment.dto.AddExamQuestionsRequest;
 import com.capstone.rebyu.assessment.dto.ExamDto;
 import com.capstone.rebyu.assessment.service.ExamService;
 import jakarta.validation.Valid;
@@ -40,6 +41,13 @@ public class ExamController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         examService.delete(id);
+    }
+
+    @PostMapping("/{id}/questions")
+    public ExamDto addQuestions(
+            @PathVariable Long id,
+            @Valid @RequestBody AddExamQuestionsRequest request) {
+        return examService.addQuestions(id, request);
     }
 
     @PostMapping("/{id}/publish")

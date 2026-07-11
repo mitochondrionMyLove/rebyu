@@ -1,5 +1,7 @@
 package com.capstone.rebyu.challenge.service;
 
+import com.capstone.rebyu.billing.entitlement.Entitlements;
+import com.capstone.rebyu.billing.service.LearnerEntitlementService;
 import com.capstone.rebyu.challenge.dto.ChallengeSessionDto;
 import com.capstone.rebyu.challenge.mapper.ChallengeSessionMapper;
 import com.capstone.rebyu.challenge.entity.ChallengeSession;
@@ -19,6 +21,7 @@ import java.util.List;
 public class ChallengeSessionService {
     private final ChallengeSessionRepository challengeSessionRepository;
     private final ChallengeSessionMapper challengeSessionMapper;
+    private final LearnerEntitlementService learnerEntitlementService;
 
     public List<ChallengeSessionDto> getAll() {
         log.debug("Fetching all challenge sessions");
@@ -32,6 +35,10 @@ public class ChallengeSessionService {
 
     public ChallengeSessionDto create(ChallengeSessionDto dto) {
         log.info("Creating new challenge session");
+        // Challenges are a premium learner feature (personal Pro or an eligible
+        // institution-sponsored entitlement) — structured 403 otherwise.
+        learnerEntitlementService.requireLearnerEntitlement(
+                dto.getLearnerId(), Entitlements.CHALLENGES_ACCESS, null);
         ChallengeSession entity = challengeSessionMapper.toEntity(dto);
         entity.setChallengeSessionId(null);
         ChallengeSessionDto result = challengeSessionMapper.toDto(challengeSessionRepository.save(entity));

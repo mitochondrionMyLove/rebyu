@@ -306,8 +306,8 @@ export default function LearnerCertificationDetailPage() {
             title="Certification not found"
             description="The requested certification is not available from the backend."
             action={
-              <Button onClick={() => navigate("/learner/certifications")}>
-                Back to Certifications
+              <Button onClick={() => navigate("/learner/learning")}>
+                Go to My Learning
               </Button>
             }
         />
@@ -353,7 +353,6 @@ export default function LearnerCertificationDetailPage() {
           ? Math.round((completedLessonCount / lessons.length) * 100)
           : 0
 
-  const price = Number(certification.price ?? 0)
   const imageUrl = getCertificationImageUrl(certification)
 
   const sectionCount = chapters.length
@@ -369,12 +368,10 @@ export default function LearnerCertificationDetailPage() {
           ? "Start Diagnostic"
           : "Continue Learning"
       : learnerId == null
-          ? "Sign In to Enroll"
+          ? "Sign In to Start"
           : purchaseMutation.isPending
               ? "Processing..."
-              : price > 0
-                  ? "Buy Certification"
-                  : "Enroll for Free"
+              : "Start Learning"
 
   const primaryActionDisabled = purchaseMutation.isPending
 
@@ -400,7 +397,7 @@ export default function LearnerCertificationDetailPage() {
 
   return (
       <div className="w-full min-w-0 pb-16">
-        <div className="mx-auto w-full max-w-[1280px] px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[1280px]">
 
           {/* Breadcrumb / Back Navigation */}
           <div className="py-6">
@@ -408,10 +405,10 @@ export default function LearnerCertificationDetailPage() {
                 type="button"
                 variant="link"
                 className="h-auto p-0 text-muted-foreground hover:text-primary"
-                onClick={() => navigate("/learner/certifications")}
+                onClick={() => navigate("/learner/learning")}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Certifications
+              Back to My Learning
             </Button>
           </div>
 

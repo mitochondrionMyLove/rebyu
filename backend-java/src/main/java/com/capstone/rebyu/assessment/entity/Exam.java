@@ -3,6 +3,8 @@ package com.capstone.rebyu.assessment.entity;
 
 import com.capstone.rebyu.certification.entity.Certification;
 import com.capstone.rebyu.certification.entity.Lesson;
+import com.capstone.rebyu.certification.entity.MajorCategory;
+import com.capstone.rebyu.certification.entity.MiddleCategory;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -67,6 +69,20 @@ public class Exam {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id")
     private Lesson lesson;
+
+    /** Set for MIDDLE_CATEGORY-scoped assessments. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "middle_category_id")
+    private MiddleCategory middleCategory;
+
+    /** Set for MAJOR_CATEGORY-scoped assessments. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "major_category_id")
+    private MajorCategory majorCategory;
+
+    /** LESSON | MIDDLE_CATEGORY | MAJOR_CATEGORY | CERTIFICATION. */
+    @Column(name = "target_scope", length = 20)
+    private String targetScope;
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;

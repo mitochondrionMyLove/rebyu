@@ -40,21 +40,6 @@ function getCertificationDescription(certification) {
   )
 }
 
-function getCertificationPrice(certification) {
-  const price = Number(certification?.price)
-
-  if (!Number.isFinite(price) || price <= 0) {
-    return "Free"
-  }
-
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price)
-}
-
 function getCertificationImageUrl(certification) {
   if (!certification?.imageKey) {
     return DEFAULT_IMAGE
@@ -188,8 +173,8 @@ function CertificationCard({
           </p>
 
           <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-base font-bold text-foreground">
-            {getCertificationPrice(certification)}
+          <span className="text-sm font-medium text-muted-foreground">
+            Free to study
           </span>
 
             {enrolled && relatedLessons.length > 0 && (
@@ -223,7 +208,7 @@ function CertificationCard({
               onClick={onAction}
               className="mt-auto h-11 w-full rounded-lg bg-zinc-950 text-sm font-semibold text-white transition hover:bg-zinc-700 active:scale-[0.99]"
           >
-            {enrolled ? "Continue Learning" : "Buy"}
+            {enrolled ? "Continue Learning" : "Start Learning"}
           </button>
         </div>
       </article>
@@ -385,14 +370,6 @@ export default function LearnerCertificationsPage() {
         )
       }
 
-      if (sortBy === "price-low") {
-        return Number(first.price ?? 0) - Number(second.price ?? 0)
-      }
-
-      if (sortBy === "price-high") {
-        return Number(second.price ?? 0) - Number(first.price ?? 0)
-      }
-
       return 0
     })
   }, [
@@ -494,8 +471,6 @@ export default function LearnerCertificationsPage() {
                   <option value="popular">Popular</option>
                   <option value="title-asc">Name: A–Z</option>
                   <option value="title-desc">Name: Z–A</option>
-                  <option value="price-low">Price: Low to High</option>
-                  <option value="price-high">Price: High to Low</option>
                 </select>
 
                 <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" />

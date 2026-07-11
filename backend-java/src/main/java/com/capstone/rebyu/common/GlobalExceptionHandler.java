@@ -122,6 +122,44 @@ public class GlobalExceptionHandler {
         log.debug("Client disconnected before response was complete");
     }
 
+    @ExceptionHandler(com.capstone.rebyu.billing.entitlement.PremiumAccessRequiredException.class)
+    public ResponseEntity<java.util.Map<String, Object>> handlePremiumAccess(
+            com.capstone.rebyu.billing.entitlement.PremiumAccessRequiredException ex) {
+        log.debug("Premium access required for feature {}", ex.getFeature());
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("code", ex.getCode());
+        body.put("feature", ex.getFeature());
+        body.put("message", ex.getMessage());
+        body.put("eligiblePlan", ex.getEligiblePlan());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(com.capstone.rebyu.billing.entitlement.InstitutionalEntitlementRequiredException.class)
+    public ResponseEntity<java.util.Map<String, Object>> handleInstitutionalEntitlement(
+            com.capstone.rebyu.billing.entitlement.InstitutionalEntitlementRequiredException ex) {
+        log.debug("Institutional entitlement required for feature {}", ex.getFeature());
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("code", ex.getCode());
+        body.put("feature", ex.getFeature());
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(com.capstone.rebyu.billing.entitlement.CapacityLimitReachedException.class)
+    public ResponseEntity<java.util.Map<String, Object>> handleCapacityLimit(
+            com.capstone.rebyu.billing.entitlement.CapacityLimitReachedException ex) {
+        log.debug("Capacity limit reached: {} ({}/{})", ex.getCode(), ex.getUsed(), ex.getLimit());
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("status", HttpStatus.CONFLICT.value());
+        body.put("code", ex.getCode());
+        body.put("limit", ex.getLimit());
+        body.put("used", ex.getUsed());
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);

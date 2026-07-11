@@ -56,7 +56,9 @@ public final class LearnerAttemptDtos {
             String diagramType,
             String instructions,
             List<LearnerSubQuestionDto> subQuestions,
-            BigDecimal points
+            BigDecimal points,
+            List<ProgrammingAttemptDtos.LearnerTestCaseDto> testCases,
+            List<DiagramAttemptDtos.RubricCriterionDto> rubric
     ) {
     }
 
@@ -76,7 +78,28 @@ public final class LearnerAttemptDtos {
             LocalDateTime expiresAt,
             boolean resumed,
             List<LearnerAttemptQuestionDto> questions,
-            Map<Long, AttemptAnswerDraftDto> savedAnswers
+            Map<Long, AttemptAnswerDraftDto> savedAnswers,
+            Long currentAttemptQuestionId,
+            List<Long> flaggedAttemptQuestionIds,
+            List<Long> skippedAttemptQuestionIds
+    ) {
+    }
+
+    public record FlagRequestDto(
+            @NotNull Long learnerId,
+            boolean flagged
+    ) {
+    }
+
+    public record SkipRequestDto(
+            @NotNull Long learnerId,
+            boolean skipped
+    ) {
+    }
+
+    public record CurrentItemRequestDto(
+            @NotNull Long learnerId,
+            @NotNull Long attemptQuestionId
     ) {
     }
 
@@ -122,6 +145,16 @@ public final class LearnerAttemptDtos {
     ) {
     }
 
+    public record LessonPerformanceDto(
+            Long lessonId,
+            String lessonTitle,
+            BigDecimal possiblePoints,
+            BigDecimal earnedPoints,
+            BigDecimal percentage,
+            Integer pendingCount
+    ) {
+    }
+
     public record AssessmentAttemptResultDto(
             Long assessmentAttemptId,
             Long assessmentId,
@@ -139,7 +172,8 @@ public final class LearnerAttemptDtos {
             Integer incorrectCount,
             Integer pendingCount,
             Integer unansweredCount,
-            List<AttemptAnswerReviewDto> answers
+            List<AttemptAnswerReviewDto> answers,
+            List<LessonPerformanceDto> lessonBreakdown
     ) {
     }
 }

@@ -1,6 +1,8 @@
 package com.capstone.rebyu.assessment.controller;
 
+import com.capstone.rebyu.assessment.dto.EligibleQuestionDto;
 import com.capstone.rebyu.assessment.dto.QuestionDto;
+import com.capstone.rebyu.assessment.service.EligibleQuestionService;
 import com.capstone.rebyu.assessment.service.QuestionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class QuestionController {
     private final QuestionService questionService;
+    private final EligibleQuestionService eligibleQuestionService;
 
     @GetMapping
     public List<QuestionDto> getAll(@RequestParam(required = false) Long lessonId) {
@@ -22,6 +25,21 @@ public class QuestionController {
         }
 
         return questionService.getAll();
+    }
+
+    /**
+     * Questions eligible for an assessment's scope, excluding any already
+     * assigned to {@code examId}. Pass only the scope ids relevant to the
+     * assessment type; the most specific id wins.
+     */
+    @GetMapping("/eligible")
+    public List<EligibleQuestionDto> getEligible(
+            @RequestParam(required = false) Long certificationId,
+            @RequestParam(required = false) Long majorId,
+            @RequestParam(required = false) Long middleId,
+            @RequestParam(required = false) Long lessonId,
+            @RequestParam(required = false) Long examId) {
+        return eligibleQuestionService.getEligible(certificationId, majorId, middleId, lessonId, examId);
     }
 
     @GetMapping("/{id}")

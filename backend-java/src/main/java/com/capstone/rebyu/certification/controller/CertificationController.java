@@ -64,4 +64,17 @@ public class CertificationController {
         certificationService.delete(id);
         log.info("Deleted certification with ID: {}", id);
     }
+
+    @GetMapping("/{id}/publishing-requirements")
+    public com.capstone.rebyu.certification.dto.CertificationPublishRequirementsDto publishingRequirements(
+            @PathVariable Long id) {
+        return certificationService.getPublishingRequirements(id);
+    }
+
+    @PutMapping("/publish/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void publishCertification(@PathVariable Long id) {
+        certificationService.publish(id);
+        log.info("Publish certification with ID: {}", id);
+    }
 }

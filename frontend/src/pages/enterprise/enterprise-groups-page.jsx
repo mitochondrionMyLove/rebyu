@@ -1,0 +1,697 @@
+import { useMemo, useState } from "react"
+import { useOutletContext } from "react-router-dom"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Loader2, Plus, Trash2, UserCog, Users2, UsersRound } from "lucide-react"
+import { toast } from "sonner"
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  EnterpriseEmptyState,
+  EnterpriseErrorState,
+  EnterpriseLoadingSkeleton,
+  EnterprisePageHeader,
+  EnterpriseStatusBadge,
+} from "@/components/enterprise/enterprise-ui.jsx"
+import {
+  getLearnerDisplayName,
+  useEnterpriseData,
+} from "@/hooks/use-enterprise-data.js"
+import { useAuth } from "@/context/auth-context.jsx"
+import {
+  addEnterpriseGroupAssignee,
+  archiveEnterpriseGroup,
+  assignEnterpriseGroupAuthority,
+  createEnterpriseGroup,
+  getAllUsers,
+  getEnterpriseGroupAssignees,
+  getEnterpriseGroupAuthorities,
+  getEnterpriseGroups,
+  getEnterpriseMembers,
+  removeEnterpriseGroupAssignee,
+  removeEnterpriseGroupAuthority,
+} from "@/services/enterpriseService.js"
+
+function backendMessage(error, fallback) {
+  return error?.response?.data?.message ?? fallback
+}
+
+function CreateGroupDialog({ open, onOpenChange, enterpriseId, userId, orgCerts, certificationById }) {
+  const queryClient = useQueryClient()
+  const [orgCertId, setOrgCertId] = useState("")
+  const [groupName, setGroupName] = useState("")
+  const [groupDescription, setGroupDescription] = useState("")
+  const [error, setError] = useState("")
+
+  const reset = () => {
+    setOrgCertId("")
+    setGroupName("")
+    setGroupDescription("")
+    setError("")
+  }
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      createEnterpriseGroup({
+        enterpriseId,
+        orgCertId: Number(orgCertId),
+        groupName: groupName.trim(),
+        groupDescription: groupDescription.trim() || null,
+        createdBy: userId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-groups"] })
+      toast.success("Group created.")
+      reset()
+      onOpenChange(false)
+    },
+    onError: (err) => {
+      const message = backendMessage(err, "Unable to create the group.")
+      setError(message)
+      toast.error(message)
+    },
+  })
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    if (!orgCertId) {
+      setError("Select a certification allocation.")
+      return
+    }
+    if (!groupName.trim()) {
+      setError("Enter a group name.")
+      return
+    }
+    createMutation.mutate()
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset()
+        onOpenChange(next)
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create group</DialogTitle>
+          <DialogDescription>
+            Groups organize learners under one certification allocation. Assign an
+            authority afterwards to let them manage the group's learners.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="group-cert">Certification allocation</Label>
+            <Select value={orgCertId} onValueChange={setOrgCertId}>
+              <SelectTrigger id="group-cert" className="w-full">
+                <SelectValue placeholder="Select certification allocation" />
+              </SelectTrigger>
+              <SelectContent>
+                {orgCerts.map((orgCert) => (
+                  <SelectItem key={orgCert.orgCertId} value={String(orgCert.orgCertId)}>
+                    {certificationById.get(orgCert.certificationId)?.title ??
+                      `Certification #${orgCert.certificationId}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="group-name">Group name</Label>
+            <Input
+              id="group-name"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="e.g. Batch 2026-A"
+              maxLength={150}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="group-description">Description (optional)</Label>
+            <Textarea
+              id="group-description"
+              value={groupDescription}
+              onChange={(e) => setGroupDescription(e.target.value)}
+              placeholder="What is this group for?"
+              maxLength={500}
+              rows={3}
+            />
+          </div>
+
+          {error ? (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                reset()
+                onOpenChange(false)
+              }}
+              disabled={createMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  Creating...
+                </>
+              ) : (
+                "Create group"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ManageGroupDialog({
+  group,
+  open,
+  onOpenChange,
+  userId,
+  members,
+  userById,
+  assignments,
+  learnerById,
+}) {
+  const queryClient = useQueryClient()
+  const groupId = group?.enterpriseGroupId
+  const [authorityUserId, setAuthorityUserId] = useState("")
+  const [orgCertLearnerId, setOrgCertLearnerId] = useState("")
+
+  const authoritiesQuery = useQuery({
+    queryKey: ["enterprise-group-authorities", groupId],
+    queryFn: () => getEnterpriseGroupAuthorities({ groupId }),
+    enabled: open && groupId != null,
+    retry: 1,
+  })
+
+  const assigneesQuery = useQuery({
+    queryKey: ["enterprise-group-assignees", groupId],
+    queryFn: () => getEnterpriseGroupAssignees({ groupId }),
+    enabled: open && groupId != null,
+    retry: 1,
+  })
+
+  const authorities = Array.isArray(authoritiesQuery.data) ? authoritiesQuery.data : []
+  const assignees = Array.isArray(assigneesQuery.data) ? assigneesQuery.data : []
+
+  const activeAuthorities = authorities.filter((a) => a.status === "active")
+  const activeAssignees = assignees.filter((a) => a.status === "active")
+
+  const assignedOrgCertLearnerIds = new Set(
+    activeAssignees.map((a) => a.orgCertLearnerId)
+  )
+
+  // Only learners that already hold access to THIS group's certification and are
+  // not already in the group can be added — mirrors the backend invariant.
+  const availableLearners = useMemo(
+    () =>
+      assignments.filter(
+        (assignment) =>
+          assignment.orgCertId === group?.orgCertId &&
+          !assignedOrgCertLearnerIds.has(assignment.orgCertLearnerId)
+      ),
+    [assignments, group?.orgCertId, assignedOrgCertLearnerIds]
+  )
+
+  const assignAuthorityMutation = useMutation({
+    mutationFn: () =>
+      assignEnterpriseGroupAuthority({
+        enterpriseGroupId: groupId,
+        userId: Number(authorityUserId),
+        assignedBy: userId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-group-authorities", groupId] })
+      toast.success("Authority assigned.")
+      setAuthorityUserId("")
+    },
+    onError: (err) =>
+      toast.error(backendMessage(err, "Unable to assign this authority.")),
+  })
+
+  const removeAuthorityMutation = useMutation({
+    mutationFn: (authorityId) => removeEnterpriseGroupAuthority(authorityId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-group-authorities", groupId] })
+      toast.success("Authority removed.")
+    },
+    onError: (err) => toast.error(backendMessage(err, "Unable to remove authority.")),
+  })
+
+  const addLearnerMutation = useMutation({
+    mutationFn: () =>
+      addEnterpriseGroupAssignee({
+        enterpriseGroupId: groupId,
+        orgCertLearnerId: Number(orgCertLearnerId),
+        assignedBy: userId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-group-assignees", groupId] })
+      toast.success("Learner added to group.")
+      setOrgCertLearnerId("")
+    },
+    onError: (err) => toast.error(backendMessage(err, "Unable to add this learner.")),
+  })
+
+  const removeLearnerMutation = useMutation({
+    mutationFn: (assigneeId) => removeEnterpriseGroupAssignee(assigneeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-group-assignees", groupId] })
+      toast.success("Learner removed from group.")
+    },
+    onError: (err) => toast.error(backendMessage(err, "Unable to remove learner.")),
+  })
+
+  const memberLabel = (memberUserId) =>
+    userById.get(memberUserId)?.email ?? `User #${memberUserId}`
+
+  if (!group) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{group.groupName}</DialogTitle>
+          <DialogDescription>
+            Assign an authority (teacher / co-admin) and manage the learners in this
+            group.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Authorities */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <UserCog className="size-4 text-muted-foreground" aria-hidden="true" />
+              <h3 className="text-sm font-medium">
+                Authorities ({activeAuthorities.length})
+              </h3>
+            </div>
+
+            <div className="flex gap-2">
+              <Select value={authorityUserId} onValueChange={setAuthorityUserId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select an organization member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No members available
+                    </SelectItem>
+                  ) : (
+                    members.map((member) => (
+                      <SelectItem key={member.userId} value={String(member.userId)}>
+                        {memberLabel(member.userId)} · {member.memberRole}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => assignAuthorityMutation.mutate()}
+                disabled={!authorityUserId || assignAuthorityMutation.isPending}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                Assign
+              </Button>
+            </div>
+
+            {authoritiesQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading authorities...</p>
+            ) : activeAuthorities.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No authority assigned yet. The enterprise assigns an authority who then
+                manages this group's learners.
+              </p>
+            ) : (
+              <ul className="divide-y rounded-lg border">
+                {activeAuthorities.map((authority) => (
+                  <li
+                    key={authority.enterpriseGroupAuthorityId}
+                    className="flex items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <span className="text-sm">{memberLabel(authority.userId)}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        removeAuthorityMutation.mutate(authority.enterpriseGroupAuthorityId)
+                      }
+                      disabled={removeAuthorityMutation.isPending}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* Learners */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Users2 className="size-4 text-muted-foreground" aria-hidden="true" />
+              <h3 className="text-sm font-medium">
+                Learners ({activeAssignees.length})
+              </h3>
+            </div>
+
+            <div className="flex gap-2">
+              <Select value={orgCertLearnerId} onValueChange={setOrgCertLearnerId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Add a learner with access to this certification" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableLearners.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No eligible learners
+                    </SelectItem>
+                  ) : (
+                    availableLearners.map((assignment) => (
+                      <SelectItem
+                        key={assignment.orgCertLearnerId}
+                        value={String(assignment.orgCertLearnerId)}
+                      >
+                        {getLearnerDisplayName(learnerById.get(assignment.learnerId))}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => addLearnerMutation.mutate()}
+                disabled={!orgCertLearnerId || addLearnerMutation.isPending}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                Add
+              </Button>
+            </div>
+
+            {assigneesQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading learners...</p>
+            ) : activeAssignees.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No learners in this group yet.
+              </p>
+            ) : (
+              <ul className="divide-y rounded-lg border">
+                {activeAssignees.map((assignee) => (
+                  <li
+                    key={assignee.enterpriseGroupAssigneeId}
+                    className="flex items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <span className="text-sm">
+                      {getLearnerDisplayName(learnerById.get(assignee.learnerId))}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        removeLearnerMutation.mutate(assignee.enterpriseGroupAssigneeId)
+                      }
+                      disabled={removeLearnerMutation.isPending}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export default function EnterpriseGroupsPage() {
+  const { enterprise, enterpriseLoading, enterpriseError, refetchEnterprise } =
+    useOutletContext()
+  const { user } = useAuth()
+  const enterpriseId = enterprise?.enterpriseId
+  const userId = user?.userId ?? null
+
+  const data = useEnterpriseData(enterpriseId)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [manageGroup, setManageGroup] = useState(null)
+  const [archiveTarget, setArchiveTarget] = useState(null)
+  const queryClient = useQueryClient()
+
+  const groupsQuery = useQuery({
+    queryKey: ["enterprise-groups", enterpriseId],
+    queryFn: () => getEnterpriseGroups({ enterpriseId }),
+    enabled: enterpriseId != null,
+    retry: 1,
+  })
+
+  const membersQuery = useQuery({
+    queryKey: ["enterprise-members", enterpriseId],
+    queryFn: () => getEnterpriseMembers(enterpriseId),
+    enabled: enterpriseId != null,
+    retry: 1,
+  })
+
+  const usersQuery = useQuery({
+    queryKey: ["users"],
+    queryFn: getAllUsers,
+    enabled: enterpriseId != null,
+    retry: 1,
+  })
+
+  const userById = useMemo(
+    () =>
+      new Map(
+        (Array.isArray(usersQuery.data) ? usersQuery.data : []).map((u) => [
+          u.userId,
+          u,
+        ])
+      ),
+    [usersQuery.data]
+  )
+
+  const groups = (Array.isArray(groupsQuery.data) ? groupsQuery.data : []).filter(
+    (group) => group.status === "active"
+  )
+  const members = Array.isArray(membersQuery.data) ? membersQuery.data : []
+
+  if (enterpriseLoading || (enterprise && data.isLoading)) {
+    return <EnterpriseLoadingSkeleton />
+  }
+  if (enterpriseError) {
+    return <EnterpriseErrorState onRetry={refetchEnterprise} />
+  }
+  if (!enterprise) {
+    return (
+      <EnterpriseEmptyState
+        title="No organization found"
+        description="Learner groups appear here once your organization is registered."
+      />
+    )
+  }
+
+  const hasAllocations = data.orgCerts.length > 0
+
+  return (
+    <div className="space-y-6">
+      <EnterprisePageHeader
+        title="Groups"
+        subtitle="Organize learners into groups under a certification allocation and delegate management to an authority."
+        actions={
+          <Button onClick={() => setCreateOpen(true)} disabled={!hasAllocations}>
+            <Plus aria-hidden="true" />
+            Create group
+          </Button>
+        }
+      />
+
+      {groupsQuery.isError ? (
+        <EnterpriseErrorState onRetry={groupsQuery.refetch} />
+      ) : !hasAllocations ? (
+        <EnterpriseEmptyState
+          icon={UsersRound}
+          title="No certification allocations yet"
+          description="Once your organization has a certification allocation, you can create groups under it."
+        />
+      ) : groups.length === 0 ? (
+        <EnterpriseEmptyState
+          icon={UsersRound}
+          title="No groups yet"
+          description="Create a group to start organizing your learners."
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {groups.map((group) => {
+            const orgCert = data.orgCertById.get(group.orgCertId)
+            const certification = orgCert
+              ? data.certificationById.get(orgCert.certificationId)
+              : null
+            return (
+              <Card key={group.enterpriseGroupId} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base">{group.groupName}</CardTitle>
+                    <EnterpriseStatusBadge status={group.status} />
+                  </div>
+                  <CardDescription>
+                    {certification?.title ??
+                      `Certification #${orgCert?.certificationId ?? "?"}`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    {group.groupDescription || "No description."}
+                  </p>
+                </CardContent>
+                <CardFooter className="gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setManageGroup(group)}
+                  >
+                    <UserCog className="size-4" aria-hidden="true" />
+                    Manage
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setArchiveTarget(group)}
+                  >
+                    Archive
+                  </Button>
+                </CardFooter>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      <CreateGroupDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        enterpriseId={enterpriseId}
+        userId={userId}
+        orgCerts={data.orgCerts}
+        certificationById={data.certificationById}
+      />
+
+      <ManageGroupDialog
+        group={manageGroup}
+        open={manageGroup != null}
+        onOpenChange={(open) => !open && setManageGroup(null)}
+        userId={userId}
+        members={members}
+        userById={userById}
+        assignments={data.assignments}
+        learnerById={data.learnerById}
+      />
+
+      <ArchiveGroupDialog
+        group={archiveTarget}
+        onClose={() => setArchiveTarget(null)}
+        onArchived={() => {
+          queryClient.invalidateQueries({ queryKey: ["enterprise-groups"] })
+          setArchiveTarget(null)
+        }}
+      />
+    </div>
+  )
+}
+
+function ArchiveGroupDialog({ group, onClose, onArchived }) {
+  const archiveMutation = useMutation({
+    mutationFn: (groupId) => archiveEnterpriseGroup(groupId),
+    onSuccess: () => {
+      toast.success("Group archived.")
+      onArchived()
+    },
+    onError: (err) =>
+      toast.error(backendMessage(err, "Unable to archive the group.")),
+  })
+
+  return (
+    <AlertDialog open={group != null} onOpenChange={(open) => !open && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Archive this group?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {group?.groupName} will be archived. Learners and authorities stay on
+            record but the group is no longer active.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={archiveMutation.isPending}>
+            Keep group
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault()
+              archiveMutation.mutate(group.enterpriseGroupId)
+            }}
+            disabled={archiveMutation.isPending}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {archiveMutation.isPending ? "Archiving..." : "Archive group"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}

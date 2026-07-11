@@ -136,11 +136,11 @@ aws:
     secret-key: ${AWS_SECRET_ACCESS_KEY}
 
 langchain4j:
-  open-ai:
-    api-key: ${GITHUB_TOKEN}
-    base-url: https://models.github.ai/inference
+  groq:
+    api-key: ${GROQ_API_KEY}
+    base-url: https://api.groq.com/openai/v1
     chat-model:
-      model-name: ${GITHUB_MODEL:openai/gpt-4o-mini}
+      model-name: ${GROQ_MODEL:openai/gpt-oss-120b}
       temperature: 0.7
 
 db:

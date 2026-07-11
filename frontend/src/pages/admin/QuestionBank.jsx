@@ -1867,14 +1867,10 @@ function QuestionFileGeneratorDialog({
     }
 
     async function handleGenerate() {
+        // Files are optional: with none, the AI generates from the
+        // certification's indexed knowledge (embeddings). With files, it uses
+        // the uploaded material. The backend resolves the source mode.
         const selectedDocuments = files.map((item) => item.file);
-
-        if (selectedDocuments.length === 0) {
-            setSubmitError(
-                "Upload at least one source document before generating drafts.",
-            );
-            return;
-        }
 
         setSubmitError("");
 
@@ -1885,7 +1881,7 @@ function QuestionFileGeneratorDialog({
             setSubmitError(
                 getBackendErrorMessage(
                     error,
-                    "REBYU could not analyze the uploaded files. Please try again.",
+                    "REBYU could not generate questions. Please try again.",
                 ),
             );
         }
@@ -1895,15 +1891,16 @@ function QuestionFileGeneratorDialog({
         <Dialog open={open} onOpenChange={handleDialogOpenChange}>
             <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-5xl">
                 <DialogHeader>
-                    <DialogTitle>Generate Questions from Files</DialogTitle>
+                    <DialogTitle>Generate Questions</DialogTitle>
 
                     <DialogDescription className="leading-6">
-                        Upload learning materials for{" "}
+                        Generate draft questions for{" "}
                         <span className="font-medium text-foreground">
                             {getCertificationTitle(selectedCertification)}
                         </span>
-                        . REBYU will read the files, identify topics, and choose
-                        the most suitable question types automatically.
+                        . Uploading files is optional — leave it empty to
+                        generate from the certification's existing knowledge, or
+                        add files to ground generation in specific material.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1990,13 +1987,13 @@ function QuestionFileGeneratorDialog({
                     <section className="space-y-3">
                         <div>
                             <h3 className="text-sm font-semibold text-foreground">
-                                Source files
+                                Source files (optional)
                             </h3>
 
                             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                Upload modules, reviewer notes, lesson files, or structured
-                                reference documents. REBYU uses the uploaded material as
-                                the basis for its drafts.
+                                Optionally upload modules, reviewer notes, or reference
+                                documents to ground the drafts. Leave empty to generate
+                                from the certification's existing indexed knowledge.
                             </p>
                         </div>
 
@@ -2190,12 +2187,14 @@ function QuestionFileGeneratorDialog({
                     <Button
                         type="button"
                         onClick={handleGenerate}
-                        disabled={isGenerating || files.length === 0}
+                        disabled={isGenerating}
                     >
                         <Sparkles className="mr-2 h-4 w-4" />
                         {isGenerating
-                            ? "Analyzing Files..."
-                            : "Analyze Files and Generate Drafts"}
+                            ? "Generating Drafts..."
+                            : files.length > 0
+                                ? "Generate from Files"
+                                : "Generate from Certification Knowledge"}
                     </Button>
                 </div>
             </DialogContent>

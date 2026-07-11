@@ -1,95 +1,59 @@
-import { FlagIcon } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import ItemNavigatorCard from "./item-navigator-card.jsx"
+import ItemStatusLegend from "./item-status-legend.jsx"
 
-// Item grid + summary shown on the right side of an attempt (or inside a
-// sheet on smaller screens).
 export default function QuestionNavigator({
-  questions,
-  currentIndex,
-  answeredIds,
-  flaggedIds,
-  onJump,
-  onFinish,
-  finishDisabled = false,
-}) {
-  const answered = questions.filter((question) =>
-    answeredIds.has(question.questionId)
-  ).length
-  const flagged = flaggedIds.size
+                                            items,
+                                            currentIndex,
+                                            onJump,
+                                            onFinish,
+                                            finishDisabled = false,
+                                          }) {
+  const list = Array.isArray(items) ? items : []
+
+  const totalPoints = list.reduce(
+      (sum, item) =>
+          sum + (item.points != null ? Number(item.points) : 0),
+      0
+  )
 
   return (
-    <div className="flex h-full flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-semibold">Item Navigation</h3>
-        <div className="mt-3 grid grid-cols-5 gap-1.5">
-          {questions.map((question, index) => {
-            const isCurrent = index === currentIndex
-            const isAnswered = answeredIds.has(question.questionId)
-            const isFlagged = flaggedIds.has(question.questionId)
-            return (
-              <button
-                key={question.questionId}
-                type="button"
-                onClick={() => onJump(index)}
-                aria-label={`Go to question ${index + 1}${
-                  isAnswered ? ", answered" : ", unanswered"
-                }${isFlagged ? ", flagged" : ""}`}
-                aria-current={isCurrent ? "true" : undefined}
-                className={cn(
-                  "relative flex h-9 items-center justify-center rounded-lg border text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  isCurrent
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : isAnswered
-                      ? "border-primary/40 bg-primary/10"
-                      : "bg-background text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {index + 1}
-                {isFlagged ? (
-                  <FlagIcon
-                    aria-hidden="true"
-                    className="absolute -right-1 -top-1 size-3 fill-amber-400 text-amber-500"
-                  />
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold">Item Navigation</h3>
 
-      <dl className="space-y-1.5 rounded-xl bg-muted/40 p-3 text-sm">
-        <div className="flex justify-between">
-          <dt className="text-muted-foreground">Total</dt>
-          <dd className="font-medium tabular-nums">{questions.length}</dd>
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {totalPoints} pts
+        </span>
         </div>
-        <div className="flex justify-between">
-          <dt className="text-muted-foreground">Answered</dt>
-          <dd className="font-medium tabular-nums">{answered}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-muted-foreground">Unanswered</dt>
-          <dd className="font-medium tabular-nums">
-            {questions.length - answered}
-          </dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-muted-foreground">Flagged</dt>
-          <dd className="font-medium tabular-nums">{flagged}</dd>
-        </div>
-      </dl>
 
-      <div className="mt-auto">
-        <Button
-          type="button"
-          className="w-full"
-          onClick={onFinish}
-          disabled={finishDisabled}
+        {/* Scrollable, but scrollbar is hidden */}
+        <div
+            className="
+          mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pb-3
+          [scrollbar-width:none]
+          [-ms-overflow-style:none]
+          [&::-webkit-scrollbar]:hidden
+        "
         >
-          Finish Attempt
-        </Button>
+          <div className="grid w-full grid-cols-5 auto-rows-max gap-1.5">
+            {list.map((item, index) => (
+                <ItemNavigatorCard
+                    key={item.attemptQuestionId ?? index}
+                    item={item}
+                    index={index}
+                    isCurrent={index === currentIndex}
+                    onJump={onJump}
+                />
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-3 shrink-0 rounded-xl border p-3">
+          <ItemStatusLegend />
+        </div>
+
+
       </div>
-    </div>
   )
 }

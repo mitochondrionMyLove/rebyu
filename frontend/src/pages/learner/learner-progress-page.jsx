@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { LearnerEmptyState } from "@/components/learner/learner-ui.jsx"
+import LearnerPremiumGuard from "@/components/learner/learner-premium-guard.jsx"
+import { FEATURES } from "@/services/subscriptionService.js"
 
 ChartJS.register(
     CategoryScale,
@@ -274,7 +276,7 @@ export default function LearnerProgressPage() {
   const outletContext = useOutletContext()
   const data = outletContext?.data ?? {}
 
-  const enrolledCertifications = data.enrolledCertifications ?? []
+  const publishedCertifications = data.certifications ?? []
   const allLessons = data.lessons ?? []
   const allWeakAreas = data.weakAreas ?? []
   const performancePoints = data.performancePoints ?? []
@@ -282,13 +284,13 @@ export default function LearnerProgressPage() {
   const stats = data.stats ?? {}
 
   const [selectedCertificationId, setSelectedCertificationId] = useState(
-      enrolledCertifications[0]?.certificationId
-          ? String(enrolledCertifications[0].certificationId)
+      publishedCertifications[0]?.certificationId
+          ? String(publishedCertifications[0].certificationId)
           : ""
   )
 
   useEffect(() => {
-    if (enrolledCertifications.length === 0) {
+    if (publishedCertifications.length === 0) {
       if (selectedCertificationId) {
         setSelectedCertificationId("")
       }
@@ -296,24 +298,24 @@ export default function LearnerProgressPage() {
       return
     }
 
-    const selectedStillExists = enrolledCertifications.some(
+    const selectedStillExists = publishedCertifications.some(
         (certification) =>
             String(certification.certificationId) === selectedCertificationId
     )
 
     if (!selectedStillExists) {
       setSelectedCertificationId(
-          String(enrolledCertifications[0].certificationId)
+          String(publishedCertifications[0].certificationId)
       )
     }
-  }, [enrolledCertifications, selectedCertificationId])
+  }, [publishedCertifications, selectedCertificationId])
 
   const selectedCertification = useMemo(() => {
-    return enrolledCertifications.find(
+    return publishedCertifications.find(
         (certification) =>
             String(certification.certificationId) === selectedCertificationId
     )
-  }, [enrolledCertifications, selectedCertificationId])
+  }, [publishedCertifications, selectedCertificationId])
 
   const lessons = useMemo(() => {
     if (!selectedCertificationId) {
@@ -673,19 +675,30 @@ export default function LearnerProgressPage() {
   const studyStreak = getNumber(stats.studyStreak, 0)
 
   return (
-      <div className="space-y-6 font-sans">
+      <LearnerPremiumGuard
+          feature={FEATURES.PROGRESS_ANALYTICS}
+          title="Progress analytics require REBYU Pro"
+          description="Upgrade to REBYU Pro to view detailed learning progress, performance trends, mastery, and weak areas."
+          benefits={[
+            "Certification progress tracking",
+            "Quiz and exam performance trends",
+            "Topic mastery and weak-area insights",
+          ]}
+          returnTo="/learner/learning"
+      >
+        <div className="space-y-6 font-sans">
         <div className="flex items-center">
           <Select
               value={selectedCertificationId}
               onValueChange={setSelectedCertificationId}
-              disabled={enrolledCertifications.length === 0}
+              disabled={publishedCertifications.length === 0}
           >
             <SelectTrigger className="h-8 w-auto min-w-[190px] border-0 bg-transparent px-0 pr-2 text-sm font-semibold uppercase text-zinc-700 shadow-none focus:ring-0 focus:ring-offset-0">
               <SelectValue placeholder="Select certification" />
             </SelectTrigger>
 
             <SelectContent align="start">
-              {enrolledCertifications.map((certification) => (
+              {publishedCertifications.map((certification) => (
                   <SelectItem
                       key={certification.certificationId}
                       value={String(certification.certificationId)}
@@ -698,14 +711,14 @@ export default function LearnerProgressPage() {
           </Select>
         </div>
 
-        {enrolledCertifications.length === 0 ? (
+        {publishedCertifications.length === 0 ? (
             <LearnerEmptyState
                 icon={BookOpen}
-                title="No certification enrollment yet"
-                description="Enroll in a certification first to view your learning analytics and assessment progress."
+                title="No published certifications yet"
+                description="Published certifications will appear here with your learning analytics and assessment progress."
                 action={
-                  <Button onClick={() => navigate("/learner/certifications")}>
-                    Browse Certifications
+                  <Button onClick={() => navigate("/learner/learning")}>
+                    Go to My Learning
                   </Button>
                 }
             />
@@ -895,6 +908,7 @@ export default function LearnerProgressPage() {
               />
             </>
         )}
-      </div>
+        </div>
+      </LearnerPremiumGuard>
   )
 }

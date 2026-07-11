@@ -22,58 +22,292 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  ASSESSMENT_TYPES,
   createExam,
   ensureExamType,
   updateExam,
 } from "@/services/assessmentService.js"
 import AssessmentQuestionPickerDialog from "./assessment-question-picker-dialog.jsx"
 
+const ASSESSMENT_CREATE_TYPES = [
+  {
+    value: "DIAGNOSTIC",
+    label: "Diagnostic Exam",
+    examTypeText: "DIAGNOSTIC",
+    scope: "CERTIFICATION",
+    targetLabel: "Certification",
+  },
+  {
+    value: "LESSON_QUIZ",
+    label: "Lesson Quiz",
+    examTypeText: "LESSON_QUIZ",
+    scope: "LESSON",
+    targetLabel: "Lesson",
+  },
+  {
+    value: "MIDDLE_EXAM",
+    label: "Middle Exam",
+    examTypeText: "MIDDLE_EXAM",
+    scope: "MIDDLE_CATEGORY",
+    targetLabel: "Middle Category",
+  },
+  {
+    value: "MAJOR_EXAM",
+    label: "Major Exam",
+    examTypeText: "MAJOR_EXAM",
+    scope: "MAJOR_CATEGORY",
+    targetLabel: "Major Category",
+  },
+  {
+    value: "MOCK_EXAM",
+    label: "Mock Exam",
+    examTypeText: "MOCK_EXAM",
+    scope: "CERTIFICATION",
+    targetLabel: "Certification",
+  },
+]
+function getCreateTypeConfig(value) {
+  return (
+      ASSESSMENT_CREATE_TYPES.find((item) => item.value === value) ??
+      ASSESSMENT_CREATE_TYPES[0]
+  )
+}
+
+function normalizeCreateType(value, fallback = "MOCK_EXAM") {
+  const text = String(value ?? "").trim().toUpperCase()
+
+  if (text === "DIAGNOSTIC" || text === "DIAGNOSTIC_EXAM") {
+    return "DIAGNOSTIC"
+  }
+
+  if (text === "QUIZ" || text === "LESSON_QUIZ") {
+    return "LESSON_QUIZ"
+  }
+
+  if (
+      text === "MODULE_EXAM" ||
+      text === "MIDDLE_EXAM" ||
+      text === "MIDDLE_CATEGORY_QUIZ"
+  ) {
+    return "MIDDLE_EXAM"
+  }
+
+  if (
+      text === "MAJOR_EXAM" ||
+      text === "MAJOR_CATEGORY_QUIZ" ||
+      text === "MAJOR_CATEGORY_EXAM"
+  ) {
+    return "MAJOR_EXAM"
+  }
+
+  if (text === "MOCK_EXAM" || text === "MOCK") return "MOCK_EXAM"
+
+  return fallback
+}
+
+function getLessonTitle(lesson) {
+  return lesson?.name ?? lesson?.title ?? "Untitled lesson"
+}
+
+function getMajorId(majorCategory) {
+  return majorCategory?.majorCategoryId ?? majorCategory?.id
+}
+
+function getMiddleId(middleCategory) {
+  return middleCategory?.middleCategoryId ?? middleCategory?.id
+}
+
+function getLessonId(lesson) {
+  return lesson?.lessonId ?? lesson?.id
+}
+
+function buildAssessmentTargets(certification) {
+  const majorCategories = certification?.majorCategory ?? []
+
+  const majors = []
+  const middles = []
+  const lessons = []
+
+  majorCategories.forEach((majorCategory) => {
+    const majorId = getMajorId(majorCategory)
+
+    if (majorId != null) {
+      majors.push({
+        id: String(majorId),
+        title: majorCategory.title ?? "Untitled major category",
+        majorCategory,
+      })
+    }
+
+    ;(majorCategory.middleCategory ?? []).forEach((middleCategory) => {
+      const middleId = getMiddleId(middleCategory)
+
+      if (middleId != null) {
+        middles.push({
+          id: String(middleId),
+          title: middleCategory.title ?? "Untitled middle category",
+          subtitle: majorCategory.title ?? "Major category",
+          middleCategory,
+          majorCategory,
+        })
+      }
+
+      ;(middleCategory.lessons ?? []).forEach((lesson) => {
+        const lessonId = getLessonId(lesson)
+
+        if (lessonId != null) {
+          lessons.push({
+            id: String(lessonId),
+            title: getLessonTitle(lesson),
+            subtitle: `${middleCategory.title ?? "Middle category"} · ${
+                majorCategory.title ?? "Major category"
+            }`,
+            lesson,
+            middleCategory,
+            majorCategory,
+          })
+        }
+      })
+    })
+  })
+
+  return {
+    majors,
+    middles,
+    lessons,
+  }
+}
+
+function getTargetOptionsByScope(targets, scope) {
+  if (scope === "LESSON") return targets.lessons
+  if (scope === "MIDDLE_CATEGORY") return targets.middles
+  if (scope === "MAJOR_CATEGORY") return targets.majors
+  return []
+}
+
+function getDefaultTitle({ createTypeConfig, selectedTarget, certification }) {
+  if (createTypeConfig.scope === "CERTIFICATION") {
+    return `${certification?.title ?? "Certification"} ${createTypeConfig.label}`
+  }
+
+  return `${selectedTarget?.title ?? createTypeConfig.targetLabel} ${
+      createTypeConfig.label
+  }`
+}
+
 export default function AssessmentDialog({
-  open,
-  onOpenChange,
-  mode = "create",
-  certification,
-  exam = null,
-  examTypeByIdText = new Map(),
-  existingExamQuestions = [],
-  questionById = new Map(),
-  initialType = "MOCK_EXAM",
-  initialMiddleCategoryId = null,
-}) {
+                                           open,
+                                           onOpenChange,
+                                           mode = "create",
+                                           certification,
+                                           exam = null,
+                                           examTypeByIdText = new Map(),
+                                           existingExamQuestions = [],
+                                           questionById = new Map(),
+                                           initialType = "MOCK_EXAM",
+                                           initialLessonId = null,
+                                           initialMiddleCategoryId = null,
+                                           initialMajorCategoryId = null,
+                                           initialTitle = "",
+                                           lockPreset = false,
+                                         }) {
   const queryClient = useQueryClient()
   const isEdit = mode === "edit"
 
   const [title, setTitle] = useState("")
-  const [type, setType] = useState(initialType)
+  const [createType, setCreateType] = useState(
+      normalizeCreateType(initialType, "MOCK_EXAM")
+  )
+  const [targetId, setTargetId] = useState("")
   const [durationMinutes, setDurationMinutes] = useState("")
   const [passingScore, setPassingScore] = useState("")
   const [selectedQuestions, setSelectedQuestions] = useState([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [error, setError] = useState("")
 
+  const targets = useMemo(
+      () => buildAssessmentTargets(certification),
+      [certification]
+  )
+
+  const createTypeConfig = useMemo(
+      () => getCreateTypeConfig(createType),
+      [createType]
+  )
+
+  const targetOptions = useMemo(
+      () => getTargetOptionsByScope(targets, createTypeConfig.scope),
+      [targets, createTypeConfig.scope]
+  )
+
+  const selectedTarget = useMemo(() => {
+    return targetOptions.find((item) => item.id === targetId) ?? null
+  }, [targetOptions, targetId])
+
+  const typeLabel = createTypeConfig.label
+
   useEffect(() => {
     if (!open) return
 
     if (isEdit && exam) {
+      const fallbackType = normalizeCreateType(initialType, "MOCK_EXAM")
+      const currentTypeText = examTypeByIdText.get(exam.examTypeId) ?? fallbackType
+      const currentCreateType = normalizeCreateType(currentTypeText, fallbackType)
+
       setTitle(exam.title ?? "")
-      setType(examTypeByIdText.get(exam.examTypeId) ?? initialType)
+      setCreateType(currentCreateType)
+      setTargetId(
+          exam.lessonId != null
+              ? String(exam.lessonId)
+              : exam.middleCategoryId != null
+                  ? String(exam.middleCategoryId)
+                  : exam.majorCategoryId != null
+                      ? String(exam.majorCategoryId)
+                      : ""
+      )
       setDurationMinutes(
-        exam.durationMinutes != null ? String(exam.durationMinutes) : ""
+          exam.durationMinutes != null ? String(exam.durationMinutes) : ""
       )
       setPassingScore(
-        exam.passingScore != null ? String(exam.passingScore) : ""
+          exam.passingScore != null ? String(exam.passingScore) : ""
       )
 
       const ordered = [...existingExamQuestions]
-        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-        .map((examQuestion) => questionById.get(examQuestion.questionId))
-        .filter(Boolean)
+          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+          .map((examQuestion) => questionById.get(examQuestion.questionId))
+          .filter(Boolean)
 
       setSelectedQuestions(ordered)
     } else {
-      setTitle("")
-      setType(initialType)
+      const nextType = normalizeCreateType(initialType, "MOCK_EXAM")
+      const nextConfig = getCreateTypeConfig(nextType)
+      const nextTargetId =
+          nextConfig.scope === "LESSON" && initialLessonId != null
+              ? String(initialLessonId)
+              : nextConfig.scope === "MIDDLE_CATEGORY" &&
+              initialMiddleCategoryId != null
+                  ? String(initialMiddleCategoryId)
+                  : nextConfig.scope === "MAJOR_CATEGORY" &&
+                  initialMajorCategoryId != null
+                      ? String(initialMajorCategoryId)
+                      : ""
+      const nextTargetOptions = getTargetOptionsByScope(
+          targets,
+          nextConfig.scope
+      )
+      const nextTarget =
+          nextTargetOptions.find((item) => item.id === nextTargetId) ?? null
+      const presetTitle = String(initialTitle ?? "").trim()
+
+      setCreateType(nextType)
+      setTargetId(nextTargetId)
+      setTitle(
+          presetTitle ||
+          getDefaultTitle({
+            createTypeConfig: nextConfig,
+            selectedTarget: nextTarget,
+            certification,
+          })
+      )
       setDurationMinutes("")
       setPassingScore("")
       setSelectedQuestions([])
@@ -88,16 +322,16 @@ export default function AssessmentDialog({
   }, [open, exam?.examId, mode])
 
   const alreadySelectedIds = useMemo(
-    () => new Set(selectedQuestions.map((question) => question.questionId)),
-    [selectedQuestions]
+      () => new Set(selectedQuestions.map((question) => question.questionId)),
+      [selectedQuestions]
   )
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const examType = await ensureExamType(type)
+      const examType = await ensureExamType(createTypeConfig.examTypeText)
 
       const questionIds = selectedQuestions.map(
-        (question) => question.questionId
+          (question) => question.questionId
       )
 
       const payload = {
@@ -109,14 +343,29 @@ export default function AssessmentDialog({
         totalQuestions: questionIds.length,
         passingScore: passingScore ? Number(passingScore) : null,
         questionIds,
+
+        targetScope: createTypeConfig.scope,
+        assessmentScope: createTypeConfig.scope,
+        lessonId:
+            createTypeConfig.scope === "LESSON" && targetId
+                ? Number(targetId)
+                : null,
+        middleCategoryId:
+            createTypeConfig.scope === "MIDDLE_CATEGORY" && targetId
+                ? Number(targetId)
+                : null,
+        majorCategoryId:
+            createTypeConfig.scope === "MAJOR_CATEGORY" && targetId
+                ? Number(targetId)
+                : null,
       }
 
       const savedExam = isEdit
-        ? await updateExam(exam.examId, {
+          ? await updateExam(exam.examId, {
             ...payload,
             examId: exam.examId,
           })
-        : await createExam(payload)
+          : await createExam(payload)
 
       return {
         savedExam,
@@ -157,6 +406,12 @@ export default function AssessmentDialog({
         queryClient.invalidateQueries({ queryKey: ["exams"] }),
         queryClient.invalidateQueries({ queryKey: ["exam-questions"] }),
         queryClient.invalidateQueries({ queryKey: ["exam-types"] }),
+        queryClient.invalidateQueries({
+          queryKey: [
+            "certification-publishing-requirements",
+            certification.certificationId,
+          ],
+        }),
       ])
 
       await Promise.all([
@@ -175,9 +430,9 @@ export default function AssessmentDialog({
       ])
 
       toast.success(
-        isEdit
-          ? "Assessment updated successfully."
-          : "Assessment created successfully."
+          isEdit
+              ? "Assessment updated successfully."
+              : "Assessment created successfully."
       )
 
       onOpenChange(false)
@@ -185,10 +440,10 @@ export default function AssessmentDialog({
 
     onError: (error) => {
       const message =
-        error?.response?.data?.message ??
-        (isEdit
-          ? "Unable to save changes. Please try again."
-          : "Assessment could not be created.")
+          error?.response?.data?.message ??
+          (isEdit
+              ? "Unable to save changes. Please try again."
+              : "Assessment could not be created.")
 
       setError(message)
       toast.error(message)
@@ -207,14 +462,51 @@ export default function AssessmentDialog({
     onOpenChange(nextOpen)
   }
 
+  const handleCreateTypeChange = (nextType) => {
+    const nextConfig = getCreateTypeConfig(nextType)
+
+    setCreateType(nextType)
+    setTargetId("")
+    setSelectedQuestions([])
+    setError("")
+
+    setTitle(
+        getDefaultTitle({
+          createTypeConfig: nextConfig,
+          selectedTarget: null,
+          certification,
+        })
+    )
+  }
+
+  const handleTargetChange = (nextTargetId) => {
+    const nextTarget = targetOptions.find((item) => item.id === nextTargetId)
+
+    setTargetId(nextTargetId)
+    setSelectedQuestions([])
+    setError("")
+
+    // The admin never has to type an assessment name. Changing the selected
+    // lesson, middle category, or major category immediately regenerates it.
+    if (!isEdit) {
+      setTitle(
+          getDefaultTitle({
+            createTypeConfig,
+            selectedTarget: nextTarget,
+            certification,
+          })
+      )
+    }
+  }
+
   const handleAddQuestions = (questions) => {
     setSelectedQuestions((current) => {
       const existingIds = new Set(
-        current.map((question) => question.questionId)
+          current.map((question) => question.questionId)
       )
 
       const newQuestions = questions.filter(
-        (question) => !existingIds.has(question.questionId)
+          (question) => !existingIds.has(question.questionId)
       )
 
       return [...current, ...newQuestions]
@@ -230,14 +522,19 @@ export default function AssessmentDialog({
       return
     }
 
+    if (createTypeConfig.scope !== "CERTIFICATION" && !targetId) {
+      setError(`Select a ${createTypeConfig.targetLabel.toLowerCase()}.`)
+      return
+    }
+
     if (selectedQuestions.length === 0) {
       setError("Add at least one question.")
       return
     }
 
     if (
-      passingScore &&
-      (Number(passingScore) < 0 || Number(passingScore) > 100)
+        passingScore &&
+        (Number(passingScore) < 0 || Number(passingScore) > 100)
     ) {
       setError("Passing score must be between 0 and 100.")
       return
@@ -264,288 +561,359 @@ export default function AssessmentDialog({
 
   const removeQuestion = (questionId) => {
     setSelectedQuestions((current) =>
-      current.filter((item) => item.questionId !== questionId)
+        current.filter((item) => item.questionId !== questionId)
     )
   }
 
-  const typeLabel =
-    ASSESSMENT_TYPES.find((option) => option.value === type)?.label ?? type
+  const canOpenQuestionPicker =
+      createTypeConfig.scope === "CERTIFICATION" || Boolean(targetId)
 
   return (
-    <Dialog open={open} onOpenChange={handleAssessmentDialogOpenChange}>
-      <DialogContent
-        onInteractOutside={(event) => {
-          if (pickerOpen || saveMutation.isPending) {
-            event.preventDefault()
-          }
-        }}
-        onEscapeKeyDown={(event) => {
-          if (pickerOpen || saveMutation.isPending) {
-            event.preventDefault()
-          }
-        }}
-        className="h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none overflow-hidden rounded-2xl p-0 sm:h-[calc(100dvh-4rem)] sm:w-[80vw] sm:max-w-[80vw] md:w-[65vw] md:max-w-[65vw] lg:h-[min(700px,calc(100dvh-4rem))] lg:w-[55vw] lg:max-w-[55vw]"
-      >
-        <div className="flex h-full min-h-0 flex-col">
-          <DialogHeader className="border-b px-6 py-5">
-            <DialogTitle className="text-xl font-semibold">
-              {isEdit ? "Edit Assessment" : `Create ${typeLabel}`}
-            </DialogTitle>
+      <Dialog open={open} onOpenChange={handleAssessmentDialogOpenChange}>
+        <DialogContent
+            onInteractOutside={(event) => {
+              if (pickerOpen || saveMutation.isPending) {
+                event.preventDefault()
+              }
+            }}
+            onEscapeKeyDown={(event) => {
+              if (pickerOpen || saveMutation.isPending) {
+                event.preventDefault()
+              }
+            }}
+            className="h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none overflow-hidden rounded-2xl p-0 sm:h-[calc(100dvh-4rem)] sm:w-[80vw] sm:max-w-[80vw] md:w-[65vw] md:max-w-[65vw] lg:h-[min(700px,calc(100dvh-4rem))] lg:w-[55vw] lg:max-w-[55vw]"
+        >
+          <div className="flex h-full min-h-0 flex-col">
+            <DialogHeader className="border-b px-6 py-5">
+              <DialogTitle className="text-xl font-semibold">
+                {isEdit ? "Edit Assessment" : `Create ${typeLabel}`}
+              </DialogTitle>
 
-            <DialogDescription className="text-sm text-muted-foreground">
-              Certification: {certification?.title}
-            </DialogDescription>
-          </DialogHeader>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Certification: {certification?.title}
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-            <div className="space-y-6">
-              <section className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground">
-                  Assessment details
-                </h3>
-
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="assessment-title">Title</Label>
-
-                    <Input
-                      id="assessment-title"
-                      value={title}
-                      onChange={(event) => setTitle(event.target.value)}
-                      placeholder="e.g. IT Passport Mock Exam 1"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Assessment type</Label>
-
-                    <Select value={type} onValueChange={setType}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-
-                      <SelectContent>
-                        {ASSESSMENT_TYPES.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="assessment-duration">
-                      Duration (minutes)
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">
-                        (optional)
-                      </span>
-                    </Label>
-
-                    <Input
-                      id="assessment-duration"
-                      type="number"
-                      min="1"
-                      value={durationMinutes}
-                      onChange={(event) =>
-                        setDurationMinutes(event.target.value)
-                      }
-                      placeholder="60"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="assessment-passing">
-                      Passing score (%)
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">
-                        (optional)
-                      </span>
-                    </Label>
-
-                    <Input
-                      id="assessment-passing"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={passingScore}
-                      onChange={(event) => setPassingScore(event.target.value)}
-                      placeholder="70"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="space-y-6">
+                <section className="space-y-4">
                   <h3 className="text-sm font-semibold text-muted-foreground">
-                    Questions ({selectedQuestions.length} selected)
+                    Assessment details
                   </h3>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPickerOpen(true)}
-                  >
-                    <Plus aria-hidden="true" />
-                    Add Questions
-                  </Button>
-                </div>
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="assessment-title">
+                        Assessment Name
+                        {!isEdit ? (
+                            <span className="ml-1 text-xs font-normal text-muted-foreground">
+                              (automatically generated)
+                            </span>
+                        ) : null}
+                      </Label>
 
-                {selectedQuestions.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                    No questions selected yet. Use Add Questions to pick from
-                    this certification&apos;s question bank.
-                  </div>
-                ) : (
-                  <ul className="space-y-2">
-                    {selectedQuestions.map((question, index) => (
-                      <li
-                        key={question.questionId}
-                        className="flex items-center gap-3 rounded-xl border p-3"
+                      <Input
+                          id="assessment-title"
+                          value={title}
+                          onChange={(event) => setTitle(event.target.value)}
+                          placeholder="Assessment name"
+                          readOnly={!isEdit}
+                          className={!isEdit ? "bg-muted" : undefined}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Exam Type</Label>
+
+                      <Select
+                          value={createType}
+                          onValueChange={handleCreateTypeChange}
+                          disabled={isEdit || lockPreset}
                       >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select exam type" />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          {ASSESSMENT_CREATE_TYPES.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {createTypeConfig.scope !== "CERTIFICATION" ? (
+                        <div className="space-y-2">
+                          <Label>Select {createTypeConfig.targetLabel}</Label>
+
+                          <Select
+                              value={targetId}
+                              onValueChange={handleTargetChange}
+                              disabled={isEdit || lockPreset}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue
+                                  placeholder={`Choose ${createTypeConfig.targetLabel}`}
+                              />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                              {targetOptions.length === 0 ? (
+                                  <SelectItem value="none" disabled>
+                                    No {createTypeConfig.targetLabel.toLowerCase()} available
+                                  </SelectItem>
+                              ) : (
+                                  targetOptions.map((target) => (
+                                      <SelectItem key={target.id} value={target.id}>
+                                        {target.title}
+                                        {target.subtitle ? ` — ${target.subtitle}` : ""}
+                                      </SelectItem>
+                                  ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                    ) : null}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="assessment-duration">
+                        Duration (minutes)
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                      </Label>
+
+                      <Input
+                          id="assessment-duration"
+                          type="number"
+                          min="1"
+                          value={durationMinutes}
+                          onChange={(event) =>
+                              setDurationMinutes(event.target.value)
+                          }
+                          placeholder="60"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="assessment-passing">
+                        Passing score (%)
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                      </Label>
+
+                      <Input
+                          id="assessment-passing"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={passingScore}
+                          onChange={(event) => setPassingScore(event.target.value)}
+                          placeholder="70"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                      Questions ({selectedQuestions.length} selected)
+                    </h3>
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (!canOpenQuestionPicker) {
+                            setError(
+                                `Select a ${createTypeConfig.targetLabel.toLowerCase()} first.`
+                            )
+                            return
+                          }
+
+                          setPickerOpen(true)
+                        }}
+                    >
+                      <Plus aria-hidden="true" />
+                      Add Questions
+                    </Button>
+                  </div>
+
+                  {selectedQuestions.length === 0 ? (
+                      <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                        No questions selected yet. Use Add Questions to pick from
+                        this certification&apos;s question bank.
+                      </div>
+                  ) : (
+                      <ul className="space-y-2">
+                        {selectedQuestions.map((question, index) => (
+                            <li
+                                key={question.questionId}
+                                className="flex items-center gap-3 rounded-xl border p-3"
+                            >
                         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
                           {index + 1}
                         </span>
 
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-1 text-sm font-medium">
-                            {question.questionText}
-                          </p>
+                              <div className="min-w-0 flex-1">
+                                <p className="line-clamp-1 text-sm font-medium">
+                                  {question.questionText}
+                                </p>
 
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <Badge variant="secondary" className="text-[10px]">
-                              {question.questionType}
-                            </Badge>
+                                <div className="mt-1 flex items-center gap-1.5">
+                                  <Badge variant="secondary" className="text-[10px]">
+                                    {question.questionType}
+                                  </Badge>
 
-                            <Badge variant="outline" className="text-[10px]">
-                              {question.difficultyLevel}
-                            </Badge>
-                          </div>
-                        </div>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {question.difficultyLevel}
+                                  </Badge>
+                                </div>
+                              </div>
 
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Move question up"
-                            disabled={index === 0}
-                            onClick={() => moveQuestion(index, -1)}
-                          >
-                            <ArrowUp />
-                          </Button>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="Move question up"
+                                    disabled={index === 0}
+                                    onClick={() => moveQuestion(index, -1)}
+                                >
+                                  <ArrowUp />
+                                </Button>
 
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Move question down"
-                            disabled={index === selectedQuestions.length - 1}
-                            onClick={() => moveQuestion(index, 1)}
-                          >
-                            <ArrowDown />
-                          </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="Move question down"
+                                    disabled={index === selectedQuestions.length - 1}
+                                    onClick={() => moveQuestion(index, 1)}
+                                >
+                                  <ArrowDown />
+                                </Button>
 
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Remove question"
-                            onClick={() => removeQuestion(question.questionId)}
-                          >
-                            <Trash2 />
-                          </Button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="Remove question"
+                                    onClick={() => removeQuestion(question.questionId)}
+                                >
+                                  <Trash2 />
+                                </Button>
+                              </div>
+                            </li>
+                        ))}
+                      </ul>
+                  )}
+                </section>
 
-              <section className="space-y-2 rounded-xl bg-muted/40 p-4 text-sm">
-                <h3 className="font-semibold text-muted-foreground">Summary</h3>
+                <section className="space-y-2 rounded-xl bg-muted/40 p-4 text-sm">
+                  <h3 className="font-semibold text-muted-foreground">Summary</h3>
 
-                <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-muted-foreground">Certification</dt>
+                  <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Certification</dt>
 
-                    <dd className="truncate font-medium">
-                      {certification?.title}
-                    </dd>
-                  </div>
+                      <dd className="truncate font-medium">
+                        {certification?.title}
+                      </dd>
+                    </div>
 
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-muted-foreground">Type</dt>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Type</dt>
 
-                    <dd className="font-medium">{typeLabel}</dd>
-                  </div>
+                      <dd className="font-medium">{typeLabel}</dd>
+                    </div>
 
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-muted-foreground">Questions</dt>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Scope</dt>
 
-                    <dd className="font-medium">{selectedQuestions.length}</dd>
-                  </div>
+                      <dd className="truncate font-medium">
+                        {createTypeConfig.scope === "CERTIFICATION"
+                            ? "Overall certification"
+                            : selectedTarget?.title ?? "Not selected"}
+                      </dd>
+                    </div>
 
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-muted-foreground">Duration</dt>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Questions</dt>
 
-                    <dd className="font-medium">
-                      {durationMinutes ? `${durationMinutes} min` : "No limit"}
-                    </dd>
-                  </div>
+                      <dd className="font-medium">{selectedQuestions.length}</dd>
+                    </div>
 
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-muted-foreground">Passing score</dt>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Duration</dt>
 
-                    <dd className="font-medium">
-                      {passingScore ? `${passingScore}%` : "Not set"}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
+                      <dd className="font-medium">
+                        {durationMinutes ? `${durationMinutes} min` : "No limit"}
+                      </dd>
+                    </div>
 
-              {error ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {error}
-                </p>
-              ) : null}
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Passing score</dt>
+
+                      <dd className="font-medium">
+                        {passingScore ? `${passingScore}%` : "Not set"}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                {error ? (
+                    <p className="text-sm text-destructive" role="alert">
+                      {error}
+                    </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
+              <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={saveMutation.isPending}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={saveMutation.isPending}
+              >
+                {saveMutation.isPending
+                    ? "Saving..."
+                    : isEdit
+                        ? "Save Changes"
+                        : `Create ${typeLabel}`}
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={saveMutation.isPending}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={saveMutation.isPending}
-            >
-              {saveMutation.isPending
-                ? "Saving..."
-                : isEdit
-                  ? "Save Changes"
-                  : `Create ${typeLabel}`}
-            </Button>
-          </div>
-        </div>
-
-        <AssessmentQuestionPickerDialog
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          certification={certification}
-          alreadySelectedIds={alreadySelectedIds}
-          initialMiddleCategoryId={initialMiddleCategoryId}
-          onAddQuestions={handleAddQuestions}
-        />
-      </DialogContent>
-    </Dialog>
+          <AssessmentQuestionPickerDialog
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              certification={certification}
+              alreadySelectedIds={alreadySelectedIds}
+              initialLessonId={createTypeConfig.scope === "LESSON" ? targetId : null}
+              initialMiddleCategoryId={
+                createTypeConfig.scope === "MIDDLE_CATEGORY" ? targetId : null
+              }
+              initialMajorCategoryId={
+                createTypeConfig.scope === "MAJOR_CATEGORY" ? targetId : null
+              }
+              onAddQuestions={handleAddQuestions}
+          />
+        </DialogContent>
+      </Dialog>
   )
 }

@@ -83,6 +83,10 @@ public class AssessmentAttempt {
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
 
+    /** attempt_question id of the item the learner last viewed, for resume. */
+    @Column(name = "current_question_id")
+    private Long currentQuestionId;
+
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
 

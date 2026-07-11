@@ -51,8 +51,6 @@ import {
 
 const TOTAL_STEPS = 2
 
-const MIN_CERTIFICATION_PRICE = 99
-const MAX_CERTIFICATION_PRICE = 9_999_999.99
 
 const MIN_TITLE_LENGTH = 3
 const MAX_TITLE_LENGTH = 150
@@ -89,7 +87,6 @@ const emptySubmissionDialog = {
 function getEmptyDetails() {
     return {
         title: "",
-        price: "",
         industry: "",
         description: "",
         imageFile: null,
@@ -124,7 +121,6 @@ function toDetails(certification) {
 
     return {
         title: certification.title ?? "",
-        price: certification.price ?? "",
         industry: certification.industry ?? "",
         description: certification.description ?? "",
         imageFile: null,
@@ -138,7 +134,6 @@ function validateCertificationDetails(details) {
     const title = normalizeText(details?.title)
     const description = normalizeText(details?.description)
     const industry = normalizeText(details?.industry)
-    const rawPrice = String(details?.price ?? "").trim()
 
     const imageFile = details?.imageFile
     const hasExistingImage = Boolean(
@@ -169,41 +164,6 @@ function validateCertificationDetails(details) {
 
 
 
-
-
-
-
-    const validPricePattern = /^\d+(?:\.\d{1,2})?$/
-
-    if (!rawPrice) {
-        errors.price = "Price is required."
-    } else if (rawPrice.startsWith("-")) {
-        errors.price = "Price cannot be negative."
-    } else if (rawPrice.startsWith("+")) {
-        errors.price = "Do not use a plus sign in the price."
-    } else if (rawPrice.length > 12) {
-        errors.price = "Price is too long. Enter a valid amount."
-    } else if (/[a-zA-Z]/.test(rawPrice)) {
-        errors.price = "Price must not contain letters."
-    } else if (/[₱$€£¥, ]/.test(rawPrice)) {
-        errors.price =
-            "Do not include currency symbols, commas, or spaces in the price."
-    } else if (!validPricePattern.test(rawPrice)) {
-        errors.price =
-            "Use numbers only with up to 2 decimal places. Example: 99 or 99.50."
-    } else {
-        const numericPrice = Number(rawPrice)
-
-        if (!Number.isFinite(numericPrice)) {
-            errors.price = "Enter a valid price."
-        } else if (!Number.isSafeInteger(Math.round(numericPrice * 100))) {
-            errors.price = "Price is too large."
-        } else if (numericPrice < MIN_CERTIFICATION_PRICE) {
-            errors.price = `Price must be at least ₱${MIN_CERTIFICATION_PRICE}.`
-        } else if (numericPrice > MAX_CERTIFICATION_PRICE) {
-            errors.price = `Price must not exceed ₱${MAX_CERTIFICATION_PRICE.toLocaleString()}.`
-        }
-    }
 
 
 
@@ -541,7 +501,6 @@ export default function CertificationFormDrawer({
             const payload = {
                 title: certificationDetails.title.trim(),
                 description: certificationDetails.description.trim(),
-                price: Number(certificationDetails.price),
                 industry: certificationDetails.industry.trim(),
                 imageKey,
 
@@ -642,7 +601,6 @@ export default function CertificationFormDrawer({
         const payload = {
             title: certificationDetails.title.trim(),
             description: certificationDetails.description.trim(),
-            price: Number(certificationDetails.price),
             industry: certificationDetails.industry.trim(),
             imageKey,
             dateCreated: formatLocalDateTime(),

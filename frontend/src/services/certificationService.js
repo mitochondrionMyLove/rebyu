@@ -24,6 +24,26 @@ export async function deleteCertification(id) {
     })
 }
 
+export async function publishCertification(id) {
+    return await base(`certifications/publish/${id}`, {
+        method: "PUT",
+    })
+}
+
+/**
+ * Structured publishing readiness: { publishable, missingRequirements,
+ * invalidRequirements }. Drives the publishing checklist and gates the
+ * Publish Certification button.
+ */
+export async function getCertificationPublishingRequirements(id) {
+    return await base(`certifications/${id}/publishing-requirements`, {
+        method: "GET",
+    })
+}
+
+
+
+
 export async function generateCertificationStructure(certificationId, files) {
     const formData = new FormData()
 

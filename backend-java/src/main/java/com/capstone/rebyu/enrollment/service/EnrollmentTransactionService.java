@@ -64,10 +64,10 @@ public class EnrollmentTransactionService {
             throw new BusinessRuleException.CertificationAlreadyEnrolledException();
         }
 
-        BigDecimal price = certification.getPrice() == null
-                ? BigDecimal.ZERO
-                : certification.getPrice();
-        boolean free = price.signum() <= 0;
+        // Certification prices are legacy data. Learner access is now gated by
+        // subscriptions, so starting any published certification creates a
+        // free enrollment immediately.
+        BigDecimal price = BigDecimal.ZERO;
 
         LocalDateTime now = LocalDateTime.now();
         LearnerOrder order = LearnerOrder.builder()
@@ -77,8 +77,8 @@ public class EnrollmentTransactionService {
                 .subtotal(price)
                 .discountAmount(BigDecimal.ZERO)
                 .totalAmount(price)
-                .status(free ? LearnerOrder.Status.completed : LearnerOrder.Status.pending)
-                .paidAt(free ? now : null)
+                .status(LearnerOrder.Status.completed)
+                .paidAt(now)
                 .idempotencyKey(idempotencyKey != null && !idempotencyKey.isBlank()
                         ? idempotencyKey
                         : UUID.randomUUID().toString())
@@ -92,14 +92,9 @@ public class EnrollmentTransactionService {
                 .build();
         detail = orderDetailRepository.save(detail);
 
-        Long enrollmentId = null;
-        if (free) {
-            enrollmentId = createEnrollment(learner, certification, detail).getLearnerCertificationId();
-            log.info("Free enrollment completed: learner={} certification={}", learnerId, certificationId);
-        } else {
-            log.info("Pending purchase created: order={} learner={} certification={} amount={}",
-                    order.getOrderId(), learnerId, certificationId, price);
-        }
+        Long enrollmentId = createEnrollment(learner, certification, detail)
+                .getLearnerCertificationId();
+        log.info("Free enrollment completed: learner={} certification={}", learnerId, certificationId);
 
         return new PurchaseTransactionDto(
                 order.getOrderId(),
@@ -108,11 +103,11 @@ public class EnrollmentTransactionService {
                 certificationId,
                 price,
                 order.getStatus().name(),
-                free ? "FREE_ENROLLMENT" : "PAID_PURCHASE",
+                "FREE_ENROLLMENT",
                 order.getOrderedAt(),
                 order.getPaidAt(),
                 enrollmentId,
-                !free
+                false
         );
     }
 

@@ -23,7 +23,6 @@ import {
 import { industries } from "@/constants/industries.js"
 import { getFileViewUrl } from "@/services/fileService.js"
 
-const MIN_PRICE = 99
 const MIN_TITLE_LENGTH = 3
 const MAX_TITLE_LENGTH = 150
 const MIN_DESCRIPTION_LENGTH = 20
@@ -35,16 +34,6 @@ function CertificationDetails({ value, onChange, errors = {} }) {
       ...value,
       [fieldName]: fieldValue,
     })
-  }
-
-  function handlePriceChange(event) {
-    const nextPrice = event.target.value
-
-    const validTypingPattern = /^\d*(?:\.\d{0,2})?$/
-
-    if (validTypingPattern.test(nextPrice)) {
-      updateField("price", nextPrice)
-    }
   }
 
   return (
@@ -86,42 +75,7 @@ function CertificationDetails({ value, onChange, errors = {} }) {
             )}
           </Field>
 
-          <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {}
-            <Field>
-              <FieldLabel htmlFor="certification-price">
-                Price
-              </FieldLabel>
-
-              <Input
-                  id="certification-price"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  maxLength={12}
-                  value={value.price ?? ""}
-                  onChange={handlePriceChange}
-                  placeholder="599.00"
-                  aria-invalid={Boolean(errors.price)}
-                  aria-describedby={
-                    errors.price
-                        ? "certification-price-error"
-                        : "certification-price-description"
-                  }
-              />
-
-              <FieldDescription id="certification-price-description">
-                Minimum price is ₱{MIN_PRICE}. Use numbers only, such as 99 or
-                599.00.
-              </FieldDescription>
-
-              {errors.price && (
-                  <FieldError id="certification-price-error">
-                    {errors.price}
-                  </FieldError>
-              )}
-            </Field>
-
+          <FieldGroup className="grid grid-cols-1 gap-5">
             {}
             <Field>
               <FieldLabel htmlFor="certification-industry">

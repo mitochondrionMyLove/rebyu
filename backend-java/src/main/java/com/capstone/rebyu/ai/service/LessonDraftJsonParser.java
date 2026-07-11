@@ -4,15 +4,24 @@ import com.capstone.rebyu.ai.dto.GeneratedLessonSectionDraftDto;
 import com.capstone.rebyu.ai.dto.GeneratedLessonToolDraftDto;
 import com.capstone.rebyu.ai.dto.lesson.data.AccordionItemDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.AccordionToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ContentAccordionBlockToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ContentTabsBlockToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.DescriptionToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.FlipGridCardDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.FlipGridToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.GridItemDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.HeaderDescriptionGridToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.HeadingToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ImageFeatureGridToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ImageLeftTextToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ImageRightTextToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ImageToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.IntroImageCardToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.ListItemDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.MediaTextBlockToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.OrderedListToolDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ReviewCardDataDto;
+import com.capstone.rebyu.ai.dto.lesson.data.ReviewCardGridToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.SubheadingToolDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.TabItemDataDto;
 import com.capstone.rebyu.ai.dto.lesson.data.TabsToolDataDto;
@@ -43,7 +52,11 @@ public class LessonDraftJsonParser {
     private static final Set<String> SUPPORTED_TYPES = Set.of(
             "heading", "subheading", "description", "unordered-list", "ordered-list",
             "tabs", "accordion", "flip-grid", "image", "video",
-            "image-left-text", "image-right-text");
+            "image-left-text", "image-right-text",
+            // Combined tools
+            "intro-image-card", "header-description-grid", "image-feature-grid",
+            "review-card-grid", "content-accordion-block", "content-tabs-block",
+            "media-text-block");
 
     private final ObjectMapper objectMapper;
 
@@ -197,6 +210,44 @@ public class LessonDraftJsonParser {
                         notesOrDefault(notes));
                 case "image" -> tool(id, "image", ImageToolDataDto.draft(), notesOrDefault(notes));
                 case "video" -> tool(id, "video", VideoToolDataDto.draft(), notesOrDefault(notes));
+                case "intro-image-card" -> tool(id, "intro-image-card",
+                        IntroImageCardToolDataDto.draft(
+                                requireText(data, "intro-image-card", "smallHeader", "header", "title"),
+                                requireText(data, "intro-image-card", "description", "text")),
+                        notesOrDefault(notes));
+                case "header-description-grid" -> tool(id, "header-description-grid",
+                        new HeaderDescriptionGridToolDataDto(
+                                requireText(data, "header-description-grid", "smallHeader", "header", "title"),
+                                requireText(data, "header-description-grid", "description", "text"),
+                                gridItems(data)),
+                        notes);
+                case "image-feature-grid" -> tool(id, "image-feature-grid",
+                        ImageFeatureGridToolDataDto.draft(
+                                requireText(data, "image-feature-grid", "smallHeader", "header", "title"),
+                                requireText(data, "image-feature-grid", "description", "text"),
+                                gridItems(data)),
+                        notesOrDefault(notes));
+                case "review-card-grid" -> tool(id, "review-card-grid",
+                        new ReviewCardGridToolDataDto(
+                                requireText(data, "review-card-grid", "smallHeader", "header", "title"),
+                                requireText(data, "review-card-grid", "description", "text"),
+                                reviewCards(data)),
+                        notes);
+                case "content-accordion-block" -> tool(id, "content-accordion-block",
+                        new ContentAccordionBlockToolDataDto(
+                                requireText(data, "content-accordion-block", "smallHeader", "header", "title"),
+                                requireText(data, "content-accordion-block", "description", "text"),
+                                accordionItems(data)),
+                        notes);
+                case "content-tabs-block" -> tool(id, "content-tabs-block",
+                        new ContentTabsBlockToolDataDto(
+                                requireText(data, "content-tabs-block", "smallHeader", "header", "title"),
+                                requireText(data, "content-tabs-block", "description", "text"),
+                                tabItems(data)),
+                        notes);
+                case "media-text-block" -> tool(id, "media-text-block",
+                        mediaTextBlock(data),
+                        notesOrDefault(notes));
                 default -> null;
             };
         } catch (IllegalArgumentException invalid) {
@@ -274,6 +325,55 @@ public class LessonDraftJsonParser {
         }
         if (result.isEmpty()) throw new IllegalArgumentException("empty flip-grid");
         return result;
+    }
+
+    private List<GridItemDataDto> gridItems(JsonNode data) {
+        JsonNode items = firstArray(data, "gridItems", "items", "features", "cards");
+        List<GridItemDataDto> result = new ArrayList<>();
+        if (items != null) {
+            for (JsonNode item : items) {
+                String title = text(item, "title", "header", "label", "name");
+                String description = text(item, "description", "text", "content");
+                if (isBlank(title) || isBlank(description)) continue;
+                result.add(new GridItemDataDto(UUID.randomUUID(), title.trim(), description.trim()));
+            }
+        }
+        if (result.isEmpty()) throw new IllegalArgumentException("empty grid");
+        return result;
+    }
+
+    private List<ReviewCardDataDto> reviewCards(JsonNode data) {
+        JsonNode cards = firstArray(data, "cards", "items", "reviewCards");
+        List<ReviewCardDataDto> result = new ArrayList<>();
+        if (cards != null) {
+            for (JsonNode card : cards) {
+                String front = text(card, "frontTitle", "front", "term", "title");
+                String back = text(card, "backTitle", "back", "definition");
+                String description = text(card, "description", "detail", "explanation");
+                if (isBlank(front) || isBlank(back)) continue;
+                if (isBlank(description)) description = back;
+                result.add(new ReviewCardDataDto(UUID.randomUUID(),
+                        front.trim(), back.trim(), description.trim()));
+            }
+        }
+        if (result.isEmpty()) throw new IllegalArgumentException("empty review-card-grid");
+        return result;
+    }
+
+    private MediaTextBlockToolDataDto mediaTextBlock(JsonNode data) {
+        String smallHeader = requireText(data, "media-text-block", "smallHeader", "header", "title");
+        String description = requireText(data, "media-text-block", "description", "text");
+        String mediaType = text(data, "mediaType", "media");
+        mediaType = "video".equalsIgnoreCase(mediaType == null ? "" : mediaType.trim()) ? "video" : "image";
+        String layout = text(data, "layout");
+        layout = "image-right".equalsIgnoreCase(layout == null ? "" : layout.trim()) ? "image-right" : "image-left";
+        String supportingTitle = text(data, "supportingTitle", "mediaTitle", "caption");
+        String supportingDescription = text(data, "supportingDescription", "mediaDescription");
+        return MediaTextBlockToolDataDto.draft(
+                smallHeader, description,
+                supportingTitle == null ? "" : supportingTitle.trim(),
+                supportingDescription == null ? "" : supportingDescription.trim(),
+                mediaType, layout);
     }
 
     // ---- JSON helpers ------------------------------------------------------

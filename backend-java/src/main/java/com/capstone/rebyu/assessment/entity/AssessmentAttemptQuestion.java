@@ -49,4 +49,12 @@ public class AssessmentAttemptQuestion {
 
     @Column(name = "lesson_id")
     private Long lessonId;
+
+    /** Learner marked this item for review. */
+    @Column(name = "flagged", nullable = false)
+    private boolean flagged = false;
+
+    /** Learner intentionally moved past this item without answering. */
+    @Column(name = "skipped", nullable = false)
+    private boolean skipped = false;
 }

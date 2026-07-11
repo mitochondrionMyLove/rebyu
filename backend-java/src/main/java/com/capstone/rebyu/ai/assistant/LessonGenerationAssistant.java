@@ -31,18 +31,34 @@ import dev.langchain4j.service.V;
         {"type": "image", "data": {}, "authoringNotes": "what image the admin should upload"}
         {"type": "video", "data": {}, "authoringNotes": "what video the admin should upload"}
 
+        Combined tools (richer layouts — use these too, not only the basic tools):
+        {"type": "intro-image-card", "data": {"smallHeader": "...", "description": "..."}, "authoringNotes": "what image the admin should upload"}
+        {"type": "header-description-grid", "data": {"smallHeader": "...", "description": "...", "gridItems": [{"title": "...", "description": "..."}]}}
+        {"type": "image-feature-grid", "data": {"smallHeader": "...", "description": "...", "gridItems": [{"title": "...", "description": "..."}]}, "authoringNotes": "what image the admin should upload"}
+        {"type": "review-card-grid", "data": {"smallHeader": "...", "description": "...", "cards": [{"frontTitle": "...", "backTitle": "...", "description": "..."}]}}
+        {"type": "content-accordion-block", "data": {"smallHeader": "...", "description": "...", "items": [{"title": "...", "content": "..."}]}}
+        {"type": "content-tabs-block", "data": {"smallHeader": "...", "description": "...", "items": [{"label": "...", "title": "...", "description": "..."}]}}
+        {"type": "media-text-block", "data": {"smallHeader": "...", "description": "...", "mediaType": "image", "supportingTitle": "...", "supportingDescription": "...", "layout": "image-left"}, "authoringNotes": "what media the admin should upload"}
+
         Rules:
         1. Use only the tool types listed above. Do not invent other types.
         2. Never output files, image keys, video keys, URLs, blobs, or base64.
-           For image, video, image-left-text and image-right-text, describe the
+           For every media tool (image, video, image-left-text, image-right-text,
+           intro-image-card, image-feature-grid, media-text-block), describe the
            needed media in authoringNotes only.
         3. Base every section on the supplied source material. Do not invent
            unsupported facts, examples, or terminology.
         4. Build a useful learning flow: introduction, explanation, key concepts,
-           practical application, recap. Prefer rich lessons with headings,
-           descriptions, lists, and at least one review tool (tabs, accordion,
-           or flip-grid) when the source supports it.
-        5. Produce multiple sections with several tools each.
+           practical application, recap. Prefer rich lessons with a mix of basic
+           tools (headings, descriptions, lists) AND combined tools. Include at
+           least one review tool (flip-grid or review-card-grid) and at least one
+           combined tool (grid, tabs block, accordion block, or media-text-block)
+           when the source supports it.
+        5. For grids, always provide at least two gridItems. For every combined
+           tool, always fill smallHeader and description.
+        6. For media-text-block, mediaType is "image" or "video" and layout is
+           "image-left" or "image-right".
+        7. Produce multiple sections with several tools each.
         """)
 public interface LessonGenerationAssistant {
 

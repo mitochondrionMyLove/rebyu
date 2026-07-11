@@ -142,6 +142,25 @@ public class CognitoAuthService {
 
     private CurrentUserDto toDto(User user) {
         Learner learner = learnerRepository.findByUser_UserId(user.getUserId()).orElse(null);
+        boolean learnerAccount = user.getUserType() != null
+                && LEARNER_USER_TYPE.equalsIgnoreCase(user.getUserType().getUserTypeText());
+
+        // Some legacy LEARNER users predate automatic profile provisioning.
+        // Repair them during authenticated sync so enrollment APIs always
+        // receive a real learners.learner_id instead of a user ID.
+        if (learner == null && learnerAccount) {
+            learner = Learner.builder()
+                    .user(user)
+                    .username(uniqueUsernameFrom(user.getEmail()))
+                    .firstName("")
+                    .lastName("")
+                    .readinessScore(java.math.BigDecimal.ZERO)
+                    .confidenceLevel(java.math.BigDecimal.ZERO)
+                    .build();
+            learner = learnerRepository.save(learner);
+            log.info("Provisioned missing learner profile for legacy user userId={}", user.getUserId());
+        }
+
         String firstName = learner != null ? learner.getFirstName() : "";
         String lastName = learner != null ? learner.getLastName() : "";
         String displayName = (firstName + " " + lastName).trim();

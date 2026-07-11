@@ -11,6 +11,7 @@ import {
   FlagIcon,
   ListIcon,
   Loader2Icon,
+  SkipForwardIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -42,6 +43,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import DiagramArea from "@/components/challenges/diagram-area.jsx"
 import CodeMirrorProgrammingWorkspace from "@/components/assessments/attempt/code-mirror-programming-workspace.jsx"
+import DiagramQuestionLayout from "@/components/assessments/attempt/diagram-question-layout.jsx"
+import ProgrammingQuestionLayout from "@/components/assessments/attempt/programming-question-layout.jsx"
 import QuestionNavigator from "@/components/assessments/attempt/question-navigator.jsx"
 import SubQuestionTabs from "@/components/assessments/attempt/sub-question-tabs.jsx"
 import { getFileViewUrl } from "@/services/fileService.js"
@@ -49,6 +52,9 @@ import { getCurrentLearnerIdentity } from "@/services/learnerService.js"
 import {
   autosaveAttemptAnswers,
   getAssessmentTypeLabel,
+  setAttemptCurrentItem,
+  setAttemptFlag,
+  setAttemptSkip,
   startAssessmentAttempt,
   submitAssessmentAttempt,
 } from "@/services/assessmentService.js"
@@ -67,8 +73,8 @@ function toDraftDto(attemptQuestionId, answer) {
   return {
     attemptQuestionId,
     learnerAnswer: hasSubs
-      ? JSON.stringify(subAnswers)
-      : (answer.learnerAnswer ?? null),
+        ? JSON.stringify(subAnswers)
+        : (answer.learnerAnswer ?? null),
     selectedChoiceId: answer.selectedChoiceId ?? null,
     submittedCode: answer.submittedCode ?? null,
     programmingLanguage: answer.programmingLanguage ?? null,
@@ -76,16 +82,116 @@ function toDraftDto(attemptQuestionId, answer) {
   }
 }
 
+function isMultipleChoice(question) {
+  const type = String(question?.questionType ?? "").toUpperCase()
+  return type === "MULTIPLE_CHOICE" || type === "MCQ"
+}
+
+const QUESTION_TYPE_STYLES = {
+  MULTIPLE_CHOICE: {
+    label: "Multiple Choice",
+    className:
+        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  },
+  SHORT_ANSWER: {
+    label: "Short Answer",
+    className:
+        "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  },
+  DESCRIPTIVE: {
+    label: "Descriptive",
+    className:
+        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  },
+  CRITICAL_THINKING: {
+    label: "Critical Thinking",
+    className:
+        "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
+  },
+  PROGRAMMING: {
+    label: "Programming",
+    className:
+        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  },
+  DIAGRAM: {
+    label: "Diagram",
+    className:
+        "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-300",
+  },
+  DEFAULT: {
+    label: "Question",
+    className:
+        "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+  },
+}
+
+function getQuestionTypeMeta(question) {
+  const questionType = String(question?.questionType ?? "").toUpperCase()
+  const criticalThinkingType = String(
+      question?.criticalThinkingType ?? ""
+  ).toUpperCase()
+
+  if (questionType === "MCQ") {
+    return QUESTION_TYPE_STYLES.MULTIPLE_CHOICE
+  }
+
+  if (questionType === "CRITICAL_THINKING") {
+    if (criticalThinkingType === "PROGRAMMING") {
+      return QUESTION_TYPE_STYLES.PROGRAMMING
+    }
+
+    if (criticalThinkingType === "DIAGRAM") {
+      return QUESTION_TYPE_STYLES.DIAGRAM
+    }
+
+    return QUESTION_TYPE_STYLES.CRITICAL_THINKING
+  }
+
+  return QUESTION_TYPE_STYLES[questionType] ?? QUESTION_TYPE_STYLES.DEFAULT
+}
+
+function QuestionTypeBadge({ question }) {
+  const typeMeta = getQuestionTypeMeta(question)
+
+  return (
+      <Badge
+          variant="outline"
+          className={cn(
+              "h-6 shrink-0 rounded-md px-2 text-[11px] font-semibold",
+              typeMeta.className
+          )}
+      >
+        {typeMeta.label}
+      </Badge>
+  )
+}
+
+function QuestionMetaRow({ question, index, itemLabel = "Question" }) {
+  return (
+      <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm font-semibold text-muted-foreground">
+        {itemLabel} {index + 1}
+      </span>
+
+        {question.points != null ? (
+            <Badge variant="secondary">{Number(question.points)} pt(s)</Badge>
+        ) : null}
+
+        <QuestionTypeBadge question={question} />
+      </div>
+  )
+}
+
 function isAnswered(question, answer) {
   if (!answer) return false
-  if (question.questionType === "MULTIPLE_CHOICE") {
+  if (isMultipleChoice(question)) {
     return answer.selectedChoiceId != null
   }
   if (question.questionType === "CRITICAL_THINKING") {
     return (
-      Boolean(answer.submittedCode?.trim()) ||
-      Boolean(answer.diagramSubmissionData?.trim()) ||
-      Object.values(answer.subAnswers ?? {}).some((text) => text?.trim())
+        Boolean(answer.submittedCode?.trim()) ||
+        Boolean(answer.diagramSubmissionData?.trim()) ||
+        Object.values(answer.subAnswers ?? {}).some((text) => text?.trim())
     )
   }
   return Boolean(answer.learnerAnswer?.trim())
@@ -94,7 +200,7 @@ function isAnswered(question, answer) {
 function SaveStatusIndicator({ status }) {
   if (status === "saving") {
     return (
-      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
         <Loader2Icon className="size-3 animate-spin" aria-hidden="true" />
         Saving…
       </span>
@@ -102,7 +208,7 @@ function SaveStatusIndicator({ status }) {
   }
   if (status === "saved") {
     return (
-      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
         <CheckIcon className="size-3" aria-hidden="true" />
         Saved
       </span>
@@ -110,7 +216,7 @@ function SaveStatusIndicator({ status }) {
   }
   if (status === "error") {
     return (
-      <span className="flex items-center gap-1 text-xs text-destructive">
+        <span className="flex items-center gap-1 text-xs text-destructive">
         <CloudOffIcon className="size-3" aria-hidden="true" />
         Unable to save draft
       </span>
@@ -121,100 +227,97 @@ function SaveStatusIndicator({ status }) {
 
 function NormalQuestionPanel({ question, index, answer, onAnswer }) {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-muted-foreground">
-          Question {index + 1}
-        </span>
-        {question.points != null ? (
-          <Badge variant="secondary">{Number(question.points)} pt(s)</Badge>
-        ) : null}
-      </div>
-
-      <p className="text-base leading-7">{question.question}</p>
-
-      {question.questionImageKey ? (
-        <img
-          src={getFileViewUrl(question.questionImageKey)}
-          alt="Question reference"
-          className="max-h-80 w-auto rounded-xl border"
+      <div className="mx-auto w-full max-w-3xl space-y-5">
+        <QuestionMetaRow
+            question={question}
+            index={index}
+            itemLabel="Question"
         />
-      ) : null}
 
-      {question.questionType === "MULTIPLE_CHOICE" ? (
-        <RadioGroup
-          value={
-            answer?.selectedChoiceId != null
-              ? String(answer.selectedChoiceId)
-              : ""
-          }
-          onValueChange={(value) =>
-            onAnswer({ selectedChoiceId: Number(value) })
-          }
-          className="gap-2"
-        >
-          {(question.choices ?? []).map((choice, choiceIndex) => (
-            <label
-              key={choice.choiceId ?? choiceIndex}
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition hover:bg-muted/40",
-                answer?.selectedChoiceId === choice.choiceId &&
-                  "border-primary bg-primary/5"
-              )}
+        <p className="text-base leading-7">{question.question}</p>
+
+        {question.questionImageKey ? (
+            <img
+                src={getFileViewUrl(question.questionImageKey)}
+                alt="Question reference"
+                className="max-h-80 w-auto rounded-xl border"
+            />
+        ) : null}
+
+        {isMultipleChoice(question) ? (
+            <RadioGroup
+                value={
+                  answer?.selectedChoiceId != null
+                      ? String(answer.selectedChoiceId)
+                      : ""
+                }
+                onValueChange={(value) =>
+                    onAnswer({ selectedChoiceId: Number(value) })
+                }
+                className="gap-2"
             >
-              <RadioGroupItem
-                value={String(choice.choiceId)}
-                className="mt-0.5"
-                aria-label={`Choice ${String.fromCharCode(65 + choiceIndex)}`}
-              />
-              <div className="min-w-0">
+              {(question.choices ?? []).map((choice, choiceIndex) => (
+                  <label
+                      key={choice.choiceId ?? choiceIndex}
+                      className={cn(
+                          "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition hover:bg-muted/40",
+                          answer?.selectedChoiceId === choice.choiceId &&
+                          "border-primary bg-primary/5"
+                      )}
+                  >
+                    <RadioGroupItem
+                        value={String(choice.choiceId)}
+                        className="mt-0.5"
+                        aria-label={`Choice ${String.fromCharCode(65 + choiceIndex)}`}
+                    />
+                    <div className="min-w-0">
                 <span className="text-sm leading-6">
                   <span className="mr-1.5 font-semibold">
                     {String.fromCharCode(65 + choiceIndex)}.
                   </span>
                   {choice.choiceText}
                 </span>
-                {choice.imageKey ? (
-                  <img
-                    src={getFileViewUrl(choice.imageKey)}
-                    alt=""
-                    className="mt-2 max-h-40 w-auto rounded-lg border"
-                  />
-                ) : null}
-              </div>
-            </label>
-          ))}
-        </RadioGroup>
-      ) : question.questionType === "SHORT_ANSWER" ? (
-        <div className="space-y-2">
-          <Label htmlFor="short-answer">Your answer</Label>
-          <Input
-            id="short-answer"
-            value={answer?.learnerAnswer ?? ""}
-            onChange={(event) =>
-              onAnswer({ learnerAnswer: event.target.value })
-            }
-            placeholder="Type your answer"
-          />
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <Label htmlFor="descriptive-answer">Your answer</Label>
-          <Textarea
-            id="descriptive-answer"
-            value={answer?.learnerAnswer ?? ""}
-            onChange={(event) =>
-              onAnswer({ learnerAnswer: event.target.value })
-            }
-            placeholder="Write your answer..."
-            className="min-h-48"
-          />
-          <p className="text-right text-xs text-muted-foreground">
-            {(answer?.learnerAnswer ?? "").length} characters
-          </p>
-        </div>
-      )}
-    </div>
+                      {choice.imageKey ? (
+                          <img
+                              src={getFileViewUrl(choice.imageKey)}
+                              alt=""
+                              className="mt-2 max-h-40 w-auto rounded-lg border"
+                          />
+                      ) : null}
+                    </div>
+                  </label>
+              ))}
+            </RadioGroup>
+        ) : question.questionType === "SHORT_ANSWER" ? (
+            <div className="space-y-2">
+              <Label htmlFor="short-answer">Your answer</Label>
+              <Input
+                  id="short-answer"
+                  value={answer?.learnerAnswer ?? ""}
+                  onChange={(event) =>
+                      onAnswer({ learnerAnswer: event.target.value })
+                  }
+                  placeholder="Type your answer"
+              />
+            </div>
+        ) : (
+            <div className="space-y-2">
+              <Label htmlFor="descriptive-answer">Your answer</Label>
+              <Textarea
+                  id="descriptive-answer"
+                  value={answer?.learnerAnswer ?? ""}
+                  onChange={(event) =>
+                      onAnswer({ learnerAnswer: event.target.value })
+                  }
+                  placeholder="Write your answer..."
+                  className="min-h-48"
+              />
+              <p className="text-right text-xs text-muted-foreground">
+                {(answer?.learnerAnswer ?? "").length} characters
+              </p>
+            </div>
+        )}
+      </div>
   )
 }
 
@@ -224,9 +327,9 @@ function WorkspaceQuestionPanel({ question, index, answer, onAnswer }) {
   // Seed starter code once, unless the learner already typed something.
   useEffect(() => {
     if (
-      format === "PROGRAMMING" &&
-      question.starterCode &&
-      answer?.submittedCode == null
+        format === "PROGRAMMING" &&
+        question.starterCode &&
+        answer?.submittedCode == null
     ) {
       onAnswer({ submittedCode: question.starterCode })
     }
@@ -234,100 +337,97 @@ function WorkspaceQuestionPanel({ question, index, answer, onAnswer }) {
   }, [format, question.starterCode])
 
   const problemPanel = (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-muted-foreground">
-          Item {index + 1}
-        </span>
-        {question.points != null ? (
-          <Badge variant="secondary">{Number(question.points)} pt(s)</Badge>
+      <div className="space-y-4">
+        <QuestionMetaRow
+            question={question}
+            index={index}
+            itemLabel="Item"
+        />
+        <p className="whitespace-pre-wrap text-sm leading-7">
+          {question.question}
+        </p>
+        {question.instructions ? (
+            <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+              {question.instructions}
+            </p>
+        ) : null}
+        {question.diagramType ? (
+            <Badge variant="outline">{question.diagramType}</Badge>
+        ) : null}
+        {question.questionImageKey ? (
+            <img
+                src={getFileViewUrl(question.questionImageKey)}
+                alt="Problem reference"
+                className="w-full rounded-xl border"
+            />
         ) : null}
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-7">
-        {question.question}
-      </p>
-      {question.instructions ? (
-        <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-          {question.instructions}
-        </p>
-      ) : null}
-      {question.diagramType ? (
-        <Badge variant="outline">{question.diagramType}</Badge>
-      ) : null}
-      {question.questionImageKey ? (
-        <img
-          src={getFileViewUrl(question.questionImageKey)}
-          alt="Problem reference"
-          className="w-full rounded-xl border"
-        />
-      ) : null}
-    </div>
   )
 
   const subQuestionTabs =
-    (question.subQuestions ?? []).length > 0 ? (
-      <SubQuestionTabs
-        subQuestions={question.subQuestions.map((sub) => ({
-          questionId: sub.subQuestionId,
-          questionText: sub.questionText,
-        }))}
-        answers={answer?.subAnswers ?? {}}
-        onAnswerChange={(subQuestionId, text) =>
-          onAnswer({
-            subAnswers: { ...(answer?.subAnswers ?? {}), [subQuestionId]: text },
-          })
-        }
-      />
-    ) : null
+      (question.subQuestions ?? []).length > 0 ? (
+          <SubQuestionTabs
+              subQuestions={question.subQuestions.map((sub) => ({
+                questionId: sub.subQuestionId,
+                questionText: sub.questionText,
+              }))}
+              answers={answer?.subAnswers ?? {}}
+              onAnswerChange={(subQuestionId, text) =>
+                  onAnswer({
+                    subAnswers: { ...(answer?.subAnswers ?? {}), [subQuestionId]: text },
+                  })
+              }
+          />
+      ) : null
 
   const workspace =
-    format === "PROGRAMMING" ? (
-      <CodeMirrorProgrammingWorkspace
-        value={answer?.submittedCode ?? question.starterCode ?? ""}
-        language={answer?.programmingLanguage ?? "Java"}
-        starterCode={question.starterCode ?? ""}
-        onChange={(code) => onAnswer({ submittedCode: code })}
-        onLanguageChange={(language) =>
-          onAnswer({ programmingLanguage: language })
-        }
-      />
-    ) : format === "DIAGRAM" ? (
-      <div className="h-full min-h-[420px] overflow-hidden rounded-xl border">
-        <DiagramArea
-          initialXml={answer?.diagramSubmissionData}
-          onChange={(diagramXml) =>
-            onAnswer({ diagramSubmissionData: diagramXml })
-          }
-        />
-      </div>
-    ) : (
-      subQuestionTabs ?? (
-        <div className="space-y-2">
-          <Label htmlFor="workspace-answer">Your answer</Label>
-          <Textarea
-            id="workspace-answer"
-            value={answer?.learnerAnswer ?? ""}
-            onChange={(event) =>
-              onAnswer({ learnerAnswer: event.target.value })
-            }
-            className="min-h-64"
+      format === "PROGRAMMING" ? (
+          <CodeMirrorProgrammingWorkspace
+              value={answer?.submittedCode ?? question.starterCode ?? ""}
+              language={answer?.programmingLanguage ?? "Java"}
+              starterCode={question.starterCode ?? ""}
+              onChange={(code) => onAnswer({ submittedCode: code })}
+              onLanguageChange={(language) =>
+                  onAnswer({ programmingLanguage: language })
+              }
           />
-        </div>
+      ) : format === "DIAGRAM" ? (
+          <div className="h-full min-h-[420px] overflow-hidden rounded-xl border">
+            <DiagramArea
+                initialXml={answer?.diagramSubmissionData}
+                onChange={(diagramXml) =>
+                    onAnswer({ diagramSubmissionData: diagramXml })
+                }
+            />
+          </div>
+      ) : (
+          subQuestionTabs ?? (
+              <div className="space-y-2">
+                <Label htmlFor="workspace-answer">Your answer</Label>
+                <Textarea
+                    id="workspace-answer"
+                    value={answer?.learnerAnswer ?? ""}
+                    onChange={(event) =>
+                        onAnswer({ learnerAnswer: event.target.value })
+                    }
+                    className="min-h-64"
+                />
+              </div>
+          )
       )
-    )
 
   return (
-    <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_1fr]">
-      <ScrollArea className="max-h-full rounded-xl border bg-card p-4">
-        {problemPanel}
-      </ScrollArea>
-      <div className="flex min-h-0 flex-col gap-3">
-        {format !== "TEXT" && subQuestionTabs ? (
-          <div className="rounded-xl border bg-card p-3">{subQuestionTabs}</div>
-        ) : null}
-        <div className="min-h-0 flex-1">{workspace}</div>
+      <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_1fr]">
+        <ScrollArea className="max-h-full rounded-xl border bg-card p-4">
+          {problemPanel}
+        </ScrollArea>
+        <div className="flex min-h-0 flex-col gap-3">
+          {format !== "TEXT" && subQuestionTabs ? (
+              <div className="rounded-xl border bg-card p-3">{subQuestionTabs}</div>
+          ) : null}
+          <div className="min-h-0 flex-1">{workspace}</div>
+        </div>
       </div>
-    </div>
   )
 }
 
@@ -343,9 +443,9 @@ export default function LearnerAssessmentAttemptPage() {
     enabled: identity.learnerId == null,
   })
   const learnerId =
-    identity.learnerId ??
-    (Array.isArray(learnersQuery.data) ? learnersQuery.data[0]?.learnerId : null) ??
-    null
+      identity.learnerId ??
+      (Array.isArray(learnersQuery.data) ? learnersQuery.data[0]?.learnerId : null) ??
+      null
 
   // Server-driven attempt state
   const [attempt, setAttempt] = useState(null)
@@ -359,12 +459,14 @@ export default function LearnerAssessmentAttemptPage() {
   const [saveStatus, setSaveStatus] = useState("idle")
 
   const [flagged, setFlagged] = useState(() => new Set())
+  const [skipped, setSkipped] = useState(() => new Set())
   const [currentIndex, setCurrentIndex] = useState(0)
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
   const [timeUp, setTimeUp] = useState(false)
   const [remainingSeconds, setRemainingSeconds] = useState(null)
   const warnedRef = useRef({ ten: false, one: false })
+  const autoSubmittedRef = useRef(false)
 
   // ---------------------------------------------------------------
   // Start / resume the attempt on the server
@@ -379,40 +481,50 @@ export default function LearnerAssessmentAttemptPage() {
       sessionStorage.setItem(keyName, idempotencyKey)
     }
     startAssessmentAttempt(examId, learnerId, idempotencyKey)
-      .then((response) => {
-        setAttempt(response)
-        // Rehydrate saved draft answers when resuming.
-        const rehydrated = {}
-        Object.values(response.savedAnswers ?? {}).forEach((draft) => {
-          let subAnswers
-          if (draft.learnerAnswer?.startsWith("{")) {
-            try {
-              subAnswers = JSON.parse(draft.learnerAnswer)
-            } catch {
-              subAnswers = undefined
+        .then((response) => {
+          setAttempt(response)
+          // Rehydrate saved draft answers when resuming.
+          const rehydrated = {}
+          Object.values(response.savedAnswers ?? {}).forEach((draft) => {
+            let subAnswers
+            if (draft.learnerAnswer?.startsWith("{")) {
+              try {
+                subAnswers = JSON.parse(draft.learnerAnswer)
+              } catch {
+                subAnswers = undefined
+              }
             }
+            rehydrated[draft.attemptQuestionId] = {
+              learnerAnswer: subAnswers ? undefined : draft.learnerAnswer,
+              selectedChoiceId: draft.selectedChoiceId,
+              submittedCode: draft.submittedCode,
+              programmingLanguage: draft.programmingLanguage,
+              diagramSubmissionData: draft.diagramSubmissionData,
+              subAnswers,
+            }
+          })
+          setAnswers(rehydrated)
+          // Restore per-item flag/skip state and the last-viewed item.
+          setFlagged(new Set(response.flaggedAttemptQuestionIds ?? []))
+          setSkipped(new Set(response.skippedAttemptQuestionIds ?? []))
+          if (response.currentAttemptQuestionId != null) {
+            const resumeIndex = (response.questions ?? []).findIndex(
+                (question) =>
+                    question.attemptQuestionId === response.currentAttemptQuestionId
+            )
+            if (resumeIndex >= 0) setCurrentIndex(resumeIndex)
           }
-          rehydrated[draft.attemptQuestionId] = {
-            learnerAnswer: subAnswers ? undefined : draft.learnerAnswer,
-            selectedChoiceId: draft.selectedChoiceId,
-            submittedCode: draft.submittedCode,
-            programmingLanguage: draft.programmingLanguage,
-            diagramSubmissionData: draft.diagramSubmissionData,
-            subAnswers,
+          if (response.resumed) {
+            toast.info("Resumed your attempt in progress.")
           }
         })
-        setAnswers(rehydrated)
-        if (response.resumed) {
-          toast.info("Resumed your attempt in progress.")
-        }
-      })
-      .catch((error) => {
-        sessionStorage.removeItem(keyName)
-        setStartError(
-          error?.response?.data?.message ??
-            "This assessment could not be started."
-        )
-      })
+        .catch((error) => {
+          sessionStorage.removeItem(keyName)
+          setStartError(
+              error?.response?.data?.message ??
+              "This assessment could not be started."
+          )
+        })
   }, [examId, learnerId])
 
   const questions = attempt?.questions ?? []
@@ -427,20 +539,20 @@ export default function LearnerAssessmentAttemptPage() {
       const dirtyIds = [...dirtyRef.current]
       dirtyRef.current = new Set()
       const payload = dirtyIds
-        .map((id) => {
-          const answer = answersRef.current[id]
-          return answer ? toDraftDto(Number(id), answer) : null
-        })
-        .filter(Boolean)
+          .map((id) => {
+            const answer = answersRef.current[id]
+            return answer ? toDraftDto(Number(id), answer) : null
+          })
+          .filter(Boolean)
       if (payload.length === 0) return
       setSaveStatus("saving")
       autosaveAttemptAnswers(attempt.assessmentAttemptId, learnerId, payload)
-        .then(() => setSaveStatus("saved"))
-        .catch(() => {
-          // Keep local answers; retry on the next tick.
-          dirtyIds.forEach((id) => dirtyRef.current.add(id))
-          setSaveStatus("error")
-        })
+          .then(() => setSaveStatus("saved"))
+          .catch(() => {
+            // Keep local answers; retry on the next tick.
+            dirtyIds.forEach((id) => dirtyRef.current.add(id))
+            setSaveStatus("error")
+          })
     }, 1500)
     return () => clearInterval(interval)
   }, [attempt, learnerId])
@@ -496,20 +608,95 @@ export default function LearnerAssessmentAttemptPage() {
     return set
   }, [questions, answers])
 
+  // Rich per-item model for the navigator (points, sub-question completion,
+  // answered/skipped/flagged), derived from persisted + local state.
+  const navItems = useMemo(
+      () =>
+          questions.map((question) => {
+            const answer = answers[question.attemptQuestionId]
+            const subs = question.subQuestions ?? []
+            const subAnswers = answer?.subAnswers ?? {}
+            const subAnsweredCount = subs.filter((sub) =>
+                subAnswers[sub.subQuestionId]?.trim()
+            ).length
+            return {
+              attemptQuestionId: question.attemptQuestionId,
+              points: question.points,
+              questionType: question.questionType,
+              subQuestionCount: subs.length,
+              subAnsweredCount,
+              answered: answeredIds.has(question.attemptQuestionId),
+              skipped: skipped.has(question.attemptQuestionId),
+              flagged: flagged.has(question.attemptQuestionId),
+            }
+          }),
+      [questions, answers, answeredIds, skipped, flagged]
+  )
+
+  // Persist the last-viewed item (debounced) so a refresh resumes in place.
+  useEffect(() => {
+    if (!attempt || !questions[currentIndex]) return
+    const attemptQuestionId = questions[currentIndex].attemptQuestionId
+    const timeout = setTimeout(() => {
+      setAttemptCurrentItem(
+          attempt.assessmentAttemptId,
+          attemptQuestionId,
+          learnerId
+      ).catch(() => {})
+    }, 400)
+    return () => clearTimeout(timeout)
+  }, [attempt, currentIndex, questions, learnerId])
+
+  const toggleFlag = useCallback(
+      (attemptQuestionId) => {
+        const willFlag = !flagged.has(attemptQuestionId)
+        setFlagged((current) => {
+          const next = new Set(current)
+          if (willFlag) next.add(attemptQuestionId)
+          else next.delete(attemptQuestionId)
+          return next
+        })
+        if (attempt) {
+          setAttemptFlag(
+              attempt.assessmentAttemptId,
+              attemptQuestionId,
+              learnerId,
+              willFlag
+          ).catch(() => {})
+        }
+      },
+      [attempt, learnerId, flagged]
+  )
+
+  const skipCurrent = useCallback(() => {
+    const question = questions[currentIndex]
+    if (!question) return
+    setSkipped((current) => new Set(current).add(question.attemptQuestionId))
+    if (attempt) {
+      setAttemptSkip(
+          attempt.assessmentAttemptId,
+          question.attemptQuestionId,
+          learnerId,
+          true
+      ).catch(() => {})
+    }
+    setCurrentIndex((index) => Math.min(questions.length - 1, index + 1))
+  }, [attempt, currentIndex, questions, learnerId])
+
   const submitMutation = useMutation({
     mutationFn: () => {
       const payload = questions
-        .map((question) => {
-          const answer = answers[question.attemptQuestionId]
-          return answer
-            ? toDraftDto(question.attemptQuestionId, answer)
-            : null
-        })
-        .filter(Boolean)
+          .map((question) => {
+            const answer = answers[question.attemptQuestionId]
+            return answer
+                ? toDraftDto(question.attemptQuestionId, answer)
+                : null
+          })
+          .filter(Boolean)
       return submitAssessmentAttempt(
-        attempt.assessmentAttemptId,
-        learnerId,
-        payload
+          attempt.assessmentAttemptId,
+          learnerId,
+          payload
       )
     },
     onSuccess: (result) => {
@@ -521,343 +708,420 @@ export default function LearnerAssessmentAttemptPage() {
     },
     onError: (error) => {
       toast.error(
-        error?.response?.data?.message ??
+          error?.response?.data?.message ??
           "Unable to submit the assessment. Please try again."
       )
     },
   })
+
+  // Server clock reached zero: lock editing and submit automatically once,
+  // flushing whatever answers are held locally.
+  useEffect(() => {
+    if (timeUp && attempt && !autoSubmittedRef.current) {
+      autoSubmittedRef.current = true
+      toast.warning("Time is up — submitting your attempt.")
+      submitMutation.mutate()
+    }
+  }, [timeUp, attempt, submitMutation])
 
   // ---------------------------------------------------------------
   // Render states
   // ---------------------------------------------------------------
   if (startError) {
     return (
-      <div className="flex min-h-dvh items-center justify-center p-6">
-        <div className="max-w-md rounded-2xl border bg-card p-8 text-center">
-          <p className="font-medium">Assessment unavailable</p>
-          <p className="mt-1 text-sm text-muted-foreground">{startError}</p>
-          <Button
-            className="mt-4"
-            variant="outline"
-            onClick={() => navigate(-1)}
-          >
-            Go back
-          </Button>
+        <div className="flex min-h-dvh items-center justify-center p-6">
+          <div className="max-w-md rounded-2xl border bg-card p-8 text-center">
+            <p className="font-medium">Assessment unavailable</p>
+            <p className="mt-1 text-sm text-muted-foreground">{startError}</p>
+            <Button
+                className="mt-4"
+                variant="outline"
+                onClick={() => navigate(-1)}
+            >
+              Go back
+            </Button>
+          </div>
         </div>
-      </div>
     )
   }
 
   if (!attempt) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 p-6">
-        <Skeleton className="h-10 w-2/3" />
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
+        <div className="mx-auto max-w-4xl space-y-4 p-6">
+          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
     )
   }
 
   const currentQuestion = questions[currentIndex]
   const isWorkspace = currentQuestion?.questionType === "CRITICAL_THINKING"
+  const isProgramming =
+      isWorkspace && currentQuestion?.criticalThinkingType === "PROGRAMMING"
+  const isDiagram =
+      isWorkspace && currentQuestion?.criticalThinkingType === "DIAGRAM"
   const currentAnswer = currentQuestion
-    ? answers[currentQuestion.attemptQuestionId]
-    : null
+      ? answers[currentQuestion.attemptQuestionId]
+      : null
   const editingLocked = timeUp || submitMutation.isPending
 
   const navigatorPanel = (
-    <QuestionNavigator
-      questions={questions.map((question) => ({
-        questionId: question.attemptQuestionId,
-      }))}
-      currentIndex={currentIndex}
-      answeredIds={answeredIds}
-      flaggedIds={flagged}
-      onJump={setCurrentIndex}
-      onFinish={() => setFinishOpen(true)}
-      finishDisabled={submitMutation.isPending}
-    />
+      <QuestionNavigator
+          items={navItems}
+          currentIndex={currentIndex}
+          onJump={setCurrentIndex}
+          onFinish={() => setFinishOpen(true)}
+          finishDisabled={submitMutation.isPending}
+      />
   )
 
   return (
-    <div className="flex h-dvh flex-col bg-muted/30">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-3 sm:px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLeaveOpen(true)}
-            aria-label="Exit attempt"
-          >
-            <ArrowLeftIcon aria-hidden="true" />
-            <span className="hidden sm:inline">Exit</span>
-          </Button>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              {attempt.assessmentTitle}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              Question {currentIndex + 1} of {questions.length} · Attempt{" "}
-              {attempt.attemptNumber}
-            </p>
-          </div>
-          <Badge variant="secondary" className="hidden sm:inline-flex">
-            {getAssessmentTypeLabel(attempt.assessmentType)}
-          </Badge>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <SaveStatusIndicator status={saveStatus} />
-          {remainingSeconds != null ? (
-            <span
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm tabular-nums",
-                remainingSeconds <= 60
-                  ? "border-destructive text-destructive"
-                  : remainingSeconds <= 600
-                    ? "border-amber-400 text-amber-600"
-                    : "text-muted-foreground"
-              )}
-              role="timer"
-              aria-label="Time remaining"
-            >
-              <ClockIcon className="size-4" aria-hidden="true" />
-              {formatClock(remainingSeconds)}
-            </span>
-          ) : null}
-
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="lg:hidden"
-                aria-label="Open item navigation"
-              >
-                <ListIcon />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] p-4">
-              <SheetHeader className="p-0 pb-3">
-                <SheetTitle>Item Navigation</SheetTitle>
-              </SheetHeader>
-              {navigatorPanel}
-            </SheetContent>
-          </Sheet>
-
-          <Button
-            size="sm"
-            className="hidden lg:inline-flex"
-            onClick={() => setFinishOpen(true)}
-            disabled={submitMutation.isPending}
-          >
-            Finish Attempt
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex min-h-0 flex-1 gap-4 p-4">
-        <main
-          className={cn(
-            "min-h-0 flex-1 overflow-y-auto rounded-2xl border bg-background p-4 sm:p-6",
-            editingLocked && "pointer-events-none opacity-70"
-          )}
-          aria-live="polite"
-        >
-          {currentQuestion ? (
-            isWorkspace ? (
-              <WorkspaceQuestionPanel
-                key={currentQuestion.attemptQuestionId}
-                question={currentQuestion}
-                index={currentIndex}
-                answer={currentAnswer}
-                onAnswer={(patch) =>
-                  setAnswer(currentQuestion.attemptQuestionId, patch)
-                }
-              />
-            ) : (
-              <NormalQuestionPanel
-                key={currentQuestion.attemptQuestionId}
-                question={currentQuestion}
-                index={currentIndex}
-                answer={currentAnswer}
-                onAnswer={(patch) =>
-                  setAnswer(currentQuestion.attemptQuestionId, patch)
-                }
-              />
-            )
-          ) : null}
-        </main>
-
-        <aside className="hidden w-64 shrink-0 rounded-2xl border bg-background p-4 lg:block">
-          {navigatorPanel}
-        </aside>
-      </div>
-
-      <footer className="flex h-16 shrink-0 items-center justify-between gap-2 border-t bg-background px-4">
-        <Button
-          variant="outline"
-          onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
-          disabled={currentIndex === 0}
-        >
-          <ChevronLeftIcon aria-hidden="true" />
-          Previous
-        </Button>
-
-        <div className="flex items-center gap-3">
-          {currentQuestion ? (
+      <div className="flex h-dvh flex-col overflow-hidden bg-muted/30">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2">
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                setFlagged((current) => {
-                  const next = new Set(current)
-                  if (next.has(currentQuestion.attemptQuestionId)) {
-                    next.delete(currentQuestion.attemptQuestionId)
-                  } else {
-                    next.add(currentQuestion.attemptQuestionId)
-                  }
-                  return next
-                })
-              }
-              aria-pressed={flagged.has(currentQuestion.attemptQuestionId)}
+                variant="ghost"
+                size="sm"
+                onClick={() => setLeaveOpen(true)}
+                aria-label="Exit attempt"
             >
-              <FlagIcon
-                className={cn(
-                  flagged.has(currentQuestion.attemptQuestionId) &&
-                    "fill-amber-400 text-amber-500"
-                )}
-                aria-hidden="true"
-              />
-              {flagged.has(currentQuestion.attemptQuestionId)
-                ? "Flagged"
-                : "Flag for review"}
+              <ArrowLeftIcon aria-hidden="true" />
+              <span className="hidden sm:inline">Exit</span>
             </Button>
-          ) : null}
-          <span className="hidden text-sm text-muted-foreground sm:block">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">
+                {attempt.assessmentTitle}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                Question {currentIndex + 1} of {questions.length} · Attempt{" "}
+                {attempt.attemptNumber}
+              </p>
+            </div>
+            <Badge variant="secondary" className="hidden sm:inline-flex">
+              {getAssessmentTypeLabel(attempt.assessmentType)}
+            </Badge>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <SaveStatusIndicator status={saveStatus} />
+            {remainingSeconds != null ? (
+                <span
+                    className={cn(
+                        "flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm tabular-nums",
+                        remainingSeconds <= 60
+                            ? "border-destructive text-destructive"
+                            : remainingSeconds <= 600
+                                ? "border-amber-400 text-amber-600"
+                                : "text-muted-foreground"
+                    )}
+                    role="timer"
+                    aria-label="Time remaining"
+                >
+              <ClockIcon className="size-4" aria-hidden="true" />
+                  {formatClock(remainingSeconds)}
+            </span>
+            ) : null}
+
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    className="lg:hidden"
+                    aria-label="Open item navigation"
+                >
+                  <ListIcon />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] overflow-hidden p-4">
+                <SheetHeader className="p-0 pb-3">
+                  <SheetTitle>Item Navigation</SheetTitle>
+                </SheetHeader>
+                {navigatorPanel}
+              </SheetContent>
+            </Sheet>
+
+            <Button
+                size="sm"
+                className="hidden lg:inline-flex"
+                onClick={() => setFinishOpen(true)}
+                disabled={submitMutation.isPending}
+            >
+              Finish Attempt
+            </Button>
+          </div>
+        </header>
+
+        <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4">
+          {isProgramming && currentQuestion ? (
+              <div
+                  className={cn(
+                      "flex min-h-0 flex-1 flex-col overflow-hidden",
+                      editingLocked && "pointer-events-none opacity-70"
+                  )}
+              >
+                <div className="mb-3 shrink-0 rounded-xl border bg-background px-4 py-3">
+                  <QuestionMetaRow
+                      question={currentQuestion}
+                      index={currentIndex}
+                      itemLabel="Item"
+                  />
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <ProgrammingQuestionLayout
+                      key={currentQuestion.attemptQuestionId}
+                      question={currentQuestion}
+                      index={currentIndex}
+                      answer={currentAnswer}
+                      onAnswer={(patch) =>
+                          setAnswer(currentQuestion.attemptQuestionId, patch)
+                      }
+                      attemptId={attempt.assessmentAttemptId}
+                      attemptQuestionId={currentQuestion.attemptQuestionId}
+                      learnerId={learnerId}
+                      navigator={navigatorPanel}
+                      editingLocked={editingLocked}
+                  />
+                </div>
+              </div>
+          ) : isDiagram && currentQuestion ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="mb-3 shrink-0 rounded-xl border bg-background px-4 py-3">
+                  <QuestionMetaRow
+                      question={currentQuestion}
+                      index={currentIndex}
+                      itemLabel="Item"
+                  />
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <DiagramQuestionLayout
+                      key={currentQuestion.attemptQuestionId}
+                      question={currentQuestion}
+                      index={currentIndex}
+                      answer={currentAnswer}
+                      onAnswer={(patch) =>
+                          setAnswer(currentQuestion.attemptQuestionId, patch)
+                      }
+                      attemptId={attempt.assessmentAttemptId}
+                      attemptQuestionId={currentQuestion.attemptQuestionId}
+                      learnerId={learnerId}
+                      navigator={navigatorPanel}
+                      editingLocked={editingLocked}
+                  />
+                </div>
+              </div>
+          ) : (
+              <>
+                <main
+                    className={cn(
+                        "min-h-0 flex-1 overflow-y-auto rounded-2xl border bg-background p-4 sm:p-6",
+                        editingLocked && "pointer-events-none opacity-70"
+                    )}
+                    aria-live="polite"
+                >
+                  {currentQuestion ? (
+                      isWorkspace ? (
+                          <WorkspaceQuestionPanel
+                              key={currentQuestion.attemptQuestionId}
+                              question={currentQuestion}
+                              index={currentIndex}
+                              answer={currentAnswer}
+                              onAnswer={(patch) =>
+                                  setAnswer(currentQuestion.attemptQuestionId, patch)
+                              }
+                          />
+                      ) : (
+                          <NormalQuestionPanel
+                              key={currentQuestion.attemptQuestionId}
+                              question={currentQuestion}
+                              index={currentIndex}
+                              answer={currentAnswer}
+                              onAnswer={(patch) =>
+                                  setAnswer(currentQuestion.attemptQuestionId, patch)
+                              }
+                          />
+                      )
+                  ) : null}
+                </main>
+
+                <aside className="hidden min-h-0 w-64 shrink-0 overflow-hidden rounded-2xl border bg-background p-4 lg:block">
+                  {navigatorPanel}
+                </aside>
+              </>
+          )}
+        </div>
+
+        <footer className="flex h-16 shrink-0 items-center justify-between gap-2 border-t bg-background px-4">
+          <Button
+              variant="outline"
+              onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
+              disabled={currentIndex === 0}
+          >
+            <ChevronLeftIcon aria-hidden="true" />
+            Previous
+          </Button>
+
+          <div className="flex items-center gap-3">
+            {currentQuestion ? (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleFlag(currentQuestion.attemptQuestionId)}
+                    disabled={editingLocked}
+                    aria-pressed={flagged.has(currentQuestion.attemptQuestionId)}
+                >
+                  <FlagIcon
+                      className={cn(
+                          flagged.has(currentQuestion.attemptQuestionId) &&
+                          "fill-amber-400 text-amber-500"
+                      )}
+                      aria-hidden="true"
+                  />
+                  {flagged.has(currentQuestion.attemptQuestionId)
+                      ? "Flagged"
+                      : "Flag for review"}
+                </Button>
+            ) : null}
+            {currentQuestion &&
+            !answeredIds.has(currentQuestion.attemptQuestionId) &&
+            currentIndex < questions.length - 1 ? (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={skipCurrent}
+                    disabled={editingLocked}
+                >
+                  <SkipForwardIcon aria-hidden="true" />
+                  Skip
+                </Button>
+            ) : null}
+            <span className="hidden text-sm text-muted-foreground sm:block">
             {currentIndex + 1} / {questions.length}
           </span>
-        </div>
+          </div>
 
-        {currentIndex === questions.length - 1 ? (
-          <Button
-            onClick={() => setFinishOpen(true)}
-            disabled={submitMutation.isPending}
-          >
-            Finish Attempt
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            onClick={() =>
-              setCurrentIndex((index) =>
-                Math.min(questions.length - 1, index + 1)
-              )
-            }
-          >
-            Next
-            <ChevronRightIcon aria-hidden="true" />
-          </Button>
-        )}
-      </footer>
+          {currentIndex === questions.length - 1 ? (
+              <Button
+                  onClick={() => setFinishOpen(true)}
+                  disabled={submitMutation.isPending}
+              >
+                Finish Attempt
+              </Button>
+          ) : (
+              <Button
+                  variant="outline"
+                  onClick={() =>
+                      setCurrentIndex((index) =>
+                          Math.min(questions.length - 1, index + 1)
+                      )
+                  }
+              >
+                Next
+                <ChevronRightIcon aria-hidden="true" />
+              </Button>
+          )}
+        </footer>
 
-      <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Leave this attempt?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have answered {answeredIds.size} of {questions.length}{" "}
-              question(s)
-              {flagged.size > 0 ? `, with ${flagged.size} flagged` : ""}. Your
-              saved drafts stay on the server — you can resume this attempt
-              later.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Taking Assessment</AlertDialogCancel>
-            <AlertDialogAction onClick={() => navigate(-1)}>
-              Leave Attempt
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave this attempt?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have answered {answeredIds.size} of {questions.length}{" "}
+                question(s)
+                {flagged.size > 0 ? `, with ${flagged.size} flagged` : ""}. Your
+                saved drafts stay on the server — you can resume this attempt
+                later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep Taking Assessment</AlertDialogCancel>
+              <AlertDialogAction onClick={() => navigate(-1)}>
+                Leave Attempt
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <AlertDialog open={finishOpen} onOpenChange={setFinishOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Submit assessment?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm">
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  <dt className="text-muted-foreground">Total items</dt>
-                  <dd className="text-right tabular-nums">
-                    {questions.length}
-                  </dd>
-                  <dt className="text-muted-foreground">Answered</dt>
-                  <dd className="text-right tabular-nums">
-                    {answeredIds.size}
-                  </dd>
-                  <dt className="text-muted-foreground">Unanswered</dt>
-                  <dd className="text-right tabular-nums">
-                    {questions.length - answeredIds.size}
-                  </dd>
-                  <dt className="text-muted-foreground">Flagged</dt>
-                  <dd className="text-right tabular-nums">{flagged.size}</dd>
-                  {remainingSeconds != null ? (
-                    <>
-                      <dt className="text-muted-foreground">Time remaining</dt>
-                      <dd className="text-right tabular-nums">
-                        {formatClock(remainingSeconds)}
-                      </dd>
-                    </>
+        <AlertDialog open={finishOpen} onOpenChange={setFinishOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Submit assessment?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <dt className="text-muted-foreground">Total items</dt>
+                    <dd className="text-right tabular-nums">
+                      {questions.length}
+                    </dd>
+                    <dt className="text-muted-foreground">Answered</dt>
+                    <dd className="text-right tabular-nums">
+                      {answeredIds.size}
+                    </dd>
+                    <dt className="text-muted-foreground">Unanswered</dt>
+                    <dd className="text-right tabular-nums">
+                      {questions.length - answeredIds.size}
+                    </dd>
+                    <dt className="text-muted-foreground">Flagged</dt>
+                    <dd className="text-right tabular-nums">{flagged.size}</dd>
+                    {remainingSeconds != null ? (
+                        <>
+                          <dt className="text-muted-foreground">Time remaining</dt>
+                          <dd className="text-right tabular-nums">
+                            {formatClock(remainingSeconds)}
+                          </dd>
+                        </>
+                    ) : null}
+                  </dl>
+                  {questions.length - answeredIds.size > 0 ? (
+                      <p className="text-destructive">
+                        Unanswered items may receive no score.
+                      </p>
                   ) : null}
-                </dl>
-                {questions.length - answeredIds.size > 0 ? (
-                  <p className="text-destructive">
-                    Unanswered items may receive no score.
-                  </p>
-                ) : null}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitMutation.isPending}>
-              Review Answers
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault()
-                submitMutation.mutate()
-              }}
-              disabled={submitMutation.isPending}
-            >
-              {submitMutation.isPending ? "Submitting..." : "Submit Assessment"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={submitMutation.isPending}>
+                Review Answers
+              </AlertDialogCancel>
+              <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault()
+                    submitMutation.mutate()
+                  }}
+                  disabled={submitMutation.isPending}
+              >
+                {submitMutation.isPending ? "Submitting..." : "Submit Assessment"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <AlertDialog open={timeUp && !submitMutation.isPending}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Time is up</AlertDialogTitle>
-            <AlertDialogDescription>
-              The time limit for this assessment has been reached. Editing is
-              locked — submit your answers now.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault()
-                submitMutation.mutate()
-              }}
-            >
-              Submit Assessment
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        <AlertDialog open={timeUp && !submitMutation.isPending}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Time is up</AlertDialogTitle>
+              <AlertDialogDescription>
+                The time limit for this assessment has been reached. Editing is
+                locked — submit your answers now.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault()
+                    submitMutation.mutate()
+                  }}
+              >
+                Submit Assessment
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
   )
 }

@@ -28,16 +28,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AiConfig {
 
-    @Value("${langchain4j.open-ai.api-key}")
+    @Value("${langchain4j.groq.api-key}")
     private String apiKey;
 
-    @Value("${langchain4j.open-ai.base-url}")
+    @Value("${langchain4j.groq.base-url}")
     private String baseUrl;
 
-    @Value("${langchain4j.open-ai.chat-model.model-name}")
+    @Value("${langchain4j.groq.chat-model.model-name}")
     private String chatModelName;
 
-    @Value("${langchain4j.open-ai.chat-model.temperature}")
+    @Value("${langchain4j.groq.chat-model.temperature}")
     private double temperature;
 
     @Value("${spring.datasource.url}")

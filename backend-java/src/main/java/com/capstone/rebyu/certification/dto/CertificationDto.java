@@ -4,9 +4,7 @@ package com.capstone.rebyu.certification.dto;
 import com.capstone.rebyu.certification.entity.Certification;
 import com.capstone.rebyu.certification.entity.MajorCategory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -35,8 +33,8 @@ public class CertificationDto {
 
     private LocalDateTime dateCreated;
 
-    @NotNull
-    @DecimalMin(value = "0.0")
+    // Legacy field, retained for historical records. No longer required or
+    // learner-facing: certifications are free and gated by subscription instead.
     private BigDecimal price = BigDecimal.ZERO;
 
     private List<MajorCategoryDto> majorCategory;
@@ -44,6 +42,8 @@ public class CertificationDto {
     private String industry;
 
     private LocalDateTime dateUpdated;
+
+    private Certification.CertificationStatus status;
 
     @JsonIgnore
     private MultipartFile file;

@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "exam_questions")
 @Data
@@ -27,4 +29,10 @@ public class ExamQuestion {
 
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
+
+    // Per-assessment point override. NULL falls back to the question's own
+    // total_points when scoring, so the same question can be worth different
+    // points in different assessments.
+    @Column(name = "points", precision = 5, scale = 2)
+    private BigDecimal points;
 }

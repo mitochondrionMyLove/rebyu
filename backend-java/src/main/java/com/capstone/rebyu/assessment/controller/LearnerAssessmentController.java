@@ -1,11 +1,15 @@
 package com.capstone.rebyu.assessment.controller;
 
+import com.capstone.rebyu.assessment.dto.attempt.DiagramAttemptDtos.*;
 import com.capstone.rebyu.assessment.dto.attempt.LearnerAttemptDtos.*;
+import com.capstone.rebyu.assessment.dto.attempt.ProgrammingAttemptDtos.*;
 import com.capstone.rebyu.assessment.service.AssessmentAttemptService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Learner-safe assessment endpoints. Responses never contain answer keys,
@@ -39,6 +43,64 @@ public class LearnerAssessmentController {
             @PathVariable Long attemptId,
             @Valid @RequestBody AutosaveAnswersRequestDto request) {
         assessmentAttemptService.autosaveAnswers(attemptId, request);
+    }
+
+    @PutMapping("/assessment-attempts/{attemptId}/flags/{attemptQuestionId}")
+    public void setFlag(
+            @PathVariable Long attemptId,
+            @PathVariable Long attemptQuestionId,
+            @Valid @RequestBody FlagRequestDto request) {
+        assessmentAttemptService.setFlag(
+                attemptId, attemptQuestionId, request.learnerId(), request.flagged());
+    }
+
+    @PutMapping("/assessment-attempts/{attemptId}/skip/{attemptQuestionId}")
+    public void setSkip(
+            @PathVariable Long attemptId,
+            @PathVariable Long attemptQuestionId,
+            @Valid @RequestBody SkipRequestDto request) {
+        assessmentAttemptService.setSkip(
+                attemptId, attemptQuestionId, request.learnerId(), request.skipped());
+    }
+
+    @PutMapping("/assessment-attempts/{attemptId}/current-item")
+    public void setCurrentItem(
+            @PathVariable Long attemptId,
+            @Valid @RequestBody CurrentItemRequestDto request) {
+        assessmentAttemptService.setCurrentItem(
+                attemptId, request.attemptQuestionId(), request.learnerId());
+    }
+
+    @PostMapping("/assessment-attempts/{attemptId}/programming/{attemptQuestionId}/run")
+    public ExecutionResultDto runProgramming(
+            @PathVariable Long attemptId,
+            @PathVariable Long attemptQuestionId,
+            @Valid @RequestBody ProgrammingRunRequestDto request) {
+        return assessmentAttemptService.runProgramming(attemptId, attemptQuestionId, request);
+    }
+
+    @PostMapping("/assessment-attempts/{attemptId}/programming/{attemptQuestionId}/check")
+    public ExecutionResultDto checkProgramming(
+            @PathVariable Long attemptId,
+            @PathVariable Long attemptQuestionId,
+            @Valid @RequestBody ProgrammingRunRequestDto request) {
+        return assessmentAttemptService.checkProgramming(attemptId, attemptQuestionId, request);
+    }
+
+    @GetMapping("/assessment-attempts/{attemptId}/programming/{attemptQuestionId}/executions")
+    public List<ExecutionHistoryItemDto> listExecutions(
+            @PathVariable Long attemptId,
+            @PathVariable Long attemptQuestionId,
+            @RequestParam Long learnerId) {
+        return assessmentAttemptService.listExecutions(attemptId, attemptQuestionId, learnerId);
+    }
+
+    @PostMapping("/assessment-attempts/{attemptId}/diagram/{attemptQuestionId}/check")
+    public DiagramCheckResultDto checkDiagram(
+            @PathVariable Long attemptId,
+            @PathVariable Long attemptQuestionId,
+            @Valid @RequestBody DiagramCheckRequestDto request) {
+        return assessmentAttemptService.checkDiagram(attemptId, attemptQuestionId, request);
     }
 
     @PostMapping("/assessment-attempts/{attemptId}/submit")

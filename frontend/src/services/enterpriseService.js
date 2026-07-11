@@ -46,6 +46,67 @@ export function deleteLearnerInvitation(invitationId) {
   return base(`learner-invitations/${invitationId}`, { method: "DELETE" })
 }
 
+// Enterprise learner groups (per certification allocation)
+export function getEnterpriseGroups({ enterpriseId, orgCertId } = {}) {
+  const params = new URLSearchParams()
+  if (enterpriseId != null) params.set("enterpriseId", enterpriseId)
+  if (orgCertId != null) params.set("orgCertId", orgCertId)
+  const query = params.toString()
+  return base(`enterprise-groups${query ? `?${query}` : ""}`)
+}
+
+export function getEnterpriseGroupById(groupId) {
+  return base(`enterprise-groups/${groupId}`)
+}
+
+export function createEnterpriseGroup(group) {
+  return base("enterprise-groups", { method: "POST", data: group })
+}
+
+export function updateEnterpriseGroup(groupId, group) {
+  return base(`enterprise-groups/${groupId}`, { method: "PUT", data: group })
+}
+
+export function archiveEnterpriseGroup(groupId) {
+  return base(`enterprise-groups/${groupId}`, { method: "DELETE" })
+}
+
+// Group authorities (teacher / co-admin assigned by the enterprise to a group)
+export function getEnterpriseGroupAuthorities({ groupId, userId } = {}) {
+  const params = new URLSearchParams()
+  if (groupId != null) params.set("groupId", groupId)
+  if (userId != null) params.set("userId", userId)
+  const query = params.toString()
+  return base(`enterprise-group-authorities${query ? `?${query}` : ""}`)
+}
+
+export function assignEnterpriseGroupAuthority(authority) {
+  return base("enterprise-group-authorities", {
+    method: "POST",
+    data: authority,
+  })
+}
+
+export function removeEnterpriseGroupAuthority(authorityId) {
+  return base(`enterprise-group-authorities/${authorityId}`, {
+    method: "DELETE",
+  })
+}
+
+// Group assignees (learners added to a group by its assigned authority)
+export function getEnterpriseGroupAssignees({ groupId } = {}) {
+  const query = groupId != null ? `?groupId=${groupId}` : ""
+  return base(`enterprise-group-assignees${query}`)
+}
+
+export function addEnterpriseGroupAssignee(assignee) {
+  return base("enterprise-group-assignees", { method: "POST", data: assignee })
+}
+
+export function removeEnterpriseGroupAssignee(assigneeId) {
+  return base(`enterprise-group-assignees/${assigneeId}`, { method: "DELETE" })
+}
+
 // Billing
 export function getEnterpriseInvoices() {
   return base("enterprise-invoices")

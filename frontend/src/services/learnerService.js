@@ -93,6 +93,10 @@ function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function isPublishedCertification(certification) {
+  return String(certification?.status ?? "").toUpperCase() === "PUBLISHED"
+}
+
 function getCertificationLessons(certification) {
   return asArray(certification?.majorCategory).flatMap((major) =>
     asArray(major.middleCategory).flatMap((middle) =>
@@ -218,7 +222,9 @@ export async function getLearnerPortalData() {
     asArray(learners).find((item) => isSameId(item.userId, identity.userId)) ??
     null
 
-  const learnerId = learner?.learnerId ?? identity.learnerId
+  // The learners table is authoritative. Never fall back to a stale legacy
+  // localStorage value when no learner profile exists for the signed-in user.
+  const learnerId = learner?.learnerId ?? null
   const userId = learner?.userId ?? identity.userId
   const user =
     asArray(users).find((item) => isSameId(item.userId, userId)) ?? null
@@ -256,12 +262,16 @@ export async function getLearnerPortalData() {
     enrollments.map((item) => String(item.certificationId))
   )
 
-  const enrolledCertifications = asArray(certifications).filter((certification) =>
+  const publishedCertifications = asArray(certifications).filter(
+    isPublishedCertification
+  )
+
+  const enrolledCertifications = publishedCertifications.filter((certification) =>
     enrolledCertificationIds.has(String(certification.certificationId))
   )
 
-  const lessonList = flattenCertificationLessons(enrolledCertifications)
-  const allLessons = flattenCertificationLessons(asArray(certifications))
+  const lessonList = flattenCertificationLessons(publishedCertifications)
+  const allLessons = lessonList
 
   const completedForLearner = asArray(completedLessons).filter((item) =>
     isSameId(item.learnerId, learnerId)
@@ -408,7 +418,7 @@ export async function getLearnerPortalData() {
     userId,
     learner,
     user,
-    certifications: asArray(certifications),
+    certifications: publishedCertifications,
     enrollments,
     enrolledCertifications,
     lessons: lessonsWithProgress,

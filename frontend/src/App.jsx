@@ -28,7 +28,7 @@ import LearnerProgressPage from "./pages/learner/learner-progress-page.jsx"
 import LearnerLearningPage from "./pages/learner/learner-learning-page.jsx"
 import LearnerDiagnosticGatePage from "./pages/learner/learner-diagnostic-page.jsx"
 import LearnerLessonPage from "./pages/learner/learner-lesson-page.jsx"
-import LearnerCertificationsPage from "./pages/learner/learner-certifications-page.jsx"
+import LearnerSubscriptionPage from "./pages/learner/learner-subscription-page.jsx"
 import LearnerCertificationDetailPage from "./pages/learner/learner-certification-detail-page.jsx"
 import LearnerChallengesPage from "./pages/learner/learner-challenges-page.jsx"
 import LearnerFilesPage from "./pages/learner/learner-files-page.jsx"
@@ -36,12 +36,17 @@ import LearnerAccountPage from "./pages/learner/learner-account-page.jsx"
 import LearnerAssessmentAttemptPage from "./pages/learner/learner-assessment-attempt-page.jsx"
 import LearnerAssessmentResultPage from "./pages/learner/learner-assessment-result-page.jsx"
 import LearningStudyPlan from "./pages/learner/learner-study-plan.jsx"
+import MistakesBank from "./pages/learner/learner-mistakes-bank.jsx"
+import Community from "./pages/learner/learner-community-qa.jsx"
+
 
 import EnterpriseDashboardPage from "./pages/enterprise/enterprise-dashboard-page.jsx"
 import EnterpriseLearnersPage from "./pages/enterprise/enterprise-learners-page.jsx"
 import EnterpriseLearnerDetailPage from "./pages/enterprise/enterprise-learner-detail-page.jsx"
 import EnterpriseInvitationsPage from "./pages/enterprise/enterprise-invitations-page.jsx"
 import EnterpriseCertificationsPage from "./pages/enterprise/enterprise-certifications-page.jsx"
+import EnterpriseGroupsPage from "./pages/enterprise/enterprise-groups-page.jsx"
+import EnterpriseLicensePage from "./pages/enterprise/enterprise-license-page.jsx"
 import EnterpriseAnalyticsPage from "./pages/enterprise/enterprise-analytics-page.jsx"
 import EnterprisePartnershipPage from "./pages/enterprise/enterprise-partnership-page.jsx"
 import EnterpriseBillingPage from "./pages/enterprise/enterprise-billing-page.jsx"
@@ -51,6 +56,7 @@ import EnterpriseSettingsPage from "./pages/enterprise/enterprise-settings-page.
 import EnterpriseRequestAccessPage from "./pages/public/enterprise-request-access-page.jsx"
 
 import CompilerArea from "./components/challenges/compiler-area.jsx"
+
 
 function RoleHomeRedirect() {
     const { user, status } = useAuth()
@@ -76,39 +82,6 @@ export function App() {
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/set-new-password" element={<SetNewPasswordPage />} />
-            <Route
-                path="/sample"
-                element={
-                    <div className="min-h-screen bg-muted/40 p-6">
-                        <div className="mx-auto h-[calc(100dvh-3rem)] max-w-7xl">
-                            <CompilerArea
-                                initialLanguage="python"
-                                initialCode={`print("Hello, REBYU!")`}
-                                initialInput=""
-                                onChange={(compilerData) => {
-                                    console.log("Compiler autosave:", compilerData)
-                                }}
-                                onRun={async ({ language, sourceCode, stdin }) => {
-                                    console.log("Running:", {
-                                        language,
-                                        sourceCode,
-                                        stdin,
-                                    })
-
-                                    return {
-                                        stdout: "Hello, REBYU!\n",
-                                        stderr: "",
-                                        compileOutput: "",
-                                        exitCode: 0,
-                                        time: "0.02s",
-                                        memory: "12MB",
-                                    }
-                                }}
-                            />
-                        </div>
-                    </div>
-                }
-            />
 
             {/* Public: organization representatives request Enterprise access with no account. */}
             <Route
@@ -156,18 +129,20 @@ export function App() {
                         element={<LearnerLearningPage />}
                     />
                     <Route path="lessons/:lessonId" element={<LearnerLessonPage />} />
-                    <Route path="certifications" element={<LearnerCertificationsPage />} />
                     <Route path="plan" element={<LearningStudyPlan />} />
                     <Route
                         path="certifications/:certificationId"
                         element={<LearnerCertificationDetailPage />}
                     />
                     <Route path="challenges" element={<LearnerChallengesPage />} />
-                    <Route path="files" element={<LearnerFilesPage />} />
+                    <Route path="subscription" element={<LearnerSubscriptionPage />} />
+                    <Route path="library" element={<LearnerFilesPage />} />
+                    <Route path="mistakes" element={<MistakesBank />} />
+                    <Route path="community" element={<Community />} />
                     <Route path="account" element={<LearnerAccountPage />} />
                 </Route>
 
-                {/* Focused full-screen attempt experience — no portal sidebar. */}
+
                 <Route
                     path="/learner/assessments/:examId"
                     element={<LearnerAssessmentAttemptPage />}
@@ -192,6 +167,8 @@ export function App() {
                         path="certifications"
                         element={<EnterpriseCertificationsPage />}
                     />
+                    <Route path="groups" element={<EnterpriseGroupsPage />} />
+                    <Route path="license" element={<EnterpriseLicensePage />} />
                     <Route path="analytics" element={<EnterpriseAnalyticsPage />} />
                     <Route path="partnership" element={<EnterprisePartnershipPage />} />
                     <Route path="billing" element={<EnterpriseBillingPage />} />

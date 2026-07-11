@@ -642,6 +642,7 @@ function GenerateLessonFromFileDialog({
   const maxSize = maxSizeMB * 1024 * 1024
 
   const [submitError, setSubmitError] = useState("")
+  const [mode, setMode] = useState("append")
 
   const [
     { files, isDragging, errors },
@@ -681,6 +682,7 @@ function GenerateLessonFromFileDialog({
   function resetForm() {
     clearFiles()
     setSubmitError("")
+    setMode("append")
   }
 
   function handleOpenChange(nextOpen) {
@@ -720,7 +722,7 @@ function GenerateLessonFromFileDialog({
     setSubmitError("")
 
     try {
-      await onGenerate?.(selectedDocuments)
+      await onGenerate?.(selectedDocuments, mode)
       resetForm()
     } catch (error) {
       setSubmitError(
@@ -904,6 +906,38 @@ function GenerateLessonFromFileDialog({
                   </div>
                 </>
             )}
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <span className="text-sm font-medium">When generation finishes</span>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                  type="button"
+                  variant={mode === "append" ? "default" : "outline"}
+                  onClick={() => setMode("append")}
+                  disabled={isGenerating}
+                  className="h-auto flex-col items-start gap-0.5 py-2 text-left"
+              >
+                <span className="text-sm font-medium">Add to lesson</span>
+                <span className="text-xs font-normal opacity-80">
+                  Keep existing sections, append new ones
+                </span>
+              </Button>
+
+              <Button
+                  type="button"
+                  variant={mode === "replace" ? "default" : "outline"}
+                  onClick={() => setMode("replace")}
+                  disabled={isGenerating}
+                  className="h-auto flex-col items-start gap-0.5 py-2 text-left"
+              >
+                <span className="text-sm font-medium">Replace lesson</span>
+                <span className="text-xs font-normal opacity-80">
+                  Discard existing sections and start fresh
+                </span>
+              </Button>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -1237,7 +1271,7 @@ function CreateLessons() {
     setIsLessonFileGeneratorOpen(true)
   }
 
-  async function handleGenerateLessonFromFiles(selectedDocuments) {
+  async function handleGenerateLessonFromFiles(selectedDocuments, mode = "append") {
     if (!lessonId) {
       throw new Error(
           "This lesson has no saved ID yet. Open the lesson from its certification page first."
@@ -1258,15 +1292,24 @@ function CreateLessons() {
           generatedSections
       )
 
-      await setLessonComponent(lessonId, savedGeneratedSections)
+      // Default behavior is to append generated sections to whatever the admin
+      // has already authored; only "replace" discards the existing structure.
+      const existingSections = mode === "replace" ? [] : sections
+      const mergedSections = [...existingSections, ...savedGeneratedSections]
 
-      setSections(savedGeneratedSections)
-      setSectionIndex(0)
+      await setLessonComponent(lessonId, mergedSections)
+
+      setSections(mergedSections)
+      setSectionIndex(
+          mode === "replace" ? 0 : Math.max(existingSections.length, 0)
+      )
       setIsLessonFileGeneratorOpen(false)
 
       toast.success("Lesson generated and saved", {
         description:
-            "Generated sections were saved to the database and can still be edited.",
+            mode === "replace"
+                ? "Existing sections were replaced with the generated content and saved."
+                : "Generated sections were appended to your lesson and saved.",
       })
 
       generationWarnings.forEach((warning) => {

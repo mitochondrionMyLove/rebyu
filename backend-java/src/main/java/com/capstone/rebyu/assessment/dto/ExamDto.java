@@ -51,6 +51,12 @@ public class ExamDto {
 
     private Long lessonId;
 
+    private Long middleCategoryId;
+
+    private Long majorCategoryId;
+
+    private String targetScope;
+
     private LocalDateTime publishedAt;
 
     private LocalDateTime updatedAt;

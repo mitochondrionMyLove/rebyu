@@ -57,7 +57,7 @@ public class Certification {
     @Column(name = "status")
     private CertificationStatus status = CertificationStatus.DRAFT;
 
-    enum CertificationStatus{
+    public enum CertificationStatus{
         PUBLISHED, DRAFT
     }
 }

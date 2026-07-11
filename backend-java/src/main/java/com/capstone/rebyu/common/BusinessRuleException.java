@@ -69,4 +69,10 @@ public abstract class BusinessRuleException extends RuntimeException {
             super(message);
         }
     }
+
+    public static class EnterpriseGroupRuleException extends BusinessRuleException {
+        public EnterpriseGroupRuleException(String message) {
+            super(message);
+        }
+    }
 }

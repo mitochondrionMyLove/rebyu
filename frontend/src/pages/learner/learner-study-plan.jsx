@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useOutletContext } from "react-router-dom"
 import {
     ArrowLeft,
@@ -38,14 +38,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-
-const certificationOptions = [
-    "TOPCIT Review Course",
-    "IT Passport Review Course",
-    "Fundamentals of Engineering Review",
-    "PNLE 2026 Review Course",
-    "Civil Service Exam Review",
-]
+import LearnerPremiumGuard from "@/components/learner/learner-premium-guard.jsx"
 
 const readinessOptions = [
     "Ready 1 week before the exam",
@@ -632,10 +625,17 @@ function StudyPlanCalendar({
     )
 }
 
-export default function LearningStudyPlan() {
+function StudyPlanContent() {
     const { data } = useOutletContext()
 
-    const [certification, setCertification] = useState(certificationOptions[0])
+    const certificationOptions = useMemo(
+        () => (data?.certifications ?? [])
+            .map((item) => item?.title)
+            .filter(Boolean),
+        [data?.certifications]
+    )
+
+    const [certification, setCertification] = useState("")
     const [courseGoal, setCourseGoal] = useState("Complete a full reviewer")
     const [targetExamDate, setTargetExamDate] = useState("2026-11-08")
     const [targetReadiness, setTargetReadiness] = useState(readinessOptions[1])
@@ -647,6 +647,12 @@ export default function LearningStudyPlan() {
     const [studyPreferences, setStudyPreferences] = useState("")
     const [generatedPlan, setGeneratedPlan] = useState(null)
     const [viewDate, setViewDate] = useState(() => parseDate("2026-07-06"))
+
+    useEffect(() => {
+        if (!certificationOptions.includes(certification)) {
+            setCertification(certificationOptions[0] ?? "")
+        }
+    }, [certification, certificationOptions])
 
     const priorityTopics = useMemo(() => {
         return getDiagnosticPriorityTopics(data)
@@ -1084,5 +1090,22 @@ export default function LearningStudyPlan() {
                 </aside>
             </div>
         </div>
+    )
+}
+
+export default function LearningStudyPlan() {
+    return (
+        <LearnerPremiumGuard
+            feature="PERSONALIZED_STUDY_PLAN"
+            title="Study plans are a REBYU Pro feature"
+            description="Personalized and AI-generated study plans are available through REBYU Pro or an eligible institutional license. Free learners can browse lessons and choose what to study."
+            benefits={[
+                "AI-generated, exam-date-aware schedules",
+                "Weakness-driven topic prioritization",
+                "Adapts to your diagnostic and quiz performance",
+            ]}
+        >
+            <StudyPlanContent />
+        </LearnerPremiumGuard>
     )
 }

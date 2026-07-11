@@ -159,7 +159,7 @@ export default function EnterpriseLayout() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 px-5 py-3">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
           <Outlet context={outletContext} />
         </div>
       </SidebarInset>

@@ -10,8 +10,10 @@ import {
   MailPlusIcon,
   ReceiptTextIcon,
   SettingsIcon,
+  SparklesIcon,
   TerminalIcon,
   UsersIcon,
+  UsersRoundIcon,
 } from "lucide-react"
 
 import { NavProjects } from "@/components/nav-projects"
@@ -51,6 +53,11 @@ const enterpriseNav = {
         icon: GraduationCapIcon,
       },
       {
+        name: "Groups",
+        url: "/enterprise/groups",
+        icon: UsersRoundIcon,
+      },
+      {
         name: "Analytics",
         url: "/enterprise/analytics",
         icon: BarChart3Icon,
@@ -64,6 +71,11 @@ const enterpriseNav = {
         name: "Partnership",
         url: "/enterprise/partnership",
         icon: HandshakeIcon,
+      },
+      {
+        name: "License",
+        url: "/enterprise/license",
+        icon: SparklesIcon,
       },
       {
         name: "Billing",

@@ -9,7 +9,6 @@ import {
   CircleUserRound,
   FileText,
   FolderOpen,
-  GraduationCap,
   LibraryBig,
   LogOut,
   Menu,
@@ -35,7 +34,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 const mainItems = [
   { label: "Progress", href: "/learner/progress", icon: BarChart3 },
   { label: "Learning", href: "/learner/learning", icon: LibraryBig },
-  { label: "Certifications", href: "/learner/certifications", icon: GraduationCap },
   { label: "Challenges", href: "/learner/challenges", icon: Trophy },
 ]
 

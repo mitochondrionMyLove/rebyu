@@ -39,6 +39,9 @@ export function AuthProvider({ children }) {
       // working; they are display hints only, never authorities.
       if (currentUser?.learnerId != null) {
         localStorage.setItem("learnerId", String(currentUser.learnerId))
+      } else {
+        localStorage.removeItem("learnerId")
+        localStorage.removeItem("learner_id")
       }
       if (currentUser?.email) localStorage.setItem("email", currentUser.email)
       if (currentUser?.displayName) {

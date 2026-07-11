@@ -67,4 +67,7 @@ public class AssessmentAttemptAnswer {
 
     @Column(name = "answered_at")
     private LocalDateTime answeredAt;
+
+    @Column(name = "last_saved_at")
+    private LocalDateTime lastSavedAt;
 }

@@ -12,4 +12,7 @@ public interface OrganizationCertificateRepository extends JpaRepository<Organiz
             Long enterpriseId, Long certificationId);
 
     List<OrganizationCertificate> findByEnterprise_EnterpriseId(Long enterpriseId);
+
+    long countByEnterprise_EnterpriseIdAndStatus(
+            Long enterpriseId, OrganizationCertificate.Status status);
 }

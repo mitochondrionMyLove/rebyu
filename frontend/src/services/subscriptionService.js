@@ -1,0 +1,44 @@
+import { base } from "./base"
+
+// B2C entitlements + plans. The backend is the source of truth; the frontend
+// never derives premium access from localStorage.
+export function getLearnerEntitlements(learnerId, certificationId) {
+  const params = new URLSearchParams({ learnerId })
+  if (certificationId != null) params.set("certificationId", certificationId)
+  return base(`learner/entitlements?${params.toString()}`)
+}
+
+export function getLearnerSubscription(learnerId) {
+  return base(`learner/subscription?learnerId=${learnerId}`)
+}
+
+export function getIndividualPlans() {
+  return base("subscription-plans/individual")
+}
+
+export function getInstitutionalPlans() {
+  return base("subscription-plans/institutional")
+}
+
+// Enterprise (B2B) license reads
+export function getEnterpriseLicense(enterpriseId) {
+  return base(`enterprise/license?enterpriseId=${enterpriseId}`)
+}
+
+export function getEnterpriseLicenseUsage(enterpriseId) {
+  return base(`enterprise/license/usage?enterpriseId=${enterpriseId}`)
+}
+
+// Well-known premium feature codes (must match backend Entitlements)
+export const FEATURES = {
+  DETAILED_PROGRESS: "DETAILED_PROGRESS",
+  PROGRESS_ANALYTICS: "PROGRESS_ANALYTICS",
+  MASTERY_ANALYTICS: "MASTERY_ANALYTICS",
+  WEAKNESS_ANALYSIS: "WEAKNESS_ANALYSIS",
+  PERSONALIZED_STUDY_PLAN: "PERSONALIZED_STUDY_PLAN",
+  MOCK_EXAM_ACCESS: "MOCK_EXAM_ACCESS",
+  BATTLES_ACCESS: "BATTLES_ACCESS",
+  CHALLENGES_ACCESS: "CHALLENGES_ACCESS",
+  READINESS_ANALYSIS: "READINESS_ANALYSIS",
+  ADVANCED_RECOMMENDATIONS: "ADVANCED_RECOMMENDATIONS",
+}

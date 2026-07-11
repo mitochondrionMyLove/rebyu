@@ -45,6 +45,15 @@ export function archiveExam(examId) {
   return base(`exams/${examId}/archive`, { method: "POST" })
 }
 
+// Adds questions to an assessment with per-question points + display order.
+// questions: [{ questionId, points, displayOrder }]
+export function addExamQuestions(examId, questions) {
+  return base(`exams/${examId}/questions`, {
+    method: "POST",
+    data: { questions },
+  })
+}
+
 // Exam questions (join between exam and question bank)
 export function getExamQuestions() {
   return base("exam-questions")
@@ -135,6 +144,54 @@ export function autosaveAttemptAnswers(attemptId, learnerId, answers) {
     method: "PUT",
     data: { learnerId, answers },
   })
+}
+
+export function setAttemptFlag(attemptId, attemptQuestionId, learnerId, flagged) {
+  return base(`learner/assessment-attempts/${attemptId}/flags/${attemptQuestionId}`, {
+    method: "PUT",
+    data: { learnerId, flagged },
+  })
+}
+
+export function setAttemptSkip(attemptId, attemptQuestionId, learnerId, skipped) {
+  return base(`learner/assessment-attempts/${attemptId}/skip/${attemptQuestionId}`, {
+    method: "PUT",
+    data: { learnerId, skipped },
+  })
+}
+
+export function setAttemptCurrentItem(attemptId, attemptQuestionId, learnerId) {
+  return base(`learner/assessment-attempts/${attemptId}/current-item`, {
+    method: "PUT",
+    data: { learnerId, attemptQuestionId },
+  })
+}
+
+export function runAttemptProgramming(attemptId, attemptQuestionId, learnerId, code, language) {
+  return base(
+    `learner/assessment-attempts/${attemptId}/programming/${attemptQuestionId}/run`,
+    { method: "POST", data: { learnerId, code, language } }
+  )
+}
+
+export function checkAttemptProgramming(attemptId, attemptQuestionId, learnerId, code, language) {
+  return base(
+    `learner/assessment-attempts/${attemptId}/programming/${attemptQuestionId}/check`,
+    { method: "POST", data: { learnerId, code, language } }
+  )
+}
+
+export function getAttemptExecutions(attemptId, attemptQuestionId, learnerId) {
+  return base(
+    `learner/assessment-attempts/${attemptId}/programming/${attemptQuestionId}/executions?learnerId=${learnerId}`
+  )
+}
+
+export function checkAttemptDiagram(attemptId, attemptQuestionId, learnerId, diagramData, diagramType) {
+  return base(
+    `learner/assessment-attempts/${attemptId}/diagram/${attemptQuestionId}/check`,
+    { method: "POST", data: { learnerId, diagramData, diagramType } }
+  )
 }
 
 export function submitAssessmentAttempt(attemptId, learnerId, answers) {
