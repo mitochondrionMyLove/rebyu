@@ -47,13 +47,13 @@ public class BktOutboxService {
      * evidence. Must never break the submission: all failures are swallowed and
      * logged (the assessment result is already the source of truth).
      */
-    public void enqueueForAttempt(
+    public int enqueueForAttempt(
             AssessmentAttempt attempt,
             List<AssessmentAttemptQuestion> questions,
             Map<Long, AssessmentAttemptAnswer> answersByQuestionId) {
 
         if (!properties.isEnabled()) {
-            return;
+            return 0;
         }
         try {
             String rawAssessmentType = attempt.getExam().getExamType().getExamTypeText();
@@ -96,13 +96,35 @@ public class BktOutboxService {
                         .build());
                 created++;
             }
-            log.info("Enqueued {} BKT event(s) for attempt {} ({})",
-                    created, attemptId, rawAssessmentType);
+            if (created > 0) {
+                log.info("Enqueued {} BKT event(s) for attempt {} ({})",
+                        created, attemptId, rawAssessmentType);
+            }
+            return created;
         } catch (Exception e) {
             // Analytics evidence is best-effort; reconciliation will recover it.
             log.warn("Could not enqueue BKT events for attempt {}: {}",
                     attempt.getAssessmentAttemptId(), e.getMessage());
+            return 0;
         }
+    }
+
+    /**
+     * Admin retry: force FAILED / DEAD_LETTER rows back to PENDING for immediate
+     * redelivery. Idempotency on the FastAPI side keeps this safe.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int resetForRetry(List<Long> ids) {
+        int reset = 0;
+        for (BktEventOutbox row : outboxRepository.findAllById(ids)) {
+            row.setStatus(BktOutboxStatus.PENDING);
+            row.setRetryCount(0);
+            row.setNextRetryAt(null);
+            row.setLockedAt(null);
+            row.setLockedBy(null);
+            reset++;
+        }
+        return reset;
     }
 
     // ------------------------------------------------------------------

@@ -8,6 +8,8 @@ import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftResponseDto;
 import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftResponseDto.GenerationAnalysisDto;
 import com.capstone.rebyu.ai.dto.QuestionGenerationSourceMode;
 import com.capstone.rebyu.ai.entity.KnowledgeDocument;
+import com.capstone.rebyu.ai.entity.KnowledgeDocumentImage;
+import com.capstone.rebyu.ai.repository.KnowledgeDocumentImageRepository;
 import com.capstone.rebyu.ai.repository.KnowledgeDocumentRepository;
 import com.capstone.rebyu.certification.entity.Certification;
 import com.capstone.rebyu.certification.entity.Lesson;
@@ -16,7 +18,14 @@ import com.capstone.rebyu.certification.repository.LessonRepository;
 import com.capstone.rebyu.ai.common.InvalidAiGeneratedQuestionException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
@@ -33,6 +42,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -50,6 +60,10 @@ public class QuestionGenerationService {
     private static final int MAX_TARGET_BATCH_ATTEMPTS = 25;
     private static final int MAX_EMPTY_BATCH_ATTEMPTS = 8;
     private static final int RETRIEVAL_MAX_RESULTS = 24;
+    // Caps vision-model token/cost per request; the highest-similarity
+    // chunks are searched first, so the first N distinct linked images are
+    // already the most relevant ones.
+    private static final int MAX_IMAGES_PER_REQUEST = 6;
     private static final java.util.Set<String> SUPPORTED_TYPES = java.util.Set.of(
             "MCQ", "SHORT_ANSWER", "DESCRIPTIVE", "PROGRAMMING", "DIAGRAM"
     );
@@ -68,6 +82,7 @@ public class QuestionGenerationService {
     private final AiUploadValidator aiUploadValidator;
     private final GeneratedQuestionDraftValidator generatedQuestionDraftValidator;
     private final KnowledgeDocumentRepository knowledgeDocumentRepository;
+    private final KnowledgeDocumentImageRepository knowledgeDocumentImageRepository;
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> questionEmbeddingStore;
     private final EmbeddingStore<TextSegment> lessonEmbeddingStore;
@@ -76,6 +91,9 @@ public class QuestionGenerationService {
     // lessonId, etc.) the model sometimes adds, without affecting the shared
     // application ObjectMapper.
     private final ObjectMapper draftMapper;
+    // Used only for the manual multimodal call (retrieval-linked images); the
+    // existing text-only questionGenerationAssistant path is untouched.
+    private final ChatModel chatModel;
 
     public QuestionGenerationService(
             LessonRepository lessonRepository,
@@ -86,10 +104,12 @@ public class QuestionGenerationService {
             AiUploadValidator aiUploadValidator,
             GeneratedQuestionDraftValidator generatedQuestionDraftValidator,
             KnowledgeDocumentRepository knowledgeDocumentRepository,
+            KnowledgeDocumentImageRepository knowledgeDocumentImageRepository,
             EmbeddingModel embeddingModel,
             @Qualifier("questionEmbeddingStore") EmbeddingStore<TextSegment> questionEmbeddingStore,
             @Qualifier("lessonEmbeddingStore") EmbeddingStore<TextSegment> lessonEmbeddingStore,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            ChatModel chatModel
     ) {
         this.lessonRepository = lessonRepository;
         this.certificationRepository = certificationRepository;
@@ -99,12 +119,14 @@ public class QuestionGenerationService {
         this.aiUploadValidator = aiUploadValidator;
         this.generatedQuestionDraftValidator = generatedQuestionDraftValidator;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
+        this.knowledgeDocumentImageRepository = knowledgeDocumentImageRepository;
         this.embeddingModel = embeddingModel;
         this.questionEmbeddingStore = questionEmbeddingStore;
         this.lessonEmbeddingStore = lessonEmbeddingStore;
         this.objectMapper = objectMapper;
         this.draftMapper = objectMapper.copy().disable(
                 com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        this.chatModel = chatModel;
     }
 
     public GeneratedQuestionDraftResponseDto generateDrafts(
@@ -152,6 +174,7 @@ public class QuestionGenerationService {
 
         String retrievedKnowledge = "";
         int chunksUsed = 0;
+        List<AvailableImage> availableImages = List.of();
         if (mode == QuestionGenerationSourceMode.CERTIFICATION_KNOWLEDGE
                 || mode == QuestionGenerationSourceMode.COMBINED) {
             if (!hasKnowledge) {
@@ -159,15 +182,25 @@ public class QuestionGenerationService {
                         "This certification has no indexed knowledge yet. Upload a temporary file "
                                 + "or add source materials to the certification first.");
             }
-            List<String> chunks = retrieveCertificationChunks(
+            List<RetrievedChunk> chunks = retrieveCertificationChunks(
                     request.getCertificationId(), ctx.certTitle(),
                     request.getAdditionalInstructions());
             chunksUsed = chunks.size();
-            retrievedKnowledge = String.join("\n\n---\n\n", chunks);
+            retrievedKnowledge = String.join("\n\n---\n\n",
+                    chunks.stream().map(RetrievedChunk::text).toList());
             if (retrievedKnowledge.isBlank()) {
                 warnings.add("Little indexed knowledge matched this certification; "
                         + "fewer questions may be generated.");
             }
+
+            // Images linked to the matched chunks (nearest-match first) —
+            // retrieved together with their text, never stored inside the
+            // embedding itself.
+            Set<String> retrievedImageKeys = new LinkedHashSet<>();
+            for (RetrievedChunk chunk : chunks) {
+                retrievedImageKeys.addAll(chunk.imageKeys());
+            }
+            availableImages = resolveAvailableImages(retrievedImageKeys);
         }
 
         // Permanent certification knowledge is listed first so it wins when
@@ -196,13 +229,20 @@ public class QuestionGenerationService {
                     : Math.max(1, Math.min(MAX_TARGET, request.getTargetQuestionCount()));
         }
 
-        log.info("Generating question drafts for certificationId={} mode={} target={}",
-                request.getCertificationId(), mode, target);
+        log.info("Generating question drafts for certificationId={} mode={} target={} images={}",
+                request.getCertificationId(), mode, target, availableImages.size());
 
         List<GeneratedQuestionDraftDto> validDrafts = requestedCounts != null
-                ? generateStrictCountDrafts(request, ctx, requestedCounts, target, referenceContext, warnings)
-                : generateTargetDrafts(request, ctx, target, referenceContext, warnings);
-        validDrafts = sanitizeImageReferences(validDrafts, sourceImageKeys);
+                ? generateStrictCountDrafts(
+                        request, ctx, requestedCounts, target, referenceContext, availableImages, warnings)
+                : generateTargetDrafts(
+                        request, ctx, target, referenceContext, availableImages, warnings);
+
+        // Both source-marker keys (uploaded files) and retrieval-linked keys
+        // are trusted; anything else the AI returns is stripped.
+        Set<String> trustedImageKeys = new HashSet<>(sourceImageKeys);
+        availableImages.forEach(image -> trustedImageKeys.add(image.imageKey()));
+        validDrafts = sanitizeImageReferences(validDrafts, trustedImageKeys);
 
         if (requestedCounts != null) {
             Map<String, Long> producedByType = validDrafts.stream()
@@ -268,7 +308,7 @@ public class QuestionGenerationService {
                     choices, draft.correctChoiceIndex(), draft.correctAnswer(),
                     draft.checkingMethod(), draft.rubricBasedAnswer(), draft.starterCode(),
                     draft.testCases(), draft.diagramType(), draft.instructions(),
-                    draft.authoringNotes(), questionImageKey);
+                    draft.authoringNotes(), questionImageKey, draft.acceptedVariations());
         }).toList();
     }
 
@@ -289,6 +329,12 @@ public class QuestionGenerationService {
         return QuestionGenerationSourceMode.UPLOADED_FILES;
     }
 
+    /** One retrieved chunk with the image keys linked to it (see DocumentIngestionService), if any. */
+    private record RetrievedChunk(String text, Set<String> imageKeys) {}
+
+    /** One image resolved and ready to attach to a multimodal prompt, with its trusted imageKey. */
+    private record AvailableImage(String imageKey, String contentType, String base64Data, String caption) {}
+
     /**
      * Retrieves chunks strictly filtered to this certification's metadata.
      * Certification source documents uploaded during certification
@@ -296,7 +342,7 @@ public class QuestionGenerationService {
      * question-specific uploads land in the question store — so both stores
      * are searched and merged.
      */
-    private List<String> retrieveCertificationChunks(
+    private List<RetrievedChunk> retrieveCertificationChunks(
             Long certificationId, String certTitle, String additionalInstructions) {
         try {
             String queryText = additionalInstructions == null || additionalInstructions.isBlank()
@@ -309,7 +355,7 @@ public class QuestionGenerationService {
                             .isEqualTo(String.valueOf(certificationId)))
                     .build();
 
-            List<String> chunks = new ArrayList<>();
+            List<RetrievedChunk> chunks = new ArrayList<>();
             chunks.addAll(searchStore(questionEmbeddingStore, searchRequest, "question"));
             if (chunks.size() < RETRIEVAL_MAX_RESULTS) {
                 chunks.addAll(searchStore(lessonEmbeddingStore, searchRequest, "knowledge"));
@@ -321,17 +367,56 @@ public class QuestionGenerationService {
         }
     }
 
-    private List<String> searchStore(
+    private List<RetrievedChunk> searchStore(
             EmbeddingStore<TextSegment> store, EmbeddingSearchRequest request, String label) {
         try {
             EmbeddingSearchResult<TextSegment> result = store.search(request);
             return result.matches().stream()
-                    .map(match -> match.embedded().text())
+                    .map(match -> {
+                        String imageKeysCsv = match.embedded().metadata().getString("imageKeys");
+                        Set<String> imageKeys = imageKeysCsv == null || imageKeysCsv.isBlank()
+                                ? Set.<String>of()
+                                : Set.of(imageKeysCsv.split(","));
+                        return new RetrievedChunk(match.embedded().text(), imageKeys);
+                    })
                     .toList();
         } catch (Exception e) {
             log.warn("Retrieval from {} store failed: {}", label, e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * Resolves retrieval-linked image keys into ready-to-attach images
+     * (capped, downloaded, base64-encoded). Never throws — an unreadable
+     * image is skipped with a warning rather than failing the whole
+     * generation request.
+     */
+    private List<AvailableImage> resolveAvailableImages(Set<String> imageKeys) {
+        if (imageKeys.isEmpty()) {
+            return List.of();
+        }
+        List<KnowledgeDocumentImage> found =
+                knowledgeDocumentImageRepository.findByImageKeyIn(imageKeys);
+
+        List<AvailableImage> available = new ArrayList<>();
+        for (KnowledgeDocumentImage image : found) {
+            if (available.size() >= MAX_IMAGES_PER_REQUEST) {
+                break;
+            }
+            try {
+                String base64 = questionSourceImageService.downloadAsBase64(image.getImageKey());
+                available.add(new AvailableImage(
+                        image.getImageKey(),
+                        image.getContentType() == null ? "image/png" : image.getContentType(),
+                        base64,
+                        image.getNearbyText()));
+            } catch (Exception e) {
+                log.warn("Could not load linked image '{}' for question generation: {}",
+                        image.getImageKey(), e.getMessage());
+            }
+        }
+        return available;
     }
 
     private String truncate(String text) {
@@ -383,11 +468,12 @@ public class QuestionGenerationService {
             Map<String, Integer> requestedCounts,
             int target,
             String referenceContext,
+            List<AvailableImage> availableImages,
             List<String> warnings
     ) throws IOException {
         String requestJson = buildRequestJson(request, ctx, requestedCounts, target, List.of());
         List<GeneratedQuestionDraftDto> generatedDrafts =
-                requestDraftBatch(request, requestJson, referenceContext, 2);
+                requestDraftBatch(request, requestJson, referenceContext, availableImages, 2);
         generatedDrafts = assignMissingLessons(generatedDrafts, ctx, warnings);
         generatedDrafts = normalizeQuestionTypeDrafts(generatedDrafts, ctx, warnings);
         return generatedQuestionDraftValidator.validateLenient(
@@ -399,6 +485,7 @@ public class QuestionGenerationService {
             CertContext ctx,
             int target,
             String referenceContext,
+            List<AvailableImage> availableImages,
             List<String> warnings
     ) throws IOException {
         List<GeneratedQuestionDraftDto> accepted = new ArrayList<>();
@@ -422,7 +509,7 @@ public class QuestionGenerationService {
 
             List<GeneratedQuestionDraftDto> generatedDrafts;
             try {
-                generatedDrafts = requestDraftBatch(request, requestJson, referenceContext, 2);
+                generatedDrafts = requestDraftBatch(request, requestJson, referenceContext, availableImages, 2);
             } catch (AiProviderRateLimitException e) {
                 if (!accepted.isEmpty()) {
                     warnings.add(e.getMessage() + " Returning " + accepted.size()
@@ -485,13 +572,18 @@ public class QuestionGenerationService {
             AiQuestionGenerationRequest request,
             String requestJson,
             String referenceContext,
+            List<AvailableImage> availableImages,
             int maxAttempts
     ) {
         InvalidAiGeneratedQuestionException lastParseError = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                String aiResponse = questionGenerationAssistant.generateQuestions(
-                        requestJson, referenceContext);
+                // The existing text-only path is used whenever there are no
+                // retrieval-linked images to show the model; the multimodal
+                // path is purely additive.
+                String aiResponse = availableImages.isEmpty()
+                        ? questionGenerationAssistant.generateQuestions(requestJson, referenceContext)
+                        : generateQuestionsWithImages(requestJson, referenceContext, availableImages);
                 return parseGeneratedQuestionDrafts(aiResponse);
             } catch (InvalidAiGeneratedQuestionException e) {
                 lastParseError = e;
@@ -513,6 +605,56 @@ public class QuestionGenerationService {
                 ? lastParseError
                 : new InvalidAiGeneratedQuestionException(
                         "The AI returned malformed question draft JSON. Please try again.");
+    }
+
+    /**
+     * Vision-capable call path used only when retrieval linked real images
+     * to the matched chunks. Bypasses the declarative
+     * {@code QuestionGenerationAssistant} (its {@code @UserMessage}
+     * templating is text-only) and calls {@code ChatModel} directly with a
+     * manually-built multimodal message, reusing the SAME system prompt
+     * ({@link QuestionGenerationAssistant#SYSTEM_PROMPT}) so output format
+     * and question-quality rules stay identical to the text-only path.
+     * Each image is preceded by a "imageId: ..." text part so the model can
+     * correlate what it sees with the trusted key it must copy back.
+     */
+    private String generateQuestionsWithImages(
+            String requestJson, String referenceContext, List<AvailableImage> availableImages) {
+        List<Content> userContents = new ArrayList<>();
+
+        StringBuilder catalog = new StringBuilder();
+        catalog.append("AVAILABLE IMAGES — each one below is shown to you with its trusted imageId. ")
+                .append("Choose an imageId ONLY if that exact image is genuinely relevant to a question ")
+                .append("or choice; copy it EXACTLY into that question's or choice's imageKey field. ")
+                .append("Never invent an imageId, never guess one that was not shown, and leave imageKey ")
+                .append("blank when none of these images is relevant.\n");
+        userContents.add(TextContent.from(catalog.toString()));
+
+        for (AvailableImage image : availableImages) {
+            StringBuilder caption = new StringBuilder("imageId: ").append(image.imageKey());
+            if (image.caption() != null && !image.caption().isBlank()) {
+                caption.append(" — nearby source text: ").append(image.caption());
+            }
+            userContents.add(TextContent.from(caption.toString()));
+            userContents.add(ImageContent.from(image.base64Data(), image.contentType()));
+        }
+
+        userContents.add(TextContent.from("""
+                Generate question-bank draft questions.
+
+                Question generation request:
+                %s
+
+                Reference context:
+                %s
+
+                Return only structured question draft data as a valid JSON array.
+                """.formatted(requestJson, referenceContext)));
+
+        List<ChatMessage> messages = List.of(
+                SystemMessage.from(QuestionGenerationAssistant.SYSTEM_PROMPT),
+                UserMessage.from(userContents));
+        return chatModel.chat(messages).aiMessage().text();
     }
 
     private boolean isRateLimitException(Throwable throwable) {
@@ -547,7 +689,9 @@ public class QuestionGenerationService {
         for (GeneratedQuestionDraftDto draft : drafts) {
             if (draft != null
                     && draft.questionType() == com.capstone.rebyu.ai.dto.GeneratedQuestionType.SHORT_ANSWER
-                    && (isTopcit(ctx.certTitle()) || !isExactShortAnswerPrompt(draft.question()))) {
+                    && (isTopcit(ctx.certTitle())
+                        || !isExactShortAnswerPrompt(draft.question())
+                        || !isShortSpecificAnswer(draft.correctAnswer()))) {
                 if (isTopcit(ctx.certTitle())) {
                     convertedTopcitShortAnswer = true;
                 } else {
@@ -592,6 +736,42 @@ public class QuestionGenerationService {
                 draft.instructions(),
                 draft.authoringNotes()
         );
+    }
+
+    /**
+     * A valid short answer is one short, specific token or phrase — a word,
+     * term, acronym, number, or short phrase. Anything that reads like an
+     * explanation, a list, or multiple sentences is rejected so it becomes a
+     * descriptive question instead. The "TODO" placeholder answer is allowed so
+     * the author can complete it.
+     */
+    private boolean isShortSpecificAnswer(String answer) {
+        if (answer == null) {
+            return false;
+        }
+        String trimmed = answer.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        if (trimmed.startsWith("TODO")) {
+            return true; // author-completed placeholder
+        }
+        if (trimmed.length() > 60) {
+            return false; // too long to be one specific answer
+        }
+        if (trimmed.split("\\s+").length > 6) {
+            return false; // longer than a short phrase
+        }
+        if (trimmed.contains(";") || trimmed.contains("\n")) {
+            return false; // enumeration / multi-line
+        }
+        if (trimmed.matches(".*[.!?]\\s+\\S.*")) {
+            return false; // a sentence break followed by more text => explanatory
+        }
+        if (trimmed.matches("(?s).*,.*,.*")) {
+            return false; // three or more comma-separated items => a list
+        }
+        return true;
     }
 
     private boolean isExactShortAnswerPrompt(String question) {
@@ -993,6 +1173,11 @@ public class QuestionGenerationService {
                     node.put("correctAnswer", "TODO: add correct answer before saving");
                 }
                 node.put("checkingMethod", "EXACT_MATCH");
+                // Optional exact-match alternatives (e.g. "SQL" / "Structured Query Language").
+                renameFirst(node, "acceptedVariations",
+                        "accepted_answers", "acceptedAnswers", "answerVariations",
+                        "variations", "alternateAnswers", "synonyms", "aliases");
+                coerceStringArray(node, "acceptedVariations");
             }
             case "DESCRIPTIVE" -> {
                 renameFirst(node, "rubricBasedAnswer",
@@ -1135,6 +1320,42 @@ public class QuestionGenerationService {
             index--;
         }
         node.put("correctChoiceIndex", index);
+    }
+
+    /**
+     * Normalizes {@code field} to a JSON array of non-blank strings: a single
+     * string becomes a one-element array; a missing/blank/other value is removed
+     * so it deserializes to null rather than a malformed list.
+     */
+    private void coerceStringArray(
+            com.fasterxml.jackson.databind.node.ObjectNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            node.remove(field);
+            return;
+        }
+        if (value.isArray()) {
+            com.fasterxml.jackson.databind.node.ArrayNode cleaned = objectMapper.createArrayNode();
+            for (JsonNode element : value) {
+                String text = element.isTextual() ? element.asText() : element.toString();
+                if (text != null && !text.isBlank()) {
+                    cleaned.add(text.trim());
+                }
+            }
+            if (cleaned.isEmpty()) {
+                node.remove(field);
+            } else {
+                node.set(field, cleaned);
+            }
+            return;
+        }
+        if (value.isTextual() && !value.asText().isBlank()) {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = objectMapper.createArrayNode();
+            arr.add(value.asText().trim());
+            node.set(field, arr);
+        } else {
+            node.remove(field);
+        }
     }
 
     private void renameFirst(

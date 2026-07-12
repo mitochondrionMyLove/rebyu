@@ -41,17 +41,12 @@ export default function ProgrammingQuestionLayout({
   const [executionsLoading, setExecutionsLoading] = useState(false)
 
   const language = answer?.programmingLanguage ?? "Java"
-  const code = answer?.submittedCode ?? question.starterCode ?? ""
+  // The editor starts blank — starter code is never auto-filled. "Reset
+  // Code" (in CodeMirrorProgrammingWorkspace) remains available as an
+  // explicit, learner-initiated action when starter code exists.
+  const code = answer?.submittedCode ?? ""
   const busy = running || checking
   const subQuestions = question.subQuestions ?? []
-
-  // Seed starter code once per item, unless the learner already typed something.
-  useEffect(() => {
-    if (question.starterCode && answer?.submittedCode == null) {
-      onAnswer({ submittedCode: question.starterCode })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [question.attemptQuestionId])
 
   // Reset test/output panels when switching items.
   useEffect(() => {

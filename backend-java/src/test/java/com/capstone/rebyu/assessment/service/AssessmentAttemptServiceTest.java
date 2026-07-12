@@ -595,6 +595,109 @@ class AssessmentAttemptServiceTest {
         assertEquals(0, result.pendingCount());
         assertNotNull(result.answers().get(0).feedback());
         verify(aiAnswerGradingService, never()).grade(any());
+
+        // Learners must see WHICH required elements matched, and what they
+        // themselves drew for each — not just the final score.
+        List<DiagramElementReviewDto> elements = result.answers().get(0).diagramElements();
+        assertEquals(3, elements.size()); // 2 required nodes + 1 required edge
+        assertTrue(elements.stream().allMatch(DiagramElementReviewDto::matched));
+        assertTrue(elements.stream()
+                .anyMatch(e -> "Student".equals(e.expectedDescription())
+                        && "Student".equals(e.learnerDescription())));
+        assertTrue(elements.stream()
+                .anyMatch(e -> "Course".equals(e.expectedDescription())
+                        && "Course".equals(e.learnerDescription())));
+    }
+
+    @Test
+    void submitReportsMissingDiagramElementsWhenTheLearnerOmitsARequiredNode() {
+        Question diagramParent = new Question();
+        diagramParent.setQuestionId(401L);
+        diagramParent.setQuestionType("CRITICAL_THINKING");
+
+        DiagramQuestionConfig diagramConfig = DiagramQuestionConfig.builder()
+                .diagramQuestionConfigId(12L)
+                .diagramType("ERD")
+                .referenceDiagramXml(diagramXml("Student", "Course", "enrolls in 1..*"))
+                .referenceDiagramJson("{}")
+                .build();
+        when(diagramQuestionConfigRepository.findByQuestion_QuestionId(401L))
+                .thenReturn(Optional.of(diagramConfig));
+        lenient().when(programmingQuestionConfigRepository.findByQuestion_QuestionId(401L))
+                .thenReturn(Optional.empty());
+        when(questionRepository.findById(401L)).thenReturn(Optional.of(diagramParent));
+
+        AssessmentAttempt attempt = AssessmentAttempt.builder()
+                .assessmentAttemptId(83L)
+                .exam(exam)
+                .learnerId(2L)
+                .attemptNumber(1)
+                .status(AssessmentAttempt.Status.IN_PROGRESS)
+                .startedAt(LocalDateTime.now().minusMinutes(3))
+                .build();
+        when(attemptRepository.findById(83L)).thenReturn(Optional.of(attempt));
+
+        AssessmentAttemptQuestion snapshot = AssessmentAttemptQuestion.builder()
+                .attemptQuestionId(7L)
+                .attempt(attempt)
+                .sourceQuestionId(401L)
+                .questionType("CRITICAL_THINKING")
+                .questionTextSnapshot("Model the Student/Course enrollment relationship as an ERD.")
+                .displayOrder(1)
+                .points(new BigDecimal("10.00"))
+                .build();
+        when(attemptQuestionRepository.findById(7L)).thenReturn(Optional.of(snapshot));
+        when(attemptQuestionRepository
+                .findByAttempt_AssessmentAttemptIdOrderByDisplayOrderAsc(83L))
+                .thenReturn(List.of(snapshot));
+
+        List<AssessmentAttemptAnswer> answers = new ArrayList<>();
+        when(attemptAnswerRepository
+                .findByAttempt_AssessmentAttemptIdAndAttemptQuestion_AttemptQuestionId(83L, 7L))
+                .thenAnswer(inv -> answers.stream().findFirst());
+        when(attemptAnswerRepository.findByAttempt_AssessmentAttemptId(83L))
+                .thenAnswer(inv -> answers);
+        when(attemptAnswerRepository.save(any())).thenAnswer(inv -> {
+            AssessmentAttemptAnswer answer = inv.getArgument(0);
+            if (answer.getAttemptAnswerId() == null) answer.setAttemptAnswerId(801L);
+            answers.removeIf(existing -> existing.getAttemptAnswerId().equals(answer.getAttemptAnswerId()));
+            answers.add(answer);
+            return answer;
+        });
+        when(attemptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(examResultRepository.existsById(any())).thenReturn(false);
+
+        // Learner draws only "Student" — "Course" and the relationship are missing.
+        String learnerXml = "<mxGraphModel><root>"
+                + "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
+                + "<mxCell id=\"2\" value=\"Student\" style=\"rounded=0;\" vertex=\"1\" parent=\"1\">"
+                + "<mxGeometry x=\"0\" y=\"0\" width=\"80\" height=\"40\" as=\"geometry\"/></mxCell>"
+                + "</root></mxGraphModel>";
+        SubmitAssessmentAttemptRequestDto request = new SubmitAssessmentAttemptRequestDto(2L, List.of(
+                new AttemptAnswerDraftDto(7L, null, null, null, null, learnerXml)));
+
+        AssessmentAttemptResultDto result = service.submitAttempt(83L, request);
+
+        List<DiagramElementReviewDto> elements = result.answers().get(0).diagramElements();
+        DiagramElementReviewDto courseNode = elements.stream()
+                .filter(e -> "Course".equals(e.expectedDescription()))
+                .findFirst().orElseThrow();
+        assertFalse(courseNode.matched());
+        assertNull(courseNode.learnerDescription());
+
+        DiagramElementReviewDto studentNode = elements.stream()
+                .filter(e -> "Student".equals(e.expectedDescription()))
+                .findFirst().orElseThrow();
+        assertTrue(studentNode.matched());
+        assertEquals("Student", studentNode.learnerDescription());
+
+        // The relationship can't exist without both endpoints.
+        DiagramElementReviewDto edge = elements.stream()
+                .filter(e -> "EDGE".equals(e.kind()))
+                .findFirst().orElseThrow();
+        assertFalse(edge.matched());
+
+        assertTrue(result.earnedPoints().compareTo(new BigDecimal("10.00")) < 0);
     }
 
     @Test

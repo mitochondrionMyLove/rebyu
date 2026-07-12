@@ -476,7 +476,8 @@ public class AssessmentAttemptService {
                     answer == null ? null : answer.getProgrammingLanguage(),
                     answer != null && answer.getDiagramSubmissionData() != null,
                     answer == null ? null : answer.getFeedback(),
-                    buildSubQuestionAnswerReviews(source, answer)
+                    buildSubQuestionAnswerReviews(source, answer),
+                    buildDiagramElementReviews(answer, releaseAnswers)
             ));
         }
 
@@ -784,8 +785,7 @@ public class AssessmentAttemptService {
             if (config.isPresent()
                     && "EXACT_MATCH".equalsIgnoreCase(config.get().getCheckingMethod())
                     && answer.getLearnerAnswer() != null) {
-                boolean correct = normalize(answer.getLearnerAnswer())
-                        .equals(normalize(config.get().getCorrectAnswer()));
+                boolean correct = matchesTextAnswer(answer.getLearnerAnswer(), config.get());
                 answer.setIsCorrect(correct);
                 answer.setEarnedPoints(correct ? points : BigDecimal.ZERO);
                 answer.setPendingManualEvaluation(false);
@@ -882,6 +882,30 @@ public class AssessmentAttemptService {
 
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    /**
+     * Exact-match short-answer scoring: the learner answer is correct when it
+     * matches the configured correct answer or any accepted variation (one per
+     * line), e.g. "SQL" and "Structured Query Language".
+     */
+    private static boolean matchesTextAnswer(String learnerAnswer, TextQuestionConfig config) {
+        String normalized = normalize(learnerAnswer);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        if (normalized.equals(normalize(config.getCorrectAnswer()))) {
+            return true;
+        }
+        String variations = config.getAcceptedVariations();
+        if (variations != null && !variations.isBlank()) {
+            for (String variation : variations.split("\\n")) {
+                if (normalized.equals(normalize(variation))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** PROGRAMMING or DIAGRAM when the parent carries that sub-config, else null (analytical). */
@@ -1120,6 +1144,43 @@ public class AssessmentAttemptService {
             ));
         }
         return reviews;
+    }
+
+    /**
+     * Reads the persisted node/edge comparison from a diagram Check/submit
+     * (see gradeDiagramAnswer) so a learner can see exactly which required
+     * elements were found vs. missing — not just a final score. Gated by
+     * the exam's release-answers setting, same as the MCQ answer key,
+     * since the "expected" side of the comparison is reference-diagram
+     * content.
+     */
+    private List<DiagramElementReviewDto> buildDiagramElementReviews(
+            AssessmentAttemptAnswer answer, boolean releaseAnswers) {
+        if (!releaseAnswers || answer == null || answer.getDiagramGradingResult() == null) {
+            return List.of();
+        }
+        try {
+            JsonNode array = objectMapper.readTree(answer.getDiagramGradingResult());
+            if (!array.isArray()) {
+                return List.of();
+            }
+            List<DiagramElementReviewDto> reviews = new ArrayList<>();
+            for (JsonNode node : array) {
+                reviews.add(new DiagramElementReviewDto(
+                        node.path("kind").asText(null),
+                        node.path("expectedDescription").asText(null),
+                        node.path("matched").asBoolean(false),
+                        node.path("matchQuality").asText(null),
+                        node.hasNonNull("learnerDescription") ? node.get("learnerDescription").asText() : null,
+                        node.hasNonNull("earnedPoints") ? node.get("earnedPoints").decimalValue() : null,
+                        node.hasNonNull("maxPoints") ? node.get("maxPoints").decimalValue() : null
+                ));
+            }
+            return reviews;
+        } catch (Exception e) {
+            log.warn("Could not parse persisted diagram grading result");
+            return List.of();
+        }
     }
 
     private Map<Long, JsonNode> parseSubAnswerScores(String subAnswerScoresJson) {

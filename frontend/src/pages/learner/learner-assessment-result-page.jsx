@@ -344,7 +344,54 @@ export default function LearnerAssessmentResultPage() {
                       </div>
                     ) : null}
 
-                    {answer.diagramSubmitted ? (
+                    {answer.diagramSubmitted && answer.diagramElements?.length > 0 ? (
+                      <div className="space-y-2 text-sm">
+                        <p className="text-muted-foreground">
+                          Diagram comparison — required elements vs. what you drew:
+                        </p>
+                        <ul className="space-y-1.5">
+                          {answer.diagramElements.map((element, index) => (
+                            <li
+                              key={index}
+                              className={cn(
+                                "flex items-start gap-2 rounded-lg border p-2.5",
+                                element.matched
+                                  ? "border-primary/30 bg-primary/5"
+                                  : "border-destructive/30 bg-destructive/5"
+                              )}
+                            >
+                              {element.matched ? (
+                                <CheckCircle2Icon
+                                  className="mt-0.5 size-4 shrink-0 text-primary"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <XCircleIcon
+                                  className="mt-0.5 size-4 shrink-0 text-destructive"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="flex flex-wrap items-center gap-1.5 font-medium">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {element.kind === "EDGE" ? "Relationship" : "Node"}
+                                  </Badge>
+                                  {element.expectedDescription}
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {element.matched
+                                    ? `You drew: ${element.learnerDescription}`
+                                    : "Missing from your diagram"}
+                                  {element.earnedPoints != null && element.maxPoints != null
+                                    ? ` · ${Number(element.earnedPoints)} / ${Number(element.maxPoints)} pts`
+                                    : ""}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : answer.diagramSubmitted ? (
                       <p className="text-sm text-muted-foreground">
                         A diagram answer was submitted and stored for review.
                       </p>

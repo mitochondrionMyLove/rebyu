@@ -49,8 +49,10 @@ public class DiagramGradingService {
 
     private final DiagramGraphExtractor extractor;
 
-    private record NodeScore(boolean matched, String quality, double factor) {}
-    private record EdgeScore(boolean matched, String quality, double factor) {}
+    private record NodeScore(
+            boolean matched, String quality, double factor, DiagramGraphDto.Node matchedNode) {}
+    private record EdgeScore(
+            boolean matched, String quality, double factor, DiagramGraphDto.Edge matchedEdge) {}
 
     public DiagramGradingResultDto grade(DiagramGradingRequestDto request) {
         DiagramGraphDto reference;
@@ -115,27 +117,50 @@ public class DiagramGradingService {
                 ? BigDecimal.ZERO
                 : maxPoints.divide(BigDecimal.valueOf(totalElements), 6, RoundingMode.HALF_UP);
 
+        Map<String, DiagramGraphDto.Node> referenceNodesById = new LinkedHashMap<>();
+        for (DiagramGraphDto.Node node : reference.nodes()) {
+            referenceNodesById.put(node.id(), node);
+        }
+        Map<String, DiagramGraphDto.Node> learnerNodesById = new LinkedHashMap<>();
+        for (DiagramGraphDto.Node node : learner.nodes()) {
+            learnerNodesById.put(node.id(), node);
+        }
+
         // Accumulate in full precision and round only the final total — if
         // every element rounded to 2dp first, a maxPoints that doesn't
         // divide evenly (e.g. 10/3) would lose cents even on a perfect match.
         BigDecimal earnedRaw = BigDecimal.ZERO;
         List<ElementResultDto> elementResults = new ArrayList<>();
         int matchedNodes = 0;
-        for (NodeScore score : nodeScores) {
+        for (int i = 0; i < nodeScores.size(); i++) {
+            NodeScore score = nodeScores.get(i);
+            DiagramGraphDto.Node refNode = reference.nodes().get(i);
             BigDecimal raw = perElement.multiply(BigDecimal.valueOf(score.factor()));
             earnedRaw = earnedRaw.add(raw);
             if (score.matched()) matchedNodes++;
             elementResults.add(new ElementResultDto(
-                    "NODE", score.matched(), score.quality(), raw.setScale(2, RoundingMode.HALF_UP),
+                    "NODE",
+                    describeNode(refNode),
+                    score.matched(),
+                    score.quality(),
+                    score.matchedNode() == null ? null : describeNode(score.matchedNode()),
+                    raw.setScale(2, RoundingMode.HALF_UP),
                     perElement.setScale(2, RoundingMode.HALF_UP)));
         }
         int matchedEdges = 0;
-        for (EdgeScore score : edgeScores) {
+        for (int i = 0; i < edgeScores.size(); i++) {
+            EdgeScore score = edgeScores.get(i);
+            DiagramGraphDto.Edge refEdge = reference.edges().get(i);
             BigDecimal raw = perElement.multiply(BigDecimal.valueOf(score.factor()));
             earnedRaw = earnedRaw.add(raw);
             if (score.matched()) matchedEdges++;
             elementResults.add(new ElementResultDto(
-                    "EDGE", score.matched(), score.quality(), raw.setScale(2, RoundingMode.HALF_UP),
+                    "EDGE",
+                    describeEdge(refEdge, referenceNodesById),
+                    score.matched(),
+                    score.quality(),
+                    score.matchedEdge() == null ? null : describeEdge(score.matchedEdge(), learnerNodesById),
+                    raw.setScale(2, RoundingMode.HALF_UP),
                     perElement.setScale(2, RoundingMode.HALF_UP)));
         }
 
@@ -147,7 +172,7 @@ public class DiagramGradingService {
 
     private NodeScore scoreNodeMatch(DiagramGraphDto.Node refNode, DiagramGraphDto.Node matched, double similarity) {
         if (matched == null || similarity < SIM_WEAK) {
-            return new NodeScore(false, "NONE", 0.0);
+            return new NodeScore(false, "NONE", 0.0, null);
         }
 
         double base;
@@ -177,7 +202,7 @@ public class DiagramGradingService {
             base *= 0.85;
         }
 
-        return new NodeScore(true, quality, base);
+        return new NodeScore(true, quality, base, matched);
     }
 
     private EdgeScore scoreEdgeMatch(
@@ -189,7 +214,7 @@ public class DiagramGradingService {
         // A relationship can't exist if either endpoint's required node was
         // never matched in the learner's diagram.
         if (matchedSource == null || matchedTarget == null) {
-            return new EdgeScore(false, "NONE", 0.0);
+            return new EdgeScore(false, "NONE", 0.0, null);
         }
 
         DiagramGraphDto.Edge forward = findEdge(learnerEdges, matchedSource, matchedTarget);
@@ -197,7 +222,7 @@ public class DiagramGradingService {
                 ? findEdge(learnerEdges, matchedTarget, matchedSource) : null;
         DiagramGraphDto.Edge found = forward != null ? forward : reversed;
         if (found == null) {
-            return new EdgeScore(false, "NONE", 0.0);
+            return new EdgeScore(false, "NONE", 0.0, null);
         }
 
         boolean correctDirection = forward != null;
@@ -219,7 +244,20 @@ public class DiagramGradingService {
             quality = "WEAK";
         }
 
-        return new EdgeScore(true, quality, factor);
+        return new EdgeScore(true, quality, factor, found);
+    }
+
+    private String describeNode(DiagramGraphDto.Node node) {
+        return node.label() == null || node.label().isBlank() ? "(unlabeled node)" : node.label();
+    }
+
+    private String describeEdge(DiagramGraphDto.Edge edge, Map<String, DiagramGraphDto.Node> nodesById) {
+        DiagramGraphDto.Node source = nodesById.get(edge.sourceId());
+        DiagramGraphDto.Node target = nodesById.get(edge.targetId());
+        String sourceLabel = source == null ? "?" : describeNode(source);
+        String targetLabel = target == null ? "?" : describeNode(target);
+        String base = sourceLabel + " → " + targetLabel;
+        return edge.label() == null || edge.label().isBlank() ? base : base + " (" + edge.label() + ")";
     }
 
     private DiagramGraphDto.Edge findEdge(List<DiagramGraphDto.Edge> edges, String sourceId, String targetId) {

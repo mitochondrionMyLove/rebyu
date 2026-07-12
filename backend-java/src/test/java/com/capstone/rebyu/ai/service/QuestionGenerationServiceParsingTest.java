@@ -87,17 +87,20 @@ class QuestionGenerationServiceParsingTest {
 
     private QuestionGenerationService newService() {
         return new QuestionGenerationService(
-                null,
-                null,
-                null,
-                null,
-                null,
-                validator,
-                null,
-                null,
-                null,
-                null,
-                new ObjectMapper()
+                null,   // lessonRepository
+                null,   // certificationRepository
+                null,   // documentIngestionService
+                null,   // questionSourceImageService
+                null,   // questionGenerationAssistant
+                null,   // aiUploadValidator
+                validator, // generatedQuestionDraftValidator
+                null,   // knowledgeDocumentRepository
+                null,   // knowledgeDocumentImageRepository
+                null,   // embeddingModel
+                null,   // questionEmbeddingStore
+                null,   // lessonEmbeddingStore
+                new ObjectMapper(),
+                null    // chatModel
         );
     }
 

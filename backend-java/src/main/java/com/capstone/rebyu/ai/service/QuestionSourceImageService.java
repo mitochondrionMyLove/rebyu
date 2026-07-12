@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import javax.imageio.ImageIO;
@@ -25,7 +26,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -36,7 +39,17 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class QuestionSourceImageService {
 
-    public record ExtractedSource(String text, Set<String> imageKeys) {}
+    /** One image extracted from a source file, with enough context to link and caption it. */
+    public record ExtractedImage(
+            String key, String contentType, Integer page, Integer order, String nearbyText) {}
+
+    /**
+     * {@code images} carries the structured per-image metadata (page/order/
+     * content type/nearby text) used to persist {@code KnowledgeDocumentImage}
+     * rows; {@code imageKeys} is kept as a flat set for existing callers that
+     * only need trusted-key validation.
+     */
+    public record ExtractedSource(String text, Set<String> imageKeys, List<ExtractedImage> images) {}
 
     private final S3Client s3Client;
 
@@ -59,33 +72,54 @@ public class QuestionSourceImageService {
             log.warn("Embedded-image extraction failed for '{}'; continuing with text only: {}",
                     name, e.getMessage());
         }
-        return new ExtractedSource(fallbackText, Set.of());
+        return new ExtractedSource(fallbackText, Set.of(), List.of());
+    }
+
+    /** Downloads and base64-encodes an already-extracted image for a vision-model prompt. */
+    public String downloadAsBase64(String key) throws IOException {
+        byte[] bytes = s3Client.getObject(GetObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(key)
+                        .build())
+                .readAllBytes();
+        return Base64.getEncoder().encodeToString(bytes);
     }
 
     private ExtractedSource extractPdf(byte[] bytes, String filename) throws IOException {
         StringBuilder context = new StringBuilder();
-        Set<String> keys = new HashSet<>();
+        Set<String> keys = new LinkedHashSet<>();
+        List<ExtractedImage> images = new ArrayList<>();
         try (PDDocument document = PDDocument.load(bytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
             for (int pageIndex = 0; pageIndex < document.getNumberOfPages(); pageIndex++) {
                 int pageNumber = pageIndex + 1;
                 stripper.setStartPage(pageNumber);
                 stripper.setEndPage(pageNumber);
+                String pageText = stripper.getText(document).trim();
                 context.append("\n--- SOURCE PAGE ").append(pageNumber).append(" ---\n")
-                        .append(stripper.getText(document).trim()).append('\n');
+                        .append(pageText).append('\n');
                 PDPage page = document.getPage(pageIndex);
-                List<PDImageXObject> images = new ArrayList<>();
-                collectPdfImages(page.getResources(), images, new HashSet<>());
-                for (int imageIndex = 0; imageIndex < images.size(); imageIndex++) {
-                    String key = uploadPng(images.get(imageIndex), filename, pageNumber, imageIndex + 1);
+                List<PDImageXObject> pdImages = new ArrayList<>();
+                collectPdfImages(page.getResources(), pdImages, new HashSet<>());
+                for (int imageIndex = 0; imageIndex < pdImages.size(); imageIndex++) {
+                    String key = uploadPng(pdImages.get(imageIndex), filename, pageNumber, imageIndex + 1);
                     keys.add(key);
+                    images.add(new ExtractedImage(key, "image/png", pageNumber, imageIndex + 1,
+                            nearbyText(pageText)));
                     context.append("[SOURCE_IMAGE key=\"").append(key)
                             .append("\" page=").append(pageNumber)
                             .append(" order=").append(imageIndex + 1).append("]\n");
                 }
             }
         }
-        return new ExtractedSource(context.toString(), Set.copyOf(keys));
+        return new ExtractedSource(context.toString(), Set.copyOf(keys), List.copyOf(images));
+    }
+
+    /** A short snippet of the surrounding text, used as a caption/context hint for the AI. */
+    private String nearbyText(String pageText) {
+        if (pageText == null || pageText.isBlank()) return null;
+        String trimmed = pageText.trim();
+        return trimmed.length() > 300 ? trimmed.substring(0, 300) : trimmed;
     }
 
     private void collectPdfImages(PDResources resources, List<PDImageXObject> images,
@@ -104,12 +138,17 @@ public class QuestionSourceImageService {
 
     private ExtractedSource extractDocx(byte[] bytes, String filename) throws IOException {
         StringBuilder context = new StringBuilder();
-        Set<String> keys = new HashSet<>();
+        Set<String> keys = new LinkedHashSet<>();
+        List<ExtractedImage> images = new ArrayList<>();
         int imageIndex = 0;
         try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(bytes))) {
+            String precedingText = null;
             for (XWPFParagraph paragraph : document.getParagraphs()) {
                 String text = paragraph.getText();
-                if (text != null && !text.isBlank()) context.append(text.trim()).append('\n');
+                if (text != null && !text.isBlank()) {
+                    context.append(text.trim()).append('\n');
+                    precedingText = text.trim();
+                }
                 for (XWPFRun run : paragraph.getRuns()) {
                     for (XWPFPicture picture : run.getEmbeddedPictures()) {
                         imageIndex++;
@@ -118,13 +157,14 @@ public class QuestionSourceImageService {
                         String contentType = picture.getPictureData().getPackagePart().getContentType();
                         String key = upload(imageBytes, extension, contentType, filename, 0, imageIndex);
                         keys.add(key);
+                        images.add(new ExtractedImage(key, contentType, null, imageIndex, precedingText));
                         context.append("[SOURCE_IMAGE key=\"").append(key)
                                 .append("\" order=").append(imageIndex).append("]\n");
                     }
                 }
             }
         }
-        return new ExtractedSource(context.toString(), Set.copyOf(keys));
+        return new ExtractedSource(context.toString(), Set.copyOf(keys), List.copyOf(images));
     }
 
     private String uploadPng(PDImageXObject image, String filename, int page, int order)

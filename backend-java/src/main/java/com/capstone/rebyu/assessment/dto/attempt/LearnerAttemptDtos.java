@@ -135,6 +135,23 @@ public final class LearnerAttemptDtos {
     ) {
     }
 
+    /**
+     * One required diagram element (node or relationship) compared against
+     * what the learner actually drew — so a learner can see exactly which
+     * required parts were found or missing, not just a final score. Gated
+     * by the exam's release-answers setting, same as the MCQ answer key.
+     */
+    public record DiagramElementReviewDto(
+            String kind,                 // NODE | EDGE
+            String expectedDescription,
+            boolean matched,
+            String matchQuality,         // STRONG | PARTIAL | WEAK | NONE
+            String learnerDescription,   // what the learner drew that matched; null when missing
+            BigDecimal earnedPoints,
+            BigDecimal maxPoints
+    ) {
+    }
+
     public record AttemptAnswerReviewDto(
             Long attemptQuestionId,
             Integer displayOrder,
@@ -153,7 +170,8 @@ public final class LearnerAttemptDtos {
             String programmingLanguage,
             boolean diagramSubmitted,
             String feedback,
-            List<SubQuestionAnswerReviewDto> subQuestionAnswers
+            List<SubQuestionAnswerReviewDto> subQuestionAnswers,
+            List<DiagramElementReviewDto> diagramElements
     ) {
     }
 

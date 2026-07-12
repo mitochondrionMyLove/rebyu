@@ -1,12 +1,17 @@
 package com.capstone.rebyu.assessment.repository;
 
 import com.capstone.rebyu.assessment.entity.AssessmentAttempt;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface AssessmentAttemptRepository extends JpaRepository<AssessmentAttempt, Long> {
+
+    /** Reconciliation: page through finalized attempts newest-first. */
+    List<AssessmentAttempt> findByStatusOrderBySubmittedAtDesc(
+            AssessmentAttempt.Status status, Pageable pageable);
 
     Optional<AssessmentAttempt> findByIdempotencyKey(String idempotencyKey);
 

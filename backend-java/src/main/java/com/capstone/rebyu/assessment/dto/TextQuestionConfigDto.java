@@ -7,6 +7,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -22,4 +24,7 @@ public class TextQuestionConfigDto {
     @NotBlank
     @Size(max = 30)
     private String checkingMethod;
+
+    /** Optional additional exact-match answers accepted as correct. */
+    private List<String> acceptedVariations;
 }

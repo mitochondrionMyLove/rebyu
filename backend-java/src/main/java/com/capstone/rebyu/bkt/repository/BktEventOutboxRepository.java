@@ -1,6 +1,8 @@
 package com.capstone.rebyu.bkt.repository;
 
 import com.capstone.rebyu.bkt.entity.BktEventOutbox;
+import com.capstone.rebyu.bkt.entity.BktOutboxStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,7 +24,9 @@ public interface BktEventOutboxRepository extends JpaRepository<BktEventOutbox, 
 
     List<BktEventOutbox> findByExamResultIdAndAttemptNo(Long examResultId, Integer attemptNo);
 
-    long countByStatus(String status);
+    long countByStatus(BktOutboxStatus status);
+
+    List<BktEventOutbox> findByStatusOrderByCreatedAtDesc(BktOutboxStatus status, Pageable pageable);
 
     /**
      * Claim up to {@code limit} deliverable rows: PENDING and past their backoff

@@ -2486,8 +2486,14 @@ const QuestionCardWrapper = React.memo(function QuestionCardWrapper({
     );
 });
 
-function QuestionBank() {
-    const [activeTab, setActiveTab] = useState("all-questions");
+// `mode` splits this screen into three routed pages that reuse the exact same
+// editor: "bank" (view/filter/edit/delete), "generate" (AI modal + preview),
+// and "manual" (pick certification + lesson, add questions). "all" keeps the
+// original combined two-tab screen as a fallback.
+function QuestionBank({ mode = "all" }) {
+    const [activeTab, setActiveTab] = useState(
+        mode === "generate" || mode === "manual" ? "question-builder" : "all-questions"
+    );
 
     const [filterCertificationId, setFilterCertificationId] = useState("");
 
@@ -3345,55 +3351,69 @@ OUTPUT RULES:
                 <header className="shrink-0 border-b border-border bg-background py-5">
                     <div>
                         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-                            Question Bank
+                            {mode === "generate"
+                                ? "AI Question Generation"
+                                : mode === "manual"
+                                    ? "Manual Question Creation"
+                                    : "Question Bank"}
                         </h1>
 
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Create and manage questions for certifications, quizzes, and
-                            exams.
+                            {mode === "generate"
+                                ? "Generate draft questions from certification knowledge or uploaded files, then review, edit, and save them."
+                                : mode === "manual"
+                                    ? "Select a certification and lesson, then add and save questions by hand."
+                                    : "View, filter, edit, preview, and delete saved questions."}
                         </p>
                     </div>
                 </header>
 
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-background">
-                    <TabsList className="h-11 w-fit rounded-none bg-transparent p-0">
-                        <TabsTrigger
-                            value="all-questions"
-                            className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                        >
-                            <ListChecks className="mr-2 h-4 w-4" />
-                            All Questions
-                        </TabsTrigger>
+                    {mode === "all" ? (
+                        <TabsList className="h-11 w-fit rounded-none bg-transparent p-0">
+                            <TabsTrigger
+                                value="all-questions"
+                                className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                            >
+                                <ListChecks className="mr-2 h-4 w-4" />
+                                All Questions
+                            </TabsTrigger>
 
-                        <TabsTrigger
-                            value="question-builder"
-                            className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                        >
-                            <BookOpen className="mr-2 h-4 w-4" />
-                            Question Builder
-                        </TabsTrigger>
-                    </TabsList>
+                            <TabsTrigger
+                                value="question-builder"
+                                className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                            >
+                                <BookOpen className="mr-2 h-4 w-4" />
+                                Question Builder
+                            </TabsTrigger>
+                        </TabsList>
+                    ) : (
+                        <span className="py-3" />
+                    )}
 
                     {activeTab === "question-builder" && (
                         <div className="flex shrink-0 items-center gap-2 py-1.5">
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={
-                                    !selectedCertification ||
-                                    isSavingQuestions ||
-                                    isGeneratingQuestions
-                                }
-                                onClick={() => setIsQuestionFileGeneratorOpen(true)}
-                            >
-                                <UploadIcon className="mr-2 h-4 w-4" />
-                                Upload File
-                            </Button>
+                            {mode !== "manual" && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={mode === "generate" ? "default" : "outline"}
+                                    disabled={
+                                        !selectedCertification ||
+                                        isSavingQuestions ||
+                                        isGeneratingQuestions
+                                    }
+                                    onClick={() => setIsQuestionFileGeneratorOpen(true)}
+                                >
+                                    <UploadIcon className="mr-2 h-4 w-4" />
+                                    Generate Questions
+                                </Button>
+                            )}
 
                             <Button
                                 type="button"
                                 size="sm"
+                                variant={mode === "generate" ? "outline" : "default"}
                                 disabled={
                                     isSavingQuestions || !selectedLesson || questions.length === 0
                                 }

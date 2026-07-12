@@ -2,11 +2,14 @@ package com.capstone.rebyu.ai.service;
 
 import com.capstone.rebyu.ai.dto.KnowledgeDocumentDto;
 import com.capstone.rebyu.ai.entity.KnowledgeDocument;
+import com.capstone.rebyu.ai.entity.KnowledgeDocumentImage;
 import com.capstone.rebyu.ai.mapper.KnowledgeDocumentMapper;
+import com.capstone.rebyu.ai.repository.KnowledgeDocumentImageRepository;
 import com.capstone.rebyu.ai.repository.KnowledgeDocumentRepository;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentParser;
 import dev.langchain4j.data.document.DocumentSplitter;
+import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.document.parser.TextDocumentParser;
 import dev.langchain4j.data.document.parser.apache.pdfbox.ApachePdfBoxDocumentParser;
 import dev.langchain4j.data.document.parser.apache.poi.ApachePoiDocumentParser;
@@ -32,16 +35,26 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 @Transactional
 public class DocumentIngestionService {
 
+    /** Matches the [SOURCE_IMAGE key="..." page=N order=N] markers QuestionSourceImageService inlines into text. */
+    private static final Pattern SOURCE_IMAGE_MARKER =
+            Pattern.compile("\\[SOURCE_IMAGE key=\"([^\"]+)\"[^]]*]");
+
     private final KnowledgeDocumentRepository knowledgeDocumentRepository;
+    private final KnowledgeDocumentImageRepository knowledgeDocumentImageRepository;
     private final KnowledgeDocumentMapper knowledgeDocumentMapper;
+    private final QuestionSourceImageService questionSourceImageService;
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> lessonEmbeddingStore;
     private final EmbeddingStore<TextSegment> questionEmbeddingStore;
@@ -51,7 +64,9 @@ public class DocumentIngestionService {
 
     public DocumentIngestionService(
             KnowledgeDocumentRepository knowledgeDocumentRepository,
+            KnowledgeDocumentImageRepository knowledgeDocumentImageRepository,
             KnowledgeDocumentMapper knowledgeDocumentMapper,
+            QuestionSourceImageService questionSourceImageService,
             EmbeddingModel embeddingModel,
             @Qualifier("lessonEmbeddingStore") EmbeddingStore<TextSegment> lessonEmbeddingStore,
             @Qualifier("questionEmbeddingStore") EmbeddingStore<TextSegment> questionEmbeddingStore,
@@ -60,7 +75,9 @@ public class DocumentIngestionService {
             @Value("${aws.s3.bucket-name}") String bucketName
     ) {
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
+        this.knowledgeDocumentImageRepository = knowledgeDocumentImageRepository;
         this.knowledgeDocumentMapper = knowledgeDocumentMapper;
+        this.questionSourceImageService = questionSourceImageService;
         this.embeddingModel = embeddingModel;
         this.lessonEmbeddingStore = lessonEmbeddingStore;
         this.questionEmbeddingStore = questionEmbeddingStore;
@@ -96,22 +113,33 @@ public class DocumentIngestionService {
                     RequestBody.fromBytes(bytes)
             );
 
+            // Text-only extraction stays the existing behavior for every file
+            // type; PDF/DOCX additionally get embedded images extracted and
+            // marker-tagged in the text (same mechanism as per-request
+            // question-generation uploads) so images can be linked to chunks.
             DocumentParser parser = resolveParser(file.getContentType());
-            Document document = parser.parse(new ByteArrayInputStream(bytes));
-            document.metadata().put("documentId", String.valueOf(doc.getKnowledgeDocumentId()));
-            document.metadata().put("filename", doc.getOriginalFilename());
+            String fallbackText = parser.parse(new ByteArrayInputStream(bytes)).text();
+            QuestionSourceImageService.ExtractedSource extracted =
+                    questionSourceImageService.extract(file, fallbackText);
+
+            Metadata metadata = new Metadata();
+            metadata.put("documentId", String.valueOf(doc.getKnowledgeDocumentId()));
+            metadata.put("filename", doc.getOriginalFilename());
             if (certificationId != null) {
-                document.metadata().put("certificationId", String.valueOf(certificationId));
+                metadata.put("certificationId", String.valueOf(certificationId));
             }
+            Document document = Document.from(extracted.text(), metadata);
 
             DocumentSplitter splitter = DocumentSplitters.recursive(500, 50);
-            List<TextSegment> segments = splitter.split(document);
+            List<TextSegment> segments = attachImageLinksAndStripMarkers(splitter.split(document));
 
             EmbeddingStore<TextSegment> targetStore = useCase == KnowledgeDocument.UseCase.QUESTION
                     ? questionEmbeddingStore : lessonEmbeddingStore;
 
             List<Embedding> embeddings = embeddingModel.embedAll(segments).content();
             addEmbeddingsInBatches(embeddings, segments, targetStore, 20);
+
+            persistExtractedImages(doc, extracted.images());
 
             doc.setS3Key(s3Key);
             doc.setChunkCount(segments.size());
@@ -160,6 +188,18 @@ public class DocumentIngestionService {
                     .build());
         }
 
+        // Extracted images are stored separately from the document's own S3
+        // object and are never referenced by the embeddings DELETE below, so
+        // clean their S3 objects up explicitly; the DB rows cascade with the
+        // document via the FK.
+        for (KnowledgeDocumentImage image :
+                knowledgeDocumentImageRepository.findByKnowledgeDocument_KnowledgeDocumentId(id)) {
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(image.getImageKey())
+                    .build());
+        }
+
         String embeddingsTable = doc.getUseCase() == KnowledgeDocument.UseCase.QUESTION
                 ? "question_embeddings" : "lesson_embeddings";
         jdbcTemplate.update(
@@ -177,6 +217,53 @@ public class DocumentIngestionService {
             int end = Math.min(i + batchSize, embeddings.size());
             store.addAll(embeddings.subList(i, end), segments.subList(i, end));
             log.debug("Stored embedding batch {}-{} of {}", i, end, embeddings.size());
+        }
+    }
+
+    /**
+     * Links each chunk to the images that fell within it: scans every
+     * segment for [SOURCE_IMAGE key="..."] markers, records the keys found
+     * as a comma-joined "imageKeys" metadata entry (so retrieval can pull
+     * images together with their chunk without storing image data in the
+     * embedding itself), and strips the marker syntax out of the embedded/
+     * searchable text. Segments without any marker are returned unchanged.
+     */
+    private List<TextSegment> attachImageLinksAndStripMarkers(List<TextSegment> rawSegments) {
+        List<TextSegment> result = new ArrayList<>(rawSegments.size());
+        for (TextSegment segment : rawSegments) {
+            Matcher matcher = SOURCE_IMAGE_MARKER.matcher(segment.text());
+            Set<String> keysInSegment = new LinkedHashSet<>();
+            while (matcher.find()) {
+                keysInSegment.add(matcher.group(1));
+            }
+            if (keysInSegment.isEmpty()) {
+                result.add(segment);
+                continue;
+            }
+            String cleaned = SOURCE_IMAGE_MARKER.matcher(segment.text()).replaceAll("").trim();
+            Metadata metadata = segment.metadata().copy();
+            metadata.put("imageKeys", String.join(",", keysInSegment));
+            result.add(TextSegment.from(cleaned.isBlank() ? segment.text() : cleaned, metadata));
+        }
+        return result;
+    }
+
+    private void persistExtractedImages(
+            KnowledgeDocument doc, List<QuestionSourceImageService.ExtractedImage> images) {
+        LocalDateTime now = LocalDateTime.now();
+        for (QuestionSourceImageService.ExtractedImage image : images) {
+            knowledgeDocumentImageRepository.save(KnowledgeDocumentImage.builder()
+                    .knowledgeDocument(doc)
+                    .imageKey(image.key())
+                    .contentType(image.contentType())
+                    .pageNumber(image.page())
+                    .orderInPage(image.order())
+                    .nearbyText(image.nearbyText())
+                    .createdAt(now)
+                    .build());
+        }
+        if (!images.isEmpty()) {
+            log.info("Linked {} image(s) to document '{}'", images.size(), doc.getOriginalFilename());
         }
     }
 

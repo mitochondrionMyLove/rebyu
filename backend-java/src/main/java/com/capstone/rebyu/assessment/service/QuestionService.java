@@ -10,6 +10,10 @@ import com.capstone.rebyu.assessment.repository.LearnerExamDetailRepository;
 import com.capstone.rebyu.assessment.repository.ProgrammingQuestionConfigRepository;
 import com.capstone.rebyu.assessment.repository.QuestionRepository;
 import com.capstone.rebyu.assessment.repository.TextQuestionConfigRepository;
+import com.capstone.rebyu.certification.entity.Certification;
+import com.capstone.rebyu.certification.entity.Lesson;
+import com.capstone.rebyu.certification.entity.MajorCategory;
+import com.capstone.rebyu.certification.entity.MiddleCategory;
 import com.capstone.rebyu.certification.repository.LessonRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -51,6 +56,7 @@ public class QuestionService {
 
     public QuestionDto create(QuestionDto dto) {
         log.info("Creating new question");
+        validateLesson(dto);
         Question entity = questionMapper.toEntity(dto);
         entity.setQuestionId(null);
         resolveParent(entity, dto.getParentQuestionId());
@@ -61,6 +67,7 @@ public class QuestionService {
 
     public QuestionDto update(Long id, QuestionDto dto) {
         log.info("Updating question id: {}", id);
+        validateLesson(dto);
         Question entity = findEntity(id);
         entity.setQuestionType(dto.getQuestionType());
         entity.setDifficultyLevel(dto.getDifficultyLevel());
@@ -72,6 +79,35 @@ public class QuestionService {
         QuestionDto result = questionMapper.toDto(questionRepository.save(entity));
         log.info("Question id: {} updated", id);
         return result;
+    }
+
+    /**
+     * Guarantees a question is anchored to a real lesson, and — when the client
+     * supplies a certificationId — that the lesson actually belongs to that
+     * certification. This backs the rule that every generated or manually
+     * created question must carry a lessonId within the selected certification.
+     */
+    private void validateLesson(QuestionDto dto) {
+        if (dto.getLessonId() == null) {
+            throw new IllegalArgumentException("A lessonId is required to save a question.");
+        }
+        Lesson lesson = lessonRepository.findById(dto.getLessonId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Lesson not found: " + dto.getLessonId()));
+
+        if (dto.getCertificationId() == null) {
+            return; // existence verified; certification scoping not requested
+        }
+        Long resolvedCertificationId = Optional.ofNullable(lesson.getMiddleCategory())
+                .map(MiddleCategory::getMajorCategory)
+                .map(MajorCategory::getCertification)
+                .map(Certification::getCertificationId)
+                .orElse(null);
+        if (!dto.getCertificationId().equals(resolvedCertificationId)) {
+            throw new IllegalArgumentException(
+                    "Lesson " + dto.getLessonId() + " does not belong to certification "
+                            + dto.getCertificationId() + ".");
+        }
     }
 
     public void delete(Long id) {

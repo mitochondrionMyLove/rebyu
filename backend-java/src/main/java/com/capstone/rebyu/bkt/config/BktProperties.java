@@ -30,6 +30,9 @@ public class BktProperties {
     private int retryInitialDelaySeconds = 15;
     private int retryMaxDelaySeconds = 3600;
 
+    /** Max submitted attempts scanned per reconciliation run. */
+    private int reconciliationBatchSize = 200;
+
     /** Partial-credit correctness threshold: isCorrect = awarded/max >= this. */
     private double partialCreditCorrectThreshold = 0.60;
 
@@ -109,6 +112,14 @@ public class BktProperties {
 
     public void setRetryMaxDelaySeconds(int retryMaxDelaySeconds) {
         this.retryMaxDelaySeconds = retryMaxDelaySeconds;
+    }
+
+    public int getReconciliationBatchSize() {
+        return reconciliationBatchSize;
+    }
+
+    public void setReconciliationBatchSize(int reconciliationBatchSize) {
+        this.reconciliationBatchSize = reconciliationBatchSize;
     }
 
     public double getPartialCreditCorrectThreshold() {

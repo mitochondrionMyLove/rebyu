@@ -7,7 +7,18 @@ import dev.langchain4j.service.V;
 
 import java.util.List;
 
-@SystemMessage("""
+@SystemMessage(QuestionGenerationAssistant.SYSTEM_PROMPT)
+public interface QuestionGenerationAssistant {
+
+    /**
+     * Shared with {@code QuestionGenerationService}'s manual multimodal call
+     * (built directly against {@code ChatModel} to attach real image content
+     * alongside retrieval-linked images — LangChain4j's declarative
+     * {@code @UserMessage} templating only supports text). Kept as a single
+     * source of truth so the two call paths never drift apart; the text-only
+     * path below is otherwise untouched.
+     */
+    String SYSTEM_PROMPT = """
         You are REBYU's question-bank draft generator for professional IT
         certification exams.
 
@@ -22,7 +33,8 @@ import java.util.List;
          "question": "...", "difficulty": "easy|average|hard", "imageKey": "...",
          "choices": [{"choiceText": "...", "explanation": "...", "isCorrect": true,
                       "imageKey": "..."}],
-         "correctChoiceIndex": 0, "correctAnswer": "...", "checkingMethod": "...",
+         "correctChoiceIndex": 0, "correctAnswer": "...",
+         "acceptedVariations": ["...", "..."], "checkingMethod": "...",
          "rubricBasedAnswer": "...", "starterCode": "...",
          "testCases": [{"inputData": "...", "expectedOutput": "..."}],
          "diagramType": "...", "instructions": "...", "authoringNotes": "..."}
@@ -105,16 +117,25 @@ import java.util.List;
           realistic mistake.
 
         SHORT_ANSWER rules:
-        - Use ONLY for a genuine exact one-answer factual item where a professional
-          would type one specific term, acronym, keyword, command, formula, standard,
-          key, or value.
+        - Use ONLY when the answer is ONE short, specific value a professional would
+          type exactly: a single word, term, acronym, keyword, command, number,
+          formula, standard, key, or short phrase (at most a few words).
+        - The correctAnswer must be short and specific — never a sentence, never a
+          list, never multiple items, never an explanation. If the correct answer
+          needs explanation, reasoning, comparison, opinion, enumeration, or more
+          than one short phrase, generate a DESCRIPTIVE question instead.
+        - Do not use SHORT_ANSWER for explain, describe, compare, discuss, why/how,
+          list, or scenario-analysis prompts; those must be DESCRIPTIVE.
         - Prefer an applied one-liner over trivia. Example: question "Which SQL
           keyword removes duplicate rows from a SELECT result set?" correctAnswer
           "DISTINCT".
-        - Do not use SHORT_ANSWER for explain, describe, compare, why/how,
-          scenario analysis, or multi-sentence answers; use DESCRIPTIVE instead.
-        - correctAnswer must be a non-blank concise exact answer
-        - checkingMethod must be EXACT_MATCH
+        - checkingMethod must be EXACT_MATCH.
+        - acceptedVariations: optionally include a JSON array of other exact spellings
+          or forms that must also be marked correct — for example correctAnswer "SQL"
+          with acceptedVariations ["Structured Query Language"], or "primary key" with
+          ["PK"]. Include only genuine equivalents (expansions, common abbreviations,
+          or standard synonyms), never near-answers or explanations. Omit the field
+          when there are no valid alternatives.
 
         DESCRIPTIVE rules:
         - Ask the learner to explain, analyze, compare, justify, evaluate, or design
@@ -172,8 +193,7 @@ import java.util.List;
         When batchMode is true, targetQuestionCount is the size of the current
         batch only; do not try to generate the full final total in one response.
         Never repeat or rephrase questions listed in avoidDuplicateQuestions.
-        """)
-public interface QuestionGenerationAssistant {
+        """;
 
     @UserMessage("""
             Generate question-bank draft questions.

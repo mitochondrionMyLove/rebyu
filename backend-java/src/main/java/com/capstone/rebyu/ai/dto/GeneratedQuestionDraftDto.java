@@ -18,8 +18,12 @@ public record GeneratedQuestionDraftDto(
         GeneratedDiagramType diagramType,
         String instructions,
         String authoringNotes,
-        String imageKey
+        String imageKey,
+        // Optional exact-match alternatives for SHORT_ANSWER, e.g. "SQL" and
+        // "Structured Query Language".
+        List<String> acceptedVariations
 ) {
+    /** Convenience constructor for callers that predate imageKey/acceptedVariations. */
     public GeneratedQuestionDraftDto(
             GeneratedQuestionType questionType,
             Long suggestedLessonId,
@@ -40,6 +44,6 @@ public record GeneratedQuestionDraftDto(
         this(questionType, suggestedLessonId, suggestedLessonTitle, question,
                 difficulty, choices, correctChoiceIndex, correctAnswer,
                 checkingMethod, rubricBasedAnswer, starterCode, testCases,
-                diagramType, instructions, authoringNotes, null);
+                diagramType, instructions, authoringNotes, null, null);
     }
 }

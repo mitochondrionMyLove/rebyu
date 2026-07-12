@@ -36,6 +36,12 @@ public class QuestionDto {
     @NotNull
     private Long lessonId;
 
+    /**
+     * Optional: when present, the server verifies {@code lessonId} belongs to
+     * this certification before saving. Not persisted.
+     */
+    private Long certificationId;
+
     @Positive
     private BigDecimal totalPoints;
 
