@@ -90,7 +90,16 @@ public class Exam {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // Nullable so ddl-auto=update can migrate the existing non-empty table;
+    // null is treated as true (current behavior: answers are released).
+    @Column(name = "release_answers_after_submit")
+    private Boolean releaseAnswersAfterSubmit;
+
     public Status effectiveStatus() {
         return status == null ? Status.DRAFT : status;
+    }
+
+    public boolean effectiveReleaseAnswers() {
+        return releaseAnswersAfterSubmit == null || releaseAnswersAfterSubmit;
     }
 }

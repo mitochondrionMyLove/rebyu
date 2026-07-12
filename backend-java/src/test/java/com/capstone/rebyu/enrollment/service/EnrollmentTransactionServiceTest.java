@@ -57,7 +57,6 @@ class EnrollmentTransactionServiceTest {
 
     @Test
     void freeEnrollmentCreatesOneCompletedTransactionAndActiveEnrollment() {
-        certification.setPrice(BigDecimal.ZERO);
         when(certificationRepository.findById(1L)).thenReturn(Optional.of(certification));
         when(learnerRepository.findById(2L)).thenReturn(Optional.of(learner));
         when(enrollmentRepository
@@ -92,7 +91,6 @@ class EnrollmentTransactionServiceTest {
 
     @Test
     void duplicateActiveEnrollmentIsRejected() {
-        certification.setPrice(BigDecimal.ZERO);
         when(certificationRepository.findById(1L)).thenReturn(Optional.of(certification));
         when(learnerRepository.findById(2L)).thenReturn(Optional.of(learner));
         when(enrollmentRepository
@@ -130,7 +128,6 @@ class EnrollmentTransactionServiceTest {
 
     @Test
     void paidPurchaseStaysPendingAndUnverifiedPaymentIsRejected() {
-        certification.setPrice(new BigDecimal("1500"));
         when(certificationRepository.findById(1L)).thenReturn(Optional.of(certification));
         when(learnerRepository.findById(2L)).thenReturn(Optional.of(learner));
         when(enrollmentRepository

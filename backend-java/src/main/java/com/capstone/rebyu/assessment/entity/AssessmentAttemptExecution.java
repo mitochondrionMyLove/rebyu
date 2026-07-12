@@ -9,10 +9,12 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * One Run or Check a learner triggered on a programming item. The executor is
- * not yet wired to a real sandbox, so rows are recorded with an UNAVAILABLE
- * status and never carry a fabricated score. When a runner is added later, this
- * is where its verdict and per-test results get persisted.
+ * One Run or Check a learner triggered on a programming item, executed via
+ * Judge0 (see {@code CodeExecutionService}). Status is UNAVAILABLE when
+ * Judge0 could not be reached or the language isn't supported — a score is
+ * never fabricated in that case. The authoritative per-run payload (code
+ * hash, output, test results, time/memory, earned points) lives on the
+ * answer itself; this table is the Run/Check history log.
  */
 @Entity
 @Table(name = "assessment_attempt_executions")

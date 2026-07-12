@@ -61,5 +61,37 @@ public class ExamDto {
 
     private LocalDateTime updatedAt;
 
+    /** Whether correct answers/explanations are shown to learners after submitting. Null = true. */
+    private Boolean releaseAnswersAfterSubmit;
+
+    /**
+     * Ordered list of the questions the admin selected, with the per-question
+     * point value and display order. This is the single source of truth for
+     * what the assessment contains; when present it fully replaces the exam's
+     * question set (points and order included) on create/update.
+     */
+    private List<ExamQuestionInput> questions;
+
+    /**
+     * Legacy/compatibility list of selected question ids without points.
+     * Retained for callers that only need to set the question set; prefer
+     * {@link #questions} when per-question points must be persisted. On read,
+     * the service always populates this with the ordered selected ids.
+     */
     private List<Long> questionIds;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExamQuestionInput {
+        @NotNull
+        private Long questionId;
+
+        /** Optional per-assessment points; null falls back to the question default. */
+        @DecimalMin("0.0")
+        private BigDecimal points;
+
+        /** 1-based position; when null the service assigns list order. */
+        private Integer displayOrder;
+    }
 }

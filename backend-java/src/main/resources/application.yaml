@@ -136,12 +136,16 @@ aws:
     secret-key: ${AWS_SECRET_ACCESS_KEY}
 
 langchain4j:
-  groq:
-    api-key: ${GROQ_API_KEY}
-    base-url: https://api.groq.com/openai/v1
+  open-ai:
     chat-model:
-      model-name: ${GROQ_MODEL:openai/gpt-oss-120b}
+      api-key: ${GITHUB_TOKEN}
+      base-url: https://models.github.ai/inference
+      model-name: ${GITHUB_MODEL:openai/gpt-4.1-mini}
       temperature: 0.7
+      max-tokens: 4096
+      timeout: 60s
+      log-requests: false
+      log-responses: false
 
 db:
   host: ${HOST}
@@ -166,3 +170,16 @@ bkt:
   partial-credit-correct-threshold: ${BKT_PARTIAL_CREDIT_CORRECT_THRESHOLD:0.60}
   fallback-assessment-type: ${BKT_FALLBACK_ASSESSMENT_TYPE:LESSON_QUIZ}
   fallback-difficulty: ${BKT_FALLBACK_DIFFICULTY:AVERAGE}
+
+# Judge0 code-execution integration for programming assessment items. Defaults
+# to the free, keyless public Judge0 CE instance; set JUDGE0_API_KEY to point
+# at a self-hosted or RapidAPI instance instead.
+judge0:
+  enabled: ${JUDGE0_ENABLED:true}
+  base-url: ${JUDGE0_BASE_URL:https://ce.judge0.com}
+  api-key: ${JUDGE0_API_KEY:}
+  api-key-header: ${JUDGE0_API_KEY_HEADER:X-RapidAPI-Key}
+  connect-timeout-ms: ${JUDGE0_CONNECT_TIMEOUT:5000}
+  read-timeout-ms: ${JUDGE0_READ_TIMEOUT:20000}
+  cpu-time-limit-seconds: ${JUDGE0_CPU_TIME_LIMIT:5}
+  memory-limit-kb: ${JUDGE0_MEMORY_LIMIT:128000}

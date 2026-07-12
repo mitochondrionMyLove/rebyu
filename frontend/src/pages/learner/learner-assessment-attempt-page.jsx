@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -434,6 +434,7 @@ function WorkspaceQuestionPanel({ question, index, answer, onAnswer }) {
 export default function LearnerAssessmentAttemptPage() {
   const { examId } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const identity = getCurrentLearnerIdentity()
   const learnersQuery = useQuery({
@@ -699,8 +700,11 @@ export default function LearnerAssessmentAttemptPage() {
           payload
       )
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       sessionStorage.removeItem(`rebyu-attempt-key-${examId}-${learnerId}`)
+      // Submission may complete the certification's diagnostic gate. Remove
+      // the pre-attempt portal snapshot so lessons are unlocked on return.
+      await queryClient.invalidateQueries({ queryKey: ["learner-portal-data"] })
       toast.success("Assessment submitted.")
       navigate(`/learner/results/${result.assessmentAttemptId}`, {
         replace: true,

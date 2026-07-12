@@ -65,6 +65,27 @@ public class AssessmentAttemptAnswer {
     @Column(name = "pending_manual_evaluation", nullable = false)
     private boolean pendingManualEvaluation = false;
 
+    /** AI grading feedback for descriptive/critical-thinking answers (learner-safe). */
+    @Column(name = "feedback", columnDefinition = "TEXT")
+    private String feedback;
+
+    /** JSON array of per-sub-question AI scores for critical-thinking answers. */
+    @Column(name = "sub_answer_scores", columnDefinition = "TEXT")
+    private String subAnswerScores;
+
+    /**
+     * JSON Judge0 execution payload for programming answers: code hash, mode,
+     * status, output, error, execution time/memory, and per-test results.
+     * Overwritten by every Run/Check and cleared whenever the submitted code
+     * changes without a fresh run (see upsertAnswers).
+     */
+    @Column(name = "execution_result", columnDefinition = "TEXT")
+    private String executionResult;
+
+    /** JSON per-element (node/edge) breakdown from DiagramGradingService. */
+    @Column(name = "diagram_grading_result", columnDefinition = "TEXT")
+    private String diagramGradingResult;
+
     @Column(name = "answered_at")
     private LocalDateTime answeredAt;
 

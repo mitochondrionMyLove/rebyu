@@ -73,9 +73,9 @@ public class ExamService {
         }
         entity.setUpdatedAt(LocalDateTime.now());
         Exam saved = examRepository.save(entity);
-        if (dto.getQuestionIds() != null) {
-            syncExamQuestions(saved, dto.getQuestionIds());
-            saved.setTotalQuestions(dto.getQuestionIds().size());
+        int synced = syncSelectedQuestions(saved, dto);
+        if (synced >= 0) {
+            saved.setTotalQuestions(synced);
             saved = examRepository.save(saved);
         }
         ExamDto result = toDtoWithQuestions(saved);
@@ -96,9 +96,9 @@ public class ExamService {
         entity.setPublishedAt(existing.getPublishedAt());
         entity.setUpdatedAt(LocalDateTime.now());
         Exam saved = examRepository.save(entity);
-        if (dto.getQuestionIds() != null) {
-            syncExamQuestions(saved, dto.getQuestionIds());
-            saved.setTotalQuestions(dto.getQuestionIds().size());
+        int synced = syncSelectedQuestions(saved, dto);
+        if (synced >= 0) {
+            saved.setTotalQuestions(synced);
             saved = examRepository.save(saved);
         }
         ExamDto result = toDtoWithQuestions(saved);
@@ -283,7 +283,9 @@ public class ExamService {
     }
 
     private void normalizeForSave(Exam entity, ExamDto dto) {
-        if (dto.getQuestionIds() != null) {
+        if (dto.getQuestions() != null) {
+            entity.setTotalQuestions(dto.getQuestions().size());
+        } else if (dto.getQuestionIds() != null) {
             entity.setTotalQuestions(dto.getQuestionIds().size());
         } else if (entity.getTotalQuestions() == null) {
             entity.setTotalQuestions(0);
@@ -343,13 +345,46 @@ public class ExamService {
     }
 
     /**
+     * Rebuilds the exam's question records from the admin's selection, honouring
+     * the richer {@code questions} payload (per-question points + order) when the
+     * frontend supplies it and falling back to the legacy {@code questionIds}
+     * list otherwise. The selection is the single source of truth: nothing is
+     * auto-attached from the certification, not even for mock/diagnostic exams.
+     *
+     * @return the number of questions synced, or {@code -1} when the payload
+     *         carried no question selection at all (leave the set untouched).
+     */
+    private int syncSelectedQuestions(Exam exam, ExamDto dto) {
+        if (dto.getQuestions() != null) {
+            syncExamQuestionsWithPoints(exam, dto.getQuestions());
+            return dto.getQuestions().size();
+        }
+        if (dto.getQuestionIds() != null) {
+            List<ExamDto.ExamQuestionInput> inputs = new ArrayList<>();
+            for (Long questionId : dto.getQuestionIds()) {
+                inputs.add(new ExamDto.ExamQuestionInput(questionId, null, null));
+            }
+            syncExamQuestionsWithPoints(exam, inputs);
+            return inputs.size();
+        }
+        return -1;
+    }
+
+    /**
      * Rebuilds the exam's question records from the admin's selection. Only the
      * selected (parent/standalone) questions become exam_questions rows — a
      * parent's sub-questions travel with it via the snapshot at attempt time,
-     * so they must NOT be added here as separate standalone items.
+     * so they must NOT be added here as separate standalone items. Each row
+     * carries its per-assessment point value (null = use the question default)
+     * and a stable 1-based display order. Runs inside the class-level
+     * transaction, so the delete + re-insert is atomic.
      */
-    private void syncExamQuestions(Exam exam, List<Long> questionIds) {
-        List<Long> orderedQuestionIds = new ArrayList<>(questionIds);
+    private void syncExamQuestionsWithPoints(Exam exam, List<ExamDto.ExamQuestionInput> selection) {
+        List<ExamDto.ExamQuestionInput> ordered = new ArrayList<>(selection);
+        List<Long> orderedQuestionIds = ordered.stream()
+                .map(ExamDto.ExamQuestionInput::getQuestionId)
+                .toList();
+
         Set<Long> uniqueQuestionIds = new LinkedHashSet<>(orderedQuestionIds);
         if (uniqueQuestionIds.size() != orderedQuestionIds.size()) {
             throw new BusinessRuleException.InvalidAssessmentSubmissionException(
@@ -387,13 +422,23 @@ public class ExamService {
             }
         }
 
+        // Replace the whole set so edits (add/remove/reorder/repoint) never leave
+        // orphan or duplicate rows behind. Flush the delete before the inserts so
+        // it reaches the DB ahead of the new rows.
         examQuestionRepository.deleteByExam_ExamId(exam.getExamId());
-        int displayOrder = 1;
-        for (Long questionId : orderedQuestionIds) {
+        examQuestionRepository.flush();
+
+        int fallbackOrder = 1;
+        for (ExamDto.ExamQuestionInput input : ordered) {
+            int displayOrder = input.getDisplayOrder() != null
+                    ? input.getDisplayOrder()
+                    : fallbackOrder;
+            fallbackOrder = displayOrder + 1;
             examQuestionRepository.save(ExamQuestion.builder()
                     .exam(exam)
-                    .question(questionById.get(questionId))
-                    .displayOrder(displayOrder++)
+                    .question(questionById.get(input.getQuestionId()))
+                    .displayOrder(displayOrder)
+                    .points(input.getPoints())
                     .build());
         }
     }

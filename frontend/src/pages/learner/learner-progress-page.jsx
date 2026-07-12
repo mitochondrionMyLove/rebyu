@@ -677,8 +677,8 @@ export default function LearnerProgressPage() {
   return (
       <LearnerPremiumGuard
           feature={FEATURES.PROGRESS_ANALYTICS}
-          title="Progress analytics require REBYU Pro"
-          description="Upgrade to REBYU Pro to view detailed learning progress, performance trends, mastery, and weak areas."
+          title="Pro Feature"
+          description="Detailed progress analytics require a Pro subscription. Upgrade to unlock this feature."
           benefits={[
             "Certification progress tracking",
             "Quiz and exam performance trends",

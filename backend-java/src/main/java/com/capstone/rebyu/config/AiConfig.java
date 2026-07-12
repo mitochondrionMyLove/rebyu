@@ -1,6 +1,7 @@
 package com.capstone.rebyu.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.capstone.rebyu.ai.assistant.AnswerGradingAssistant;
 import com.capstone.rebyu.ai.assistant.CurriculumPlanningAssistant;
 import com.capstone.rebyu.ai.assistant.LessonGenerationAssistant;
 import com.capstone.rebyu.ai.assistant.QuestionGenerationAssistant;
@@ -28,16 +29,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AiConfig {
 
-    @Value("${langchain4j.groq.api-key}")
+    @Value("${langchain4j.open-ai.chat-model.api-key}")
     private String apiKey;
 
-    @Value("${langchain4j.groq.base-url}")
+    @Value("${langchain4j.open-ai.chat-model.base-url}")
     private String baseUrl;
 
-    @Value("${langchain4j.groq.chat-model.model-name}")
+    @Value("${langchain4j.open-ai.chat-model.model-name}")
     private String chatModelName;
 
-    @Value("${langchain4j.groq.chat-model.temperature}")
+    @Value("${langchain4j.open-ai.chat-model.temperature}")
     private double temperature;
 
     @Value("${spring.datasource.url}")
@@ -193,6 +194,13 @@ public class AiConfig {
     @Bean
     public CurriculumPlanningAssistant curriculumPlanningAssistant(ChatModel chatModel) {
         return AiServices.builder(CurriculumPlanningAssistant.class)
+                .chatModel(chatModel)
+                .build();
+    }
+
+    @Bean
+    public AnswerGradingAssistant answerGradingAssistant(ChatModel chatModel) {
+        return AiServices.builder(AnswerGradingAssistant.class)
                 .chatModel(chatModel)
                 .build();
     }

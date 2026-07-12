@@ -116,6 +116,13 @@ public class LearnerAssessmentController {
         return assessmentAttemptService.listAttempts(learnerId);
     }
 
+    @GetMapping("/assessments/{assessmentId}/attempts")
+    public List<AttemptSummaryDto> listAttemptsForAssessment(
+            @PathVariable Long assessmentId,
+            @RequestParam Long learnerId) {
+        return assessmentAttemptService.listAttemptsForAssessment(assessmentId, learnerId);
+    }
+
     @GetMapping("/assessment-attempts/{attemptId}/result")
     public AssessmentAttemptResultDto getResult(
             @PathVariable Long attemptId,

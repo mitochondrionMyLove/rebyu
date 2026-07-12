@@ -209,6 +209,11 @@ export function getLearnerAttempts(learnerId) {
   return base(`learner/assessment-attempts?learnerId=${learnerId}`)
 }
 
+// Full attempt history for one assessment — every retake, newest first.
+export function getAssessmentAttempts(assessmentId, learnerId) {
+  return base(`learner/assessments/${assessmentId}/attempts?learnerId=${learnerId}`)
+}
+
 // ---------------------------------------------------------------------------
 // Enrollment / purchase transaction API
 // ---------------------------------------------------------------------------

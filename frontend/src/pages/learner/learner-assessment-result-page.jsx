@@ -238,21 +238,22 @@ export default function LearnerAssessmentResultPage() {
                         </span>
                         {answer.question}
                       </p>
-                      {answer.pendingManualEvaluation ? (
-                        <Badge variant="secondary" className="shrink-0">
-                          Pending review
-                        </Badge>
-                      ) : answer.isCorrect == null ? (
-                        <Badge variant="outline" className="shrink-0">
-                          Unanswered
-                        </Badge>
-                      ) : answer.isCorrect ? (
-                        <Badge className="shrink-0">Correct</Badge>
-                      ) : (
-                        <Badge variant="destructive" className="shrink-0">
-                          Incorrect
-                        </Badge>
-                      )}
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {answer.pendingManualEvaluation ? (
+                          <Badge variant="secondary">Pending review</Badge>
+                        ) : answer.isCorrect == null ? (
+                          <Badge variant="outline">Unanswered</Badge>
+                        ) : answer.isCorrect ? (
+                          <Badge>Correct</Badge>
+                        ) : (
+                          <Badge variant="destructive">Incorrect</Badge>
+                        )}
+                        {answer.points != null && answer.earnedPoints != null ? (
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {Number(answer.earnedPoints)} / {Number(answer.points)} pts
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
 
                     {answer.selectedChoiceText ? (
@@ -279,12 +280,52 @@ export default function LearnerAssessmentResultPage() {
                       </div>
                     ) : null}
 
-                    {answer.learnerAnswer && !answer.selectedChoiceText ? (
+                    {answer.subQuestionAnswers?.length > 0 ? (
+                      // Sub-questions always render as a normal ordered list
+                      // here — tabs are attempt-answering UI only.
+                      <ol className="space-y-2.5 text-sm">
+                        {answer.subQuestionAnswers.map((sub, index) => (
+                          <li
+                            key={sub.subQuestionId}
+                            className="rounded-lg border p-2.5"
+                          >
+                            <p className="font-medium">
+                              <span className="mr-1.5 text-muted-foreground">
+                                {index + 1}.
+                              </span>
+                              {sub.questionText}
+                            </p>
+                            <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-muted/50 p-2 text-muted-foreground">
+                              {sub.learnerAnswer?.trim()
+                                ? sub.learnerAnswer
+                                : "No answer submitted."}
+                            </p>
+                            {sub.earnedPoints != null && sub.maxPoints != null ? (
+                              <p className="mt-1.5 text-xs tabular-nums text-muted-foreground">
+                                {Number(sub.earnedPoints)} / {Number(sub.maxPoints)} pts
+                              </p>
+                            ) : null}
+                            {sub.feedback ? (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {sub.feedback}
+                              </p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : answer.learnerAnswer && !answer.selectedChoiceText ? (
                       <div className="text-sm">
                         <p className="text-muted-foreground">Your answer:</p>
                         <p className="mt-1 whitespace-pre-wrap rounded-lg bg-muted/50 p-2.5">
                           {answer.learnerAnswer}
                         </p>
+                      </div>
+                    ) : null}
+
+                    {answer.feedback ? (
+                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-sm">
+                        <p className="text-xs font-medium text-primary">Feedback</p>
+                        <p className="mt-1 text-muted-foreground">{answer.feedback}</p>
                       </div>
                     ) : null}
 

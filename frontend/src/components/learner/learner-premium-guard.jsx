@@ -11,8 +11,6 @@ export default function LearnerPremiumGuard({
   certificationId,
   title,
   description,
-  benefits,
-  returnTo,
   children,
 }) {
   const entitlements = useLearnerEntitlements(certificationId)
@@ -27,13 +25,29 @@ export default function LearnerPremiumGuard({
 
   if (!entitlements.hasFeature(feature)) {
     return (
-      <FeatureLockState
-        title={title}
-        description={description}
-        benefits={benefits}
-        accessSource={entitlements.accessSource}
-        returnTo={returnTo}
-      />
+      <div className="relative isolate min-h-[calc(100vh-8rem)]">
+        <div
+          className="pointer-events-none select-none blur-sm"
+          aria-hidden="true"
+          inert=""
+        >
+          {typeof children === "function" ? children(entitlements) : children}
+        </div>
+
+        <div
+          className="absolute inset-0 z-50 flex items-start justify-center bg-background/20 px-4"
+          aria-modal="true"
+          role="dialog"
+          aria-label="Pro Feature"
+        >
+          <div className="sticky top-1/2 w-full -translate-y-1/2">
+            <FeatureLockState
+              title={title}
+              description={description}
+            />
+          </div>
+        </div>
+      </div>
     )
   }
 

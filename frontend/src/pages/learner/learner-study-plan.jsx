@@ -1097,8 +1097,8 @@ export default function LearningStudyPlan() {
     return (
         <LearnerPremiumGuard
             feature="PERSONALIZED_STUDY_PLAN"
-            title="Study plans are a REBYU Pro feature"
-            description="Personalized and AI-generated study plans are available through REBYU Pro or an eligible institutional license. Free learners can browse lessons and choose what to study."
+            title="Pro Feature"
+            description="Personalized and AI-generated study plans require a Pro subscription. Upgrade to unlock this feature."
             benefits={[
                 "AI-generated, exam-date-aware schedules",
                 "Weakness-driven topic prioritization",

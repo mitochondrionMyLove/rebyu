@@ -11,7 +11,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,10 +31,6 @@ public class CertificationDto {
     private String imageKey;
 
     private LocalDateTime dateCreated;
-
-    // Legacy field, retained for historical records. No longer required or
-    // learner-facing: certifications are free and gated by subscription instead.
-    private BigDecimal price = BigDecimal.ZERO;
 
     private List<MajorCategoryDto> majorCategory;
 

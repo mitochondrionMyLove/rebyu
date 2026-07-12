@@ -13,6 +13,11 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
 
     List<Question> findByParentQuestion_QuestionId(Long questionId);
 
+    // Stable authoring order for sub-questions (creation order); used
+    // wherever critical-thinking sub-questions must render/grade as an
+    // ordered list rather than in arbitrary fetch order.
+    List<Question> findByParentQuestion_QuestionIdOrderByQuestionIdAsc(Long questionId);
+
     // Scope-derived eligibility (top-level questions only; sub-questions ride
     // with their parent). Ordered for stable picker display.
     List<Question> findByParentQuestionIsNullAndLesson_LessonIdOrderByQuestionIdAsc(Long lessonId);

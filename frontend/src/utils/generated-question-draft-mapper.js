@@ -2,6 +2,7 @@ function createMcqData(draft) {
     const choices = (draft.choices ?? []).map((choice, index) => ({
         choiceText: choice?.choiceText ?? "",
         image: null,
+        imageKey: choice?.imageKey ?? null,
         explanation: choice?.explanation ?? "",
         isCorrect: Boolean(choice?.isCorrect),
     }));
@@ -15,6 +16,7 @@ function createMcqData(draft) {
         questionType: "MCQ",
         question: draft.question ?? "",
         image: null,
+        imageKey: draft.imageKey ?? null,
         choices,
         correctChoiceIndex: correctChoiceIndex >= 0 ? correctChoiceIndex : null,
         difficulty: draft.difficulty ?? "average",
@@ -29,6 +31,7 @@ function createShortAnswerData(draft) {
         questionType: "SHORT_ANSWER",
         question: draft.question ?? "",
         image: null,
+        imageKey: draft.imageKey ?? null,
         correctAnswer: draft.correctAnswer ?? "",
         checkingMethod: draft.checkingMethod ?? "EXACT_MATCH",
         difficulty: draft.difficulty ?? "average",
@@ -43,6 +46,7 @@ function createDescriptiveData(draft) {
         questionType: "DESCRIPTIVE",
         question: draft.question ?? "",
         image: null,
+        imageKey: draft.imageKey ?? null,
         rubricBasedAnswer: draft.rubricBasedAnswer ?? "",
         checkingMethod: draft.checkingMethod ?? "AI_SEMANTIC",
         difficulty: draft.difficulty ?? "average",
@@ -58,6 +62,7 @@ function createProgrammingData(draft) {
         criticalThinkingType: "PROGRAMMING",
         question: draft.question ?? "",
         image: null,
+        imageKey: draft.imageKey ?? null,
         starterCode: draft.starterCode ?? "",
         testCases: (draft.testCases ?? []).map((testCase) => ({
             inputData: testCase?.inputData ?? "",
@@ -77,6 +82,7 @@ function createDiagramData(draft) {
         criticalThinkingType: "DIAGRAM",
         question: draft.question ?? "",
         image: null,
+        imageKey: draft.imageKey ?? null,
         diagramType: draft.diagramType ?? "ERD",
         instructions: draft.instructions ?? "",
         referenceDiagramXml: "",

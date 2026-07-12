@@ -1,5 +1,10 @@
 package com.capstone.rebyu.assessment.service;
 
+import com.capstone.rebyu.ai.dto.AnswerGradingRequestDto;
+import com.capstone.rebyu.ai.dto.AnswerGradingRequestDto.SubQuestionGradingRequestDto;
+import com.capstone.rebyu.ai.dto.AnswerGradingResultDto;
+import com.capstone.rebyu.ai.dto.AnswerGradingResultDto.SubAnswerGradeDto;
+import com.capstone.rebyu.ai.service.AiAnswerGradingService;
 import com.capstone.rebyu.assessment.dto.attempt.DiagramAttemptDtos.*;
 import com.capstone.rebyu.assessment.dto.attempt.LearnerAttemptDtos.*;
 import com.capstone.rebyu.assessment.dto.attempt.ProgrammingAttemptDtos.*;
@@ -13,7 +18,16 @@ import com.capstone.rebyu.certification.repository.LessonRepository;
 import com.capstone.rebyu.common.BusinessRuleException;
 import com.capstone.rebyu.enrollment.entity.LearnerCertification;
 import com.capstone.rebyu.enrollment.repository.LearnerCertificationRepository;
+import com.capstone.rebyu.execution.dto.CodeExecutionRequestDto;
+import com.capstone.rebyu.execution.dto.CodeExecutionRequestDto.TestCaseInputDto;
+import com.capstone.rebyu.execution.dto.CodeExecutionResultDto;
+import com.capstone.rebyu.execution.dto.CodeExecutionResultDto.TestCaseResultDto;
+import com.capstone.rebyu.execution.service.CodeExecutionService;
+import com.capstone.rebyu.diagram.dto.DiagramGradingRequestDto;
+import com.capstone.rebyu.diagram.dto.DiagramGradingResultDto;
+import com.capstone.rebyu.diagram.service.DiagramGradingService;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -66,11 +80,11 @@ public class AssessmentAttemptService {
     private final LearnerEntitlementService learnerEntitlementService;
     private final BktOutboxService bktOutboxService;
     private final ObjectMapper objectMapper;
+    private final AiAnswerGradingService aiAnswerGradingService;
+    private final CodeExecutionService codeExecutionService;
+    private final DiagramGradingService diagramGradingService;
 
     private static final int MAX_EXECUTION_HISTORY = 20;
-    private static final String EXECUTION_UNAVAILABLE_MESSAGE =
-            "Code execution is not available yet. Your code has been saved and will be "
-                    + "evaluated when the runner is enabled.";
 
     // ------------------------------------------------------------------
     // Learner-safe assessment listing
@@ -323,7 +337,10 @@ public class AssessmentAttemptService {
             }
             scoreAnswer(attemptQuestion, answer, points);
             attemptAnswerRepository.save(answer);
-            if (Boolean.TRUE.equals(answer.getIsCorrect()) && answer.getEarnedPoints() != null) {
+            // Partial credit (AI-graded descriptive/critical-thinking, future
+            // diagram grading) sets earnedPoints without isCorrect=TRUE, so
+            // gating the sum on isCorrect would silently drop that credit.
+            if (answer.getEarnedPoints() != null) {
                 earnedPoints = earnedPoints.add(answer.getEarnedPoints());
             }
         }
@@ -371,6 +388,10 @@ public class AssessmentAttemptService {
             throw new BusinessRuleException.InvalidAssessmentSubmissionException(
                     "This attempt has not been submitted yet.");
         }
+        // Admin-configured per-assessment setting: whether the answer key is
+        // shown to the learner at all. AI/diagram feedback is never gated by
+        // this — it's guidance, not the reference answer itself.
+        boolean releaseAnswers = attempt.getExam().effectiveReleaseAnswers();
 
         List<AssessmentAttemptQuestion> questions = attemptQuestionRepository
                 .findByAttempt_AssessmentAttemptIdOrderByDisplayOrderAsc(attemptId);
@@ -416,7 +437,7 @@ public class AssessmentAttemptService {
             if (source != null && isMultipleChoice(source.getQuestionType())) {
                 Choice correctChoice = source.getChoices().stream()
                         .filter(Choice::isCorrect).findFirst().orElse(null);
-                if (correctChoice != null) {
+                if (releaseAnswers && correctChoice != null) {
                     correctChoiceText = correctChoice.getChoiceText();
                     explanation = correctChoice.getExplanation();
                 }
@@ -453,7 +474,9 @@ public class AssessmentAttemptService {
                     explanation,
                     answer == null ? null : answer.getSubmittedCode(),
                     answer == null ? null : answer.getProgrammingLanguage(),
-                    answer != null && answer.getDiagramSubmissionData() != null
+                    answer != null && answer.getDiagramSubmissionData() != null,
+                    answer == null ? null : answer.getFeedback(),
+                    buildSubQuestionAnswerReviews(source, answer)
             ));
         }
 
@@ -509,6 +532,33 @@ public class AssessmentAttemptService {
             summary.put("percentage", attempt.getPercentage());
             summary.put("passed", attempt.getPassed());
             summaries.add(summary);
+        }
+        return summaries;
+    }
+
+    /**
+     * Every attempt a learner has made on one assessment, newest first —
+     * the attempt-history list. Retakes never remove or overwrite earlier
+     * attempts (see startAttempt), so this always reflects the full history.
+     */
+    @Transactional(readOnly = true)
+    public List<AttemptSummaryDto> listAttemptsForAssessment(Long examId, Long learnerId) {
+        List<AttemptSummaryDto> summaries = new ArrayList<>();
+        for (AssessmentAttempt attempt : attemptRepository
+                .findByExam_ExamIdAndLearnerIdOrderByAttemptNumberDesc(examId, learnerId)) {
+            summaries.add(new AttemptSummaryDto(
+                    attempt.getAssessmentAttemptId(),
+                    attempt.getExam().getExamId(),
+                    attempt.getExam().getTitle(),
+                    attempt.getAttemptNumber(),
+                    attempt.getStatus().name(),
+                    attempt.getStartedAt(),
+                    attempt.getSubmittedAt(),
+                    attempt.getDurationSeconds(),
+                    attempt.getTotalPoints(),
+                    attempt.getEarnedPoints(),
+                    attempt.getPercentage(),
+                    attempt.getPassed()));
         }
         return summaries;
     }
@@ -572,10 +622,15 @@ public class AssessmentAttemptService {
         if (!TYPE_DIAGNOSTIC.equals(attempt.getExam().getExamType().getExamTypeText())) {
             return;
         }
-        if (attempt.getEnrollmentId() == null) {
-            return;
-        }
-        learnerCertificationRepository.findById(attempt.getEnrollmentId())
+        Optional<LearnerCertification> activeEnrollment = attempt.getEnrollmentId() != null
+                ? learnerCertificationRepository.findById(attempt.getEnrollmentId())
+                : learnerCertificationRepository
+                        .findFirstByLearner_LearnerIdAndCertification_CertificationIdAndStatus(
+                                attempt.getLearnerId(),
+                                attempt.getExam().getCertification().getCertificationId(),
+                                LearnerCertification.Status.active);
+
+        activeEnrollment
                 .ifPresent(enrollment -> {
                     if (enrollment.getDiagnosticCompletedAt() == null) {
                         enrollment.setDiagnosticCompletedAt(LocalDateTime.now());
@@ -651,11 +706,24 @@ public class AssessmentAttemptService {
                 continue;
             }
 
+            boolean codeChanged = !equalsNullable(answer.getSubmittedCode(), draft.submittedCode());
+
             answer.setLearnerAnswer(draft.learnerAnswer());
             answer.setSelectedChoiceId(draft.selectedChoiceId());
             answer.setSubmittedCode(draft.submittedCode());
             answer.setProgrammingLanguage(draft.programmingLanguage());
             answer.setDiagramSubmissionData(draft.diagramSubmissionData());
+
+            // The code no longer matches whatever Judge0 last graded — clear
+            // the stale result rather than let an old verdict silently
+            // describe new code. A fresh Run/Check repopulates it.
+            if (codeChanged && answer.getExecutionResult() != null) {
+                answer.setExecutionResult(null);
+                answer.setEarnedPoints(null);
+                answer.setIsCorrect(null);
+                answer.setPendingManualEvaluation(true);
+            }
+
             LocalDateTime now = LocalDateTime.now();
             answer.setAnsweredAt(now);
             answer.setLastSavedAt(now);
@@ -725,15 +793,354 @@ public class AssessmentAttemptService {
             }
         }
 
-        // Descriptive, programming, diagram, and non-exact short answers have
-        // no automatic evaluator — never fabricate a score for them.
+        // AI grading (no admin review): descriptive answers scored against
+        // their authored rubric, immediately finalized.
+        if ("DESCRIPTIVE".equals(type) && source != null
+                && gradeDescriptiveAnswer(attemptQuestion, source, answer, points)) {
+            return;
+        }
+
+        // AI grading: critical-thinking questions whose parent has neither a
+        // programming nor a diagram config are plain analytical sub-question
+        // sets — grade every sub-question in one holistic call.
+        if ("CRITICAL_THINKING".equals(type) && source != null) {
+            String criticalThinkingType = resolveCriticalThinkingType(source.getQuestionId());
+
+            if (criticalThinkingType == null
+                    && gradeCriticalThinkingAnswer(attemptQuestion, source, answer, points)) {
+                return;
+            }
+
+            // Programming is graded deterministically via Judge0 at Check
+            // time (executeProgramming), not here — submit must never
+            // re-execute or overwrite that verdict (or the still-pending
+            // state if the learner never ran Check).
+            if ("PROGRAMMING".equals(criticalThinkingType)) {
+                return;
+            }
+
+            // Deterministic structural grading against the admin's reference
+            // diagram, immediately finalized — no AI, no admin review.
+            if ("DIAGRAM".equals(criticalThinkingType)
+                    && gradeDiagramAnswer(attemptQuestion, source, answer, points)) {
+                return;
+            }
+        }
+
+        // Unrubricked descriptive/critical-thinking, an unusable diagram
+        // reference, AI/grading failures, and non-exact short answers have
+        // no trustworthy automatic evaluator here — never fabricate a score.
         answer.setIsCorrect(null);
         answer.setEarnedPoints(null);
         answer.setPendingManualEvaluation(true);
     }
 
+    /**
+     * Structural (non-AI) diagram grading: compares the learner's submitted
+     * draw.io XML against the admin's reference XML as node/edge graphs
+     * (label similarity, direction, cardinality — see DiagramGradingService)
+     * and awards weighted partial credit. Never fabricates a score when the
+     * reference itself has no gradeable content.
+     */
+    private boolean gradeDiagramAnswer(
+            AssessmentAttemptQuestion attemptQuestion,
+            Question source,
+            AssessmentAttemptAnswer answer,
+            BigDecimal points) {
+        Optional<DiagramQuestionConfig> config = diagramQuestionConfigRepository
+                .findByQuestion_QuestionId(source.getQuestionId());
+        if (config.isEmpty() || config.get().getReferenceDiagramXml() == null
+                || config.get().getReferenceDiagramXml().isBlank()) {
+            return false;
+        }
+
+        DiagramGradingResultDto result = diagramGradingService.grade(new DiagramGradingRequestDto(
+                config.get().getReferenceDiagramXml(), answer.getDiagramSubmissionData(), points));
+
+        if ("INVALID_REFERENCE".equals(result.status())) {
+            // The admin's own reference diagram isn't gradeable — an
+            // authoring gap, never the learner's fault.
+            return false;
+        }
+
+        answer.setEarnedPoints(result.earnedPoints());
+        answer.setFeedback(result.feedback());
+        answer.setIsCorrect(isPassingShare(result.earnedPoints(), points));
+        answer.setPendingManualEvaluation(false);
+        answer.setDiagramGradingResult(serializeDiagramGradingResult(result));
+        return true;
+    }
+
+    private String serializeDiagramGradingResult(DiagramGradingResultDto result) {
+        try {
+            return objectMapper.writeValueAsString(result.elementResults());
+        } catch (Exception e) {
+            log.warn("Could not serialize diagram grading result");
+            return null;
+        }
+    }
+
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    /** PROGRAMMING or DIAGRAM when the parent carries that sub-config, else null (analytical). */
+    private String resolveCriticalThinkingType(Long parentQuestionId) {
+        if (programmingQuestionConfigRepository.findByQuestion_QuestionId(parentQuestionId).isPresent()) {
+            return "PROGRAMMING";
+        }
+        if (diagramQuestionConfigRepository.findByQuestion_QuestionId(parentQuestionId).isPresent()) {
+            return "DIAGRAM";
+        }
+        return null;
+    }
+
+    /** True on a successful (or intentionally rubric-less) resolution; the caller returns either way. */
+    private boolean gradeDescriptiveAnswer(
+            AssessmentAttemptQuestion attemptQuestion,
+            Question source,
+            AssessmentAttemptAnswer answer,
+            BigDecimal points) {
+        String rubricGuidance = rubricGuidanceFor(source.getQuestionId());
+        List<AnswerGradingRequestDto.RubricCriterionDto> criteria = rubricCriteriaFor(source.getQuestionId());
+        if ((rubricGuidance == null || rubricGuidance.isBlank()) && criteria.isEmpty()) {
+            // No rubric authored: nothing to grade against, leave pending.
+            return false;
+        }
+
+        String learnerText = answer.getLearnerAnswer() == null ? "" : answer.getLearnerAnswer();
+        AnswerGradingRequestDto request = new AnswerGradingRequestDto(
+                attemptQuestion.getQuestionTextSnapshot(), points, rubricGuidance, criteria, learnerText, null);
+
+        Optional<AnswerGradingResultDto> graded = aiAnswerGradingService.grade(request);
+        if (graded.isEmpty()) {
+            return false;
+        }
+        AnswerGradingResultDto result = graded.get();
+        answer.setEarnedPoints(result.earnedPoints());
+        answer.setFeedback(result.feedback());
+        answer.setIsCorrect(isPassingShare(result.earnedPoints(), points));
+        answer.setPendingManualEvaluation(false);
+        return true;
+    }
+
+    private boolean gradeCriticalThinkingAnswer(
+            AssessmentAttemptQuestion attemptQuestion,
+            Question source,
+            AssessmentAttemptAnswer answer,
+            BigDecimal points) {
+        List<Question> subQuestions = questionRepository
+                .findByParentQuestion_QuestionIdOrderByQuestionIdAsc(source.getQuestionId());
+        if (subQuestions.isEmpty()) {
+            return false;
+        }
+
+        Map<Long, BigDecimal> pointSplit = splitPointsAcrossSubQuestions(subQuestions, points);
+        Map<Long, String> subAnswerText = parseSubAnswerText(answer.getLearnerAnswer());
+
+        List<SubQuestionGradingRequestDto> subRequests = new ArrayList<>();
+        for (Question sub : subQuestions) {
+            subRequests.add(new SubQuestionGradingRequestDto(
+                    sub.getQuestionId(),
+                    sub.getQuestionText(),
+                    pointSplit.get(sub.getQuestionId()),
+                    rubricGuidanceFor(sub.getQuestionId()),
+                    rubricCriteriaFor(sub.getQuestionId()),
+                    subAnswerText.getOrDefault(sub.getQuestionId(), "")));
+        }
+
+        AnswerGradingRequestDto request = new AnswerGradingRequestDto(
+                attemptQuestion.getQuestionTextSnapshot(), points,
+                rubricGuidanceFor(source.getQuestionId()), rubricCriteriaFor(source.getQuestionId()),
+                null, subRequests);
+
+        Optional<AnswerGradingResultDto> graded = aiAnswerGradingService.grade(request);
+        if (graded.isEmpty()) {
+            return false;
+        }
+        AnswerGradingResultDto result = graded.get();
+        answer.setEarnedPoints(result.earnedPoints());
+        answer.setFeedback(result.feedback());
+        answer.setIsCorrect(isPassingShare(result.earnedPoints(), points));
+        answer.setPendingManualEvaluation(false);
+        answer.setSubAnswerScores(
+                serializeSubAnswerScores(subQuestions, pointSplit, subAnswerText, result));
+        return true;
+    }
+
+    private String rubricGuidanceFor(Long questionId) {
+        return textQuestionConfigRepository.findByQuestion_QuestionId(questionId)
+                .filter(config -> "AI_SEMANTIC".equalsIgnoreCase(config.getCheckingMethod()))
+                .map(TextQuestionConfig::getCorrectAnswer)
+                .orElse(null);
+    }
+
+    private List<AnswerGradingRequestDto.RubricCriterionDto> rubricCriteriaFor(Long questionId) {
+        List<AnswerGradingRequestDto.RubricCriterionDto> criteria = new ArrayList<>();
+        for (QuestionRubricCriterion criterion :
+                rubricCriterionRepository.findByQuestion_QuestionIdOrderByDisplayOrderAsc(questionId)) {
+            criteria.add(new AnswerGradingRequestDto.RubricCriterionDto(
+                    criterion.getName(), criterion.getMaxPoints()));
+        }
+        return criteria;
+    }
+
+    /**
+     * Splits an assessment's configured points for a critical-thinking item
+     * across its sub-questions, weighted by each sub-question's own
+     * {@code totalPoints} (equal weight when unset). The last sub-question
+     * absorbs the rounding remainder so shares always sum to exactly points.
+     */
+    private Map<Long, BigDecimal> splitPointsAcrossSubQuestions(
+            List<Question> subQuestions, BigDecimal totalPoints) {
+        Map<Long, BigDecimal> allocation = new LinkedHashMap<>();
+        if (subQuestions.isEmpty() || totalPoints == null || totalPoints.signum() <= 0) {
+            return allocation;
+        }
+
+        Map<Long, BigDecimal> weights = new LinkedHashMap<>();
+        BigDecimal weightSum = BigDecimal.ZERO;
+        for (Question sub : subQuestions) {
+            BigDecimal weight = sub.getTotalPoints() == null || sub.getTotalPoints().signum() <= 0
+                    ? BigDecimal.ONE : sub.getTotalPoints();
+            weights.put(sub.getQuestionId(), weight);
+            weightSum = weightSum.add(weight);
+        }
+
+        BigDecimal running = BigDecimal.ZERO;
+        for (int i = 0; i < subQuestions.size(); i++) {
+            Long id = subQuestions.get(i).getQuestionId();
+            BigDecimal share;
+            if (i == subQuestions.size() - 1) {
+                share = totalPoints.subtract(running).setScale(2, RoundingMode.HALF_UP);
+            } else {
+                share = totalPoints.multiply(weights.get(id))
+                        .divide(weightSum, 2, RoundingMode.HALF_UP);
+                running = running.add(share);
+            }
+            allocation.put(id, share);
+        }
+        return allocation;
+    }
+
+    /** Parses a critical-thinking learner_answer JSON blob ({subQuestionId: text}) safely. */
+    private Map<Long, String> parseSubAnswerText(String learnerAnswer) {
+        Map<Long, String> result = new LinkedHashMap<>();
+        if (learnerAnswer == null || learnerAnswer.isBlank()) {
+            return result;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(learnerAnswer);
+            if (!node.isObject()) {
+                return result;
+            }
+            node.fields().forEachRemaining(entry -> {
+                try {
+                    result.put(Long.valueOf(entry.getKey()), entry.getValue().asText(""));
+                } catch (NumberFormatException ignored) {
+                    // skip malformed keys
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Could not parse critical-thinking sub-answer JSON");
+        }
+        return result;
+    }
+
+    private String serializeSubAnswerScores(
+            List<Question> subQuestions,
+            Map<Long, BigDecimal> pointSplit,
+            Map<Long, String> subAnswerText,
+            AnswerGradingResultDto result) {
+        Map<Long, SubAnswerGradeDto> scoreById = new LinkedHashMap<>();
+        for (SubAnswerGradeDto score : result.subScores()) {
+            scoreById.put(score.subQuestionId(), score);
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Question sub : subQuestions) {
+            SubAnswerGradeDto scored = scoreById.get(sub.getQuestionId());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("subQuestionId", sub.getQuestionId());
+            row.put("questionText", sub.getQuestionText());
+            row.put("learnerAnswer", subAnswerText.get(sub.getQuestionId()));
+            row.put("earnedPoints", scored == null ? null : scored.earnedPoints());
+            row.put("maxPoints", pointSplit.get(sub.getQuestionId()));
+            row.put("feedback", scored == null ? null : scored.feedback());
+            rows.add(row);
+        }
+        try {
+            return objectMapper.writeValueAsString(rows);
+        } catch (Exception e) {
+            log.warn("Could not serialize sub-answer scores");
+            return null;
+        }
+    }
+
+    private Boolean isPassingShare(BigDecimal earned, BigDecimal max) {
+        if (earned == null || max == null || max.signum() <= 0) {
+            return null;
+        }
+        return earned.compareTo(max.multiply(new BigDecimal("0.5"))) >= 0;
+    }
+
+    /**
+     * Sub-questions render as a normal ordered list in review/results (tabs
+     * are attempt-answering UI only). Merges the sub-question text from the
+     * question tree with the persisted AI score/feedback so review is a pure
+     * read — grading never re-runs here.
+     */
+    private List<SubQuestionAnswerReviewDto> buildSubQuestionAnswerReviews(
+            Question source, AssessmentAttemptAnswer answer) {
+        if (source == null || !"CRITICAL_THINKING".equals(source.getQuestionType())) {
+            return List.of();
+        }
+        List<Question> subQuestions = questionRepository
+                .findByParentQuestion_QuestionIdOrderByQuestionIdAsc(source.getQuestionId());
+        if (subQuestions.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> rawAnswers = parseSubAnswerText(answer == null ? null : answer.getLearnerAnswer());
+        Map<Long, JsonNode> scored = parseSubAnswerScores(answer == null ? null : answer.getSubAnswerScores());
+
+        List<SubQuestionAnswerReviewDto> reviews = new ArrayList<>();
+        for (Question sub : subQuestions) {
+            JsonNode scoreNode = scored.get(sub.getQuestionId());
+            reviews.add(new SubQuestionAnswerReviewDto(
+                    sub.getQuestionId(),
+                    sub.getQuestionText(),
+                    rawAnswers.get(sub.getQuestionId()),
+                    scoreNode != null && scoreNode.hasNonNull("earnedPoints")
+                            ? scoreNode.get("earnedPoints").decimalValue() : null,
+                    scoreNode != null && scoreNode.hasNonNull("maxPoints")
+                            ? scoreNode.get("maxPoints").decimalValue() : null,
+                    scoreNode != null && scoreNode.hasNonNull("feedback")
+                            ? scoreNode.get("feedback").asText() : null
+            ));
+        }
+        return reviews;
+    }
+
+    private Map<Long, JsonNode> parseSubAnswerScores(String subAnswerScoresJson) {
+        Map<Long, JsonNode> result = new LinkedHashMap<>();
+        if (subAnswerScoresJson == null || subAnswerScoresJson.isBlank()) {
+            return result;
+        }
+        try {
+            JsonNode array = objectMapper.readTree(subAnswerScoresJson);
+            if (!array.isArray()) {
+                return result;
+            }
+            for (JsonNode node : array) {
+                if (node.hasNonNull("subQuestionId")) {
+                    result.put(node.get("subQuestionId").asLong(), node);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not parse persisted sub-answer scores");
+        }
+        return result;
     }
 
     private AssessmentAttemptStartResponseDto buildStartResponse(
@@ -844,7 +1251,7 @@ public class AssessmentAttemptService {
 
             List<Map<String, Object>> subQuestions = new ArrayList<>();
             for (Question sub : questionRepository
-                    .findByParentQuestion_QuestionId(question.getQuestionId())) {
+                    .findByParentQuestion_QuestionIdOrderByQuestionIdAsc(question.getQuestionId())) {
                 Map<String, Object> safe = new LinkedHashMap<>();
                 safe.put("subQuestionId", sub.getQuestionId());
                 safe.put("questionText", sub.getQuestionText());
@@ -948,7 +1355,10 @@ public class AssessmentAttemptService {
     }
 
     // ------------------------------------------------------------------
-    // Diagram Check (evaluator stubbed — never fabricates a score)
+    // Diagram Check — saves the current diagram and previews the rubric.
+    // The actual structural grade (DiagramGradingService, see scoreAnswer /
+    // gradeDiagramAnswer) is computed once, definitively, at submit time —
+    // Check never scores, so re-checking a diagram is always safe.
     // ------------------------------------------------------------------
 
     @Transactional
@@ -1010,7 +1420,9 @@ public class AssessmentAttemptService {
     }
 
     // ------------------------------------------------------------------
-    // Programming Run / Check (executor stubbed — never fabricates a score)
+    // Programming Run / Check — deterministic Judge0 execution, no AI.
+    // Run grades against sample tests only (quick feedback); Check grades
+    // against every configured test case and finalizes the answer's score.
     // ------------------------------------------------------------------
 
     @Transactional
@@ -1033,48 +1445,232 @@ public class AssessmentAttemptService {
 
         AssessmentAttempt attempt = requireOwnedAttempt(attemptId, request.learnerId());
         requireEditable(attempt);
-        AssessmentAttemptQuestion question = requireAttemptQuestion(attempt, attemptQuestionId);
-        if (!"CRITICAL_THINKING".equals(question.getQuestionType())) {
+        AssessmentAttemptQuestion attemptQuestion = requireAttemptQuestion(attempt, attemptQuestionId);
+        if (!"CRITICAL_THINKING".equals(attemptQuestion.getQuestionType())) {
             throw new BusinessRuleException.InvalidAssessmentSubmissionException(
                     "This item is not a programming question.");
         }
 
-        // Run/Check always saves the current code first (spec requirement).
+        // Run/Check always saves the current code first (spec requirement);
+        // if the code changed since the last run, this also clears the prior
+        // stale execution result (see upsertAnswers).
         upsertAnswers(attempt, List.of(new AttemptAnswerDraftDto(
                 attemptQuestionId, null, null, request.code(), request.language(), null)));
 
-        // No sandbox is wired yet — record the attempt with an UNAVAILABLE
-        // status and never fabricate a pass/fail or score.
-        List<LearnerTestCaseDto> tests = readSnapshotTestCases(question);
-        Integer totalTests = tests.isEmpty() ? null : tests.size();
+        List<LearnerTestCaseDto> learnerTests = readSnapshotTestCases(attemptQuestion);
+        Question source = questionRepository
+                .findById(attemptQuestion.getSourceQuestionId()).orElse(null);
+        List<IndexedTestCase> allTestCases = source == null
+                ? List.of() : loadIndexedProgrammingTestCases(source);
+        List<IndexedTestCase> scopedTestCases = mode == AssessmentAttemptExecution.Mode.RUN
+                ? allTestCases.stream().filter(it -> it.testCase().isSample()).toList()
+                : allTestCases;
+
         LocalDateTime now = LocalDateTime.now();
+        if (scopedTestCases.isEmpty()) {
+            // Nothing configured to run against (or no sample cases for Run) —
+            // never fabricate a result.
+            String message = allTestCases.isEmpty()
+                    ? "No test cases are configured for this item yet."
+                    : "No sample test cases are available for Run — use Check to grade against all tests.";
+            AssessmentAttemptExecution execution = executionRepository.save(
+                    AssessmentAttemptExecution.builder()
+                            .attempt(attempt).attemptQuestion(attemptQuestion).mode(mode)
+                            .language(request.language()).submittedCode(request.code())
+                            .status(AssessmentAttemptExecution.Status.UNAVAILABLE)
+                            .totalTests(learnerTests.isEmpty() ? null : learnerTests.size())
+                            .output(message)
+                            .createdAt(now)
+                            .build());
+            return new ExecutionResultDto(
+                    execution.getExecutionId(), mode.name(), execution.getStatus().name(),
+                    message, request.language(), null, execution.getTotalTests(), now, learnerTests);
+        }
+
+        List<TestCaseInputDto> inputs = scopedTestCases.stream()
+                .map(it -> new TestCaseInputDto(
+                        it.index(), it.testCase().isSample(),
+                        it.testCase().getInputData(), it.testCase().getExpectedOutput()))
+                .toList();
+
+        CodeExecutionResultDto result = codeExecutionService.execute(
+                new CodeExecutionRequestDto(request.language(), request.code(), inputs));
+
+        applyExecutionResultToAnswer(attemptQuestion, mode, result, hashCode(request.code()));
 
         AssessmentAttemptExecution execution = executionRepository.save(
                 AssessmentAttemptExecution.builder()
                         .attempt(attempt)
-                        .attemptQuestion(question)
+                        .attemptQuestion(attemptQuestion)
                         .mode(mode)
                         .language(request.language())
                         .submittedCode(request.code())
-                        .status(AssessmentAttemptExecution.Status.UNAVAILABLE)
-                        .passedTests(null)
-                        .totalTests(totalTests)
-                        .output(EXECUTION_UNAVAILABLE_MESSAGE)
+                        .status(toExecutionEntityStatus(result.status()))
+                        .passedTests(result.passedTests())
+                        .totalTests(result.totalTests())
+                        .output(executionOutputSummary(result))
                         .createdAt(now)
                         .build());
 
-        // CHECK only reveals sample inputs; hidden expected outputs never leave
-        // the server. All statuses stay NOT_RUN since nothing executed.
         return new ExecutionResultDto(
                 execution.getExecutionId(),
                 mode.name(),
                 execution.getStatus().name(),
-                EXECUTION_UNAVAILABLE_MESSAGE,
+                executionOutputSummary(result),
                 request.language(),
-                null,
-                totalTests,
+                result.passedTests(),
+                result.totalTests(),
                 now,
-                tests);
+                mergeTestStatuses(learnerTests, result));
+    }
+
+    private record IndexedTestCase(int index, ProgrammingTestCase testCase) {}
+
+    /** Loads a source question's programming test cases with a stable 1-based index matching the snapshot. */
+    private List<IndexedTestCase> loadIndexedProgrammingTestCases(Question source) {
+        return programmingQuestionConfigRepository.findByQuestion_QuestionId(source.getQuestionId())
+                .map(config -> {
+                    List<IndexedTestCase> indexed = new ArrayList<>();
+                    int index = 1;
+                    for (ProgrammingTestCase testCase : config.getTestCases()) {
+                        indexed.add(new IndexedTestCase(index++, testCase));
+                    }
+                    return indexed;
+                })
+                .orElse(List.of());
+    }
+
+    /**
+     * Persists the Judge0 result onto the answer's execution payload (code
+     * hash, output, status, per-test results, time/memory) and — only for
+     * Check, and only on a definitive outcome — finalizes earned points.
+     * Run never scores; an infra-level UNAVAILABLE/UNSUPPORTED_LANGUAGE
+     * result never scores either (never fabricate on a Judge0 failure).
+     */
+    private void applyExecutionResultToAnswer(
+            AssessmentAttemptQuestion attemptQuestion,
+            AssessmentAttemptExecution.Mode mode,
+            CodeExecutionResultDto result,
+            String codeHash) {
+        AssessmentAttemptAnswer answer = attemptAnswerRepository
+                .findByAttempt_AssessmentAttemptIdAndAttemptQuestion_AttemptQuestionId(
+                        attemptQuestion.getAttempt().getAssessmentAttemptId(),
+                        attemptQuestion.getAttemptQuestionId())
+                .orElse(null);
+        if (answer == null) {
+            return;
+        }
+
+        answer.setExecutionResult(serializeExecutionResult(
+                attemptQuestion.getAttemptQuestionId(), mode, result, codeHash));
+
+        boolean definitive = "COMPLETED".equals(result.status()) || "COMPILE_ERROR".equals(result.status());
+        if (mode == AssessmentAttemptExecution.Mode.CHECK && definitive) {
+            BigDecimal points = attemptQuestion.getPoints() == null
+                    ? BigDecimal.ZERO : attemptQuestion.getPoints();
+            int total = result.totalTests() == null ? 0 : result.totalTests();
+            int passed = result.passedTests() == null ? 0 : result.passedTests();
+            if (total > 0) {
+                BigDecimal ratio = BigDecimal.valueOf(passed)
+                        .divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP);
+                answer.setEarnedPoints(points.multiply(ratio).setScale(2, RoundingMode.HALF_UP));
+                answer.setIsCorrect(passed == total);
+            } else {
+                answer.setEarnedPoints(BigDecimal.ZERO);
+                answer.setIsCorrect(false);
+            }
+            answer.setPendingManualEvaluation(false);
+        }
+        attemptAnswerRepository.save(answer);
+    }
+
+    private String serializeExecutionResult(
+            Long attemptQuestionId, AssessmentAttemptExecution.Mode mode,
+            CodeExecutionResultDto result, String codeHash) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("codeHash", codeHash);
+        payload.put("mode", mode.name());
+        payload.put("status", result.status());
+        payload.put("output", result.output());
+        payload.put("error", result.error());
+        payload.put("executionTimeMs", result.executionTimeMs());
+        payload.put("memoryKb", result.memoryKb());
+        payload.put("passedTests", result.passedTests());
+        payload.put("totalTests", result.totalTests());
+        List<Map<String, Object>> tests = new ArrayList<>();
+        for (TestCaseResultDto testResult : result.testResults()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("index", testResult.index());
+            row.put("sample", testResult.sample());
+            row.put("passed", testResult.passed());
+            row.put("status", testResult.status());
+            tests.add(row);
+        }
+        payload.put("testResults", tests);
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            log.warn("Could not serialize execution result for attempt question {}", attemptQuestionId);
+            return null;
+        }
+    }
+
+    private AssessmentAttemptExecution.Status toExecutionEntityStatus(String status) {
+        return switch (status) {
+            case "COMPLETED" -> AssessmentAttemptExecution.Status.COMPLETED;
+            case "COMPILE_ERROR" -> AssessmentAttemptExecution.Status.ERROR;
+            default -> AssessmentAttemptExecution.Status.UNAVAILABLE;
+        };
+    }
+
+    private String executionOutputSummary(CodeExecutionResultDto result) {
+        if ("COMPILE_ERROR".equals(result.status())) {
+            return "Compilation failed:\n" + (result.error() == null ? "" : result.error());
+        }
+        if ("UNAVAILABLE".equals(result.status()) || "UNSUPPORTED_LANGUAGE".equals(result.status())) {
+            return result.error();
+        }
+        if (result.error() != null && !result.error().isBlank()) {
+            return result.error();
+        }
+        if (result.totalTests() != null) {
+            return result.passedTests() + " / " + result.totalTests() + " test case(s) passed.";
+        }
+        return result.output();
+    }
+
+    /** Overlays real PASSED/FAILED/etc. statuses onto the learner-safe test list; never adds actual output for hidden tests (the DTO has no such field). */
+    private List<LearnerTestCaseDto> mergeTestStatuses(
+            List<LearnerTestCaseDto> learnerTests, CodeExecutionResultDto result) {
+        Map<Integer, TestCaseResultDto> byIndex = new LinkedHashMap<>();
+        for (TestCaseResultDto testResult : result.testResults()) {
+            byIndex.put(testResult.index(), testResult);
+        }
+        List<LearnerTestCaseDto> merged = new ArrayList<>();
+        for (LearnerTestCaseDto test : learnerTests) {
+            TestCaseResultDto matched = byIndex.get(test.index());
+            merged.add(new LearnerTestCaseDto(
+                    test.index(), test.label(), test.sample(), test.input(),
+                    matched != null ? matched.status() : test.status()));
+        }
+        return merged;
+    }
+
+    private String hashCode(String code) {
+        if (code == null) {
+            return null;
+        }
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(code.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 
     @Transactional(readOnly = true)

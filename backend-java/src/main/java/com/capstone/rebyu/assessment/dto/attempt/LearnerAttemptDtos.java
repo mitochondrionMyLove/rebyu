@@ -125,6 +125,16 @@ public final class LearnerAttemptDtos {
     ) {
     }
 
+    public record SubQuestionAnswerReviewDto(
+            Long subQuestionId,
+            String questionText,
+            String learnerAnswer,
+            BigDecimal earnedPoints,
+            BigDecimal maxPoints,
+            String feedback
+    ) {
+    }
+
     public record AttemptAnswerReviewDto(
             Long attemptQuestionId,
             Integer displayOrder,
@@ -141,7 +151,9 @@ public final class LearnerAttemptDtos {
             String explanation,
             String submittedCode,
             String programmingLanguage,
-            boolean diagramSubmitted
+            boolean diagramSubmitted,
+            String feedback,
+            List<SubQuestionAnswerReviewDto> subQuestionAnswers
     ) {
     }
 
@@ -175,6 +187,27 @@ public final class LearnerAttemptDtos {
             List<AttemptAnswerReviewDto> answers,
             List<LessonPerformanceDto> lessonBreakdown,
             Long certificationId
+    ) {
+    }
+
+    /**
+     * One row of an assessment's attempt history — every retake, never
+     * overwritten. Used to list/compare all of a learner's attempts on one
+     * assessment before opening a specific one for full review.
+     */
+    public record AttemptSummaryDto(
+            Long assessmentAttemptId,
+            Long assessmentId,
+            String assessmentTitle,
+            Integer attemptNumber,
+            String status,
+            LocalDateTime startedAt,
+            LocalDateTime submittedAt,
+            Integer durationSeconds,
+            BigDecimal totalPoints,
+            BigDecimal earnedPoints,
+            BigDecimal percentage,
+            Boolean passed
     ) {
     }
 }

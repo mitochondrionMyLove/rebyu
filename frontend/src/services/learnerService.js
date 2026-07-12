@@ -203,7 +203,9 @@ export async function getLearnerPortalData() {
     getAllLearners(),
     getAllUsers(),
     base("certifications"),
-    getAllLearnerCertifications(),
+    identity.learnerId != null
+      ? base(`learner/enrollments?learnerId=${identity.learnerId}`)
+      : getAllLearnerCertifications(),
     getAllCompletedLessons(),
     getAllLessonMastery(),
     getAllWeakAreas(),
@@ -290,11 +292,21 @@ export async function getLearnerPortalData() {
     isSameId(item.userId, userId)
   )
 
-  const examResultsForLearner = asArray(examResults).filter((item) =>
-    isSameId(item.learnerId, learnerId)
-  )
-
   const examById = new Map(asArray(exams).map((exam) => [String(exam.examId), exam]))
+  const examResultsForLearner = asArray(examResults)
+    .filter((item) => isSameId(item.learnerId, learnerId))
+    .map((result) => {
+      const exam = examById.get(String(result.examId))
+      return {
+        ...result,
+        certificationId:
+          result.certificationId ?? exam?.certificationId ?? exam?.certification?.certificationId,
+        assessmentType:
+          result.assessmentType ?? exam?.examTypeText ?? exam?.examType?.examTypeText,
+        assessmentTitle: result.assessmentTitle ?? exam?.title,
+      }
+    })
+
   const lessonById = new Map(allLessons.map((lesson) => [String(lesson.lessonId), lesson]))
 
   const lessonsWithProgress = lessonList.map((lesson) => {

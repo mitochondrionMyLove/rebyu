@@ -53,6 +53,9 @@ public class QuestionGenerationService {
     private static final java.util.Set<String> SUPPORTED_TYPES = java.util.Set.of(
             "MCQ", "SHORT_ANSWER", "DESCRIPTIVE", "PROGRAMMING", "DIAGRAM"
     );
+    private static final java.util.Set<String> DIAGRAM_TYPES = java.util.Set.of(
+            "ERD", "UML_CLASS", "UML_SEQUENCE", "FLOWCHART", "DFD", "MIND_MAP", "NETWORK_DIAGRAM"
+    );
 
     public record LessonRef(Long lessonId, String title) {}
     public record CertContext(String certTitle, Map<Long, LessonRef> lessonsById) {}
@@ -60,6 +63,7 @@ public class QuestionGenerationService {
     private final LessonRepository lessonRepository;
     private final CertificationRepository certificationRepository;
     private final DocumentIngestionService documentIngestionService;
+    private final QuestionSourceImageService questionSourceImageService;
     private final QuestionGenerationAssistant questionGenerationAssistant;
     private final AiUploadValidator aiUploadValidator;
     private final GeneratedQuestionDraftValidator generatedQuestionDraftValidator;
@@ -77,6 +81,7 @@ public class QuestionGenerationService {
             LessonRepository lessonRepository,
             CertificationRepository certificationRepository,
             DocumentIngestionService documentIngestionService,
+            QuestionSourceImageService questionSourceImageService,
             QuestionGenerationAssistant questionGenerationAssistant,
             AiUploadValidator aiUploadValidator,
             GeneratedQuestionDraftValidator generatedQuestionDraftValidator,
@@ -89,6 +94,7 @@ public class QuestionGenerationService {
         this.lessonRepository = lessonRepository;
         this.certificationRepository = certificationRepository;
         this.documentIngestionService = documentIngestionService;
+        this.questionSourceImageService = questionSourceImageService;
         this.questionGenerationAssistant = questionGenerationAssistant;
         this.aiUploadValidator = aiUploadValidator;
         this.generatedQuestionDraftValidator = generatedQuestionDraftValidator;
@@ -106,6 +112,7 @@ public class QuestionGenerationService {
             List<MultipartFile> files
     ) throws IOException {
         List<String> warnings = new ArrayList<>();
+        Set<String> sourceImageKeys = new HashSet<>();
         List<MultipartFile> uploadedFiles = files == null
                 ? List.of()
                 : files.stream().filter(f -> f != null && !f.isEmpty()).toList();
@@ -133,8 +140,11 @@ public class QuestionGenerationService {
             aiUploadValidator.validate(uploadedFiles);
             StringBuilder rawText = new StringBuilder();
             for (MultipartFile file : uploadedFiles) {
-                // Temporary extraction only — never permanently ingested here.
-                rawText.append(documentIngestionService.extractDocumentText(file)).append("\n\n");
+                String fallbackText = documentIngestionService.extractDocumentText(file);
+                QuestionSourceImageService.ExtractedSource extracted =
+                        questionSourceImageService.extract(file, fallbackText);
+                rawText.append(extracted.text()).append("\n\n");
+                sourceImageKeys.addAll(extracted.imageKeys());
             }
             aiUploadValidator.requireReadableText(rawText.toString());
             temporaryText = truncate(rawText.toString());
@@ -192,6 +202,7 @@ public class QuestionGenerationService {
         List<GeneratedQuestionDraftDto> validDrafts = requestedCounts != null
                 ? generateStrictCountDrafts(request, ctx, requestedCounts, target, referenceContext, warnings)
                 : generateTargetDrafts(request, ctx, target, referenceContext, warnings);
+        validDrafts = sanitizeImageReferences(validDrafts, sourceImageKeys);
 
         if (requestedCounts != null) {
             Map<String, Long> producedByType = validDrafts.stream()
@@ -235,6 +246,30 @@ public class QuestionGenerationService {
                         uploadedFiles.size()),
                 warnings
         );
+    }
+
+    private List<GeneratedQuestionDraftDto> sanitizeImageReferences(
+            List<GeneratedQuestionDraftDto> drafts, Set<String> allowedKeys) {
+        return drafts.stream().map(draft -> {
+            String questionImageKey = allowedKeys.contains(draft.imageKey())
+                    ? draft.imageKey() : null;
+            List<com.capstone.rebyu.ai.dto.GeneratedChoiceDto> choices = draft.choices() == null
+                    ? null
+                    : draft.choices().stream().map(choice ->
+                            new com.capstone.rebyu.ai.dto.GeneratedChoiceDto(
+                                    choice.choiceText(),
+                                    choice.explanation(),
+                                    choice.isCorrect(),
+                                    allowedKeys.contains(choice.imageKey()) ? choice.imageKey() : null))
+                    .toList();
+            return new GeneratedQuestionDraftDto(
+                    draft.questionType(), draft.suggestedLessonId(),
+                    draft.suggestedLessonTitle(), draft.question(), draft.difficulty(),
+                    choices, draft.correctChoiceIndex(), draft.correctAnswer(),
+                    draft.checkingMethod(), draft.rubricBasedAnswer(), draft.starterCode(),
+                    draft.testCases(), draft.diagramType(), draft.instructions(),
+                    draft.authoringNotes(), questionImageKey);
+        }).toList();
     }
 
     private QuestionGenerationSourceMode resolveSourceMode(
@@ -594,6 +629,17 @@ public class QuestionGenerationService {
         requestData.put("certificationId", request.getCertificationId());
         requestData.put("certificationTitle", ctx.certTitle());
         requestData.put("availableLessons", availableLessons);
+        // Reinforced every batch so drafts follow concise professional exam style.
+        requestData.put("styleGuide",
+                "Generate concise, professional IT certification-exam questions similar to "
+                        + "TOPCIT or PhilNITS. Prefer direct technical stems, calculations, "
+                        + "binary/logic operations, code or SQL interpretation, data structures, "
+                        + "architecture, standards, and precise Which-of-the-following questions. "
+                        + "Do not force workplace scenarios. Avoid repetitive openings such as "
+                        + "A company, An enterprise, An organization, A team, A developer, or named "
+                        + "people. Use a situation only when its facts are required to solve the "
+                        + "technical problem. Keep wording mature, objective, and exam-grade, with "
+                        + "plausible MCQ distractors.");
         if (requestedCounts != null) {
             requestData.put("questionCounts", requestedCounts);
         } else {
@@ -994,23 +1040,30 @@ public class QuestionGenerationService {
                         .toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
                 diagramType = switch (diagramType) {
                     case "UML", "CLASS", "CLASS_DIAGRAM", "UMLCLASS" -> "UML_CLASS";
+                    case "SEQUENCE", "SEQUENCE_DIAGRAM", "UMLSEQUENCE" -> "UML_SEQUENCE";
                     case "ENTITY_RELATIONSHIP", "ENTITY_RELATIONSHIP_DIAGRAM" -> "ERD";
                     case "DATA_FLOW", "DATA_FLOW_DIAGRAM", "DATAFLOW" -> "DFD";
                     case "FLOW_CHART" -> "FLOWCHART";
+                    case "MINDMAP", "MIND_MAPPING" -> "MIND_MAP";
+                    case "NETWORK", "NETWORK_TOPOLOGY", "NETWORK_DIAGRAM_TYPE" -> "NETWORK_DIAGRAM";
                     default -> diagramType;
                 };
                 // Infer the diagram type from the prompt when the model omits it.
-                if (diagramType.isBlank()
-                        || !java.util.Set.of("ERD", "UML_CLASS", "FLOWCHART", "DFD")
-                                .contains(diagramType)) {
+                if (diagramType.isBlank() || !DIAGRAM_TYPES.contains(diagramType)) {
                     String q = node.path("question").asText("").toLowerCase(Locale.ROOT);
                     if (q.contains("erd") || q.contains("entity") || q.contains("relationship")
                             || q.contains("schema")) {
                         diagramType = "ERD";
+                    } else if (q.contains("sequence")) {
+                        diagramType = "UML_SEQUENCE";
                     } else if (q.contains("uml") || q.contains("class")) {
                         diagramType = "UML_CLASS";
                     } else if (q.contains("data flow") || q.contains("dfd")) {
                         diagramType = "DFD";
+                    } else if (q.contains("mind map") || q.contains("mindmap")) {
+                        diagramType = "MIND_MAP";
+                    } else if (q.contains("network") || q.contains("topology")) {
+                        diagramType = "NETWORK_DIAGRAM";
                     } else {
                         diagramType = "FLOWCHART";
                     }

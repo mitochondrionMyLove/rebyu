@@ -204,6 +204,13 @@ export default function CertificationAssessmentsSection({
                     </Link>
                   </Button>
                 ) : null}
+                {attempts.length > 1 ? (
+                  <Button asChild size="sm" variant="ghost">
+                    <Link to={`/learner/assessments/${exam.examId}/history`}>
+                      View All Attempts
+                    </Link>
+                  </Button>
+                ) : null}
               </div>
             </article>
           )

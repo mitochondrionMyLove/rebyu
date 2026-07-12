@@ -17,7 +17,6 @@ import { getFileViewUrl } from "@/services/fileService.js"
 import CertificationFormDrawer from "@/components/certifications/certification-form-drawer"
 import AssessmentsTab from "@/components/assessments/admin/assessments-tab.jsx"
 import CertificationPublishingChecklist from "@/components/assessments/admin/certification-publishing-checklist.jsx"
-import AssessmentStructureView from "@/components/assessments/admin/assessment-structure-view.jsx"
 import { useQueryClient } from "@tanstack/react-query"
 
 function getCertification(location) {
@@ -271,9 +270,16 @@ export default function ViewCertificationAdmin() {
 
               <TabsContent value="assessments">
                 <div className="space-y-8">
-                  <AssessmentStructureView
-                      certification={certification}
+                  <CertificationPublishingChecklist
+                      certificationId={certification?.certificationId}
+                      isPublished={certification?.status === "PUBLISHED"}
                       onCreateAssessment={handleCreateAssessment}
+                      onPublished={() =>
+                          setCertification((current) => ({
+                            ...current,
+                            status: "PUBLISHED",
+                          }))
+                      }
                   />
                   <AssessmentsTab
                       certification={certification}
@@ -285,20 +291,6 @@ export default function ViewCertificationAdmin() {
                 </div>
               </TabsContent>
             </Tabs>
-
-            <div className="mt-10">
-              <CertificationPublishingChecklist
-                  certificationId={certification?.certificationId}
-                  isPublished={certification?.status === "PUBLISHED"}
-                  onCreateAssessment={handleCreateAssessment}
-                  onPublished={() =>
-                      setCertification((current) => ({
-                        ...current,
-                        status: "PUBLISHED",
-                      }))
-                  }
-              />
-            </div>
           </div>
         </main>
       </section>

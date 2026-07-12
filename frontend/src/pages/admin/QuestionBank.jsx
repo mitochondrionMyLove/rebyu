@@ -67,6 +67,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 
 import { getAllCertifications } from "../../services/certificationService.js";
+import { getFileViewUrl } from "../../services/fileService.js";
 import DiagramArea from "../../components/challenges/diagram-area.jsx";
 import BigDialog from "../../components/commons/dialog.jsx";
 import AiGenerationProgress from "../../components/commons/ai-generation-progress.jsx";
@@ -819,6 +820,13 @@ function QuestionPromptFields({
                 </summary>
 
                 <div className="mt-3">
+                    {data.imageKey && !data.image && (
+                        <img
+                            src={getFileViewUrl(data.imageKey)}
+                            alt="Extracted source question"
+                            className="mb-3 max-h-64 rounded-md border object-contain"
+                        />
+                    )}
                     <ImageUpload
                         id={`${questionKey}-question-image`}
                         name={getQuestionFieldName(questionKey, "image")}
@@ -1135,6 +1143,13 @@ function MultipleChoices({
                                     </summary>
 
                                     <div className="mt-3 space-y-3">
+                                        {choice.imageKey && !choice.image && (
+                                            <img
+                                                src={getFileViewUrl(choice.imageKey)}
+                                                alt={`Extracted source choice ${letter}`}
+                                                className="max-h-40 rounded-md border object-contain"
+                                            />
+                                        )}
                                         <ImageUpload
                                             id={`${questionKey}-choice-image-${index}`}
                                             name={getQuestionFieldName(
@@ -1810,6 +1825,13 @@ function QuestionFileGeneratorDialog({
     const maxSize = maxSizeMB * 1024 * 1024;
 
     const [submitError, setSubmitError] = useState("");
+    const [generationOptions, setGenerationOptions] = useState({
+        total: DEFAULT_GENERATION_TARGET,
+        questionType: "AUTO",
+        easy: Math.floor(DEFAULT_GENERATION_TARGET / 3),
+        average: DEFAULT_GENERATION_TARGET - 2 * Math.floor(DEFAULT_GENERATION_TARGET / 3),
+        hard: Math.floor(DEFAULT_GENERATION_TARGET / 3),
+    });
 
     const [
         { files, isDragging, errors },
@@ -1874,8 +1896,18 @@ function QuestionFileGeneratorDialog({
 
         setSubmitError("");
 
+        const difficultyTotal = generationOptions.easy + generationOptions.average + generationOptions.hard;
+        if (generationOptions.total < 1 || generationOptions.total > 50) {
+            setSubmitError("Number of items must be between 1 and 50.");
+            return;
+        }
+        if (difficultyTotal !== generationOptions.total) {
+            setSubmitError("Easy, average, and difficult counts must equal the total number of items.");
+            return;
+        }
+
         try {
-            await onGenerate(selectedDocuments);
+            await onGenerate(selectedDocuments, generationOptions);
             resetGeneratorForm();
         } catch (error) {
             setSubmitError(
@@ -1905,6 +1937,87 @@ function QuestionFileGeneratorDialog({
                 </DialogHeader>
 
                 <div className="space-y-5">
+                    <section className="space-y-4 rounded-xl border p-4">
+                        <div>
+                            <h3 className="text-sm font-semibold text-foreground">Question setup</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Choose the number, type, and exact difficulty distribution.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="ai-question-total">Number of items</Label>
+                                <Input
+                                    id="ai-question-total"
+                                    type="number"
+                                    min="1"
+                                    max="50"
+                                    value={generationOptions.total}
+                                    disabled={isGenerating}
+                                    onChange={(event) => setGenerationOptions((current) => ({
+                                        ...current,
+                                        total: Number(event.target.value) || 0,
+                                    }))}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Question type</Label>
+                                <Select
+                                    value={generationOptions.questionType}
+                                    disabled={isGenerating}
+                                    onValueChange={(questionType) => setGenerationOptions((current) => ({
+                                        ...current,
+                                        questionType,
+                                    }))}
+                                >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="AUTO">AI-selected mix</SelectItem>
+                                        <SelectItem value="MCQ">Multiple Choice</SelectItem>
+                                        <SelectItem value="SHORT_ANSWER">Short Answer</SelectItem>
+                                        <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
+                                        <SelectItem value="PROGRAMMING">Programming</SelectItem>
+                                        <SelectItem value="DIAGRAM">Diagram</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            {[
+                                ["easy", "Easy"],
+                                ["average", "Average"],
+                                ["hard", "Difficult"],
+                            ].map(([field, label]) => (
+                                <div key={field} className="space-y-2">
+                                    <Label htmlFor={`ai-question-${field}`}>{label}</Label>
+                                    <Input
+                                        id={`ai-question-${field}`}
+                                        type="number"
+                                        min="0"
+                                        max="50"
+                                        value={generationOptions[field]}
+                                        disabled={isGenerating}
+                                        onChange={(event) => setGenerationOptions((current) => ({
+                                            ...current,
+                                            [field]: Math.max(0, Number(event.target.value) || 0),
+                                        }))}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+
+                        <p className={`text-xs ${
+                            generationOptions.easy + generationOptions.average + generationOptions.hard === generationOptions.total
+                                ? "text-muted-foreground"
+                                : "font-medium text-destructive"
+                        }`}>
+                            Difficulty total: {generationOptions.easy + generationOptions.average + generationOptions.hard} of {generationOptions.total} items
+                        </p>
+                    </section>
+
                     <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -2875,7 +2988,7 @@ function QuestionBank() {
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
-                        imageKey: null,
+                        imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
@@ -2884,7 +2997,7 @@ function QuestionBank() {
                         await saveChoices({
                             questionId: savedMCQ.questionId,
                             choiceText: choice.choiceText,
-                            imageKey: null,
+                            imageKey: choice.imageKey ?? null,
                             correct: choice.isCorrect,
                             explanation: choice.explanation,
                         });
@@ -2896,7 +3009,7 @@ function QuestionBank() {
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
-                        imageKey: null,
+                        imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
@@ -2912,7 +3025,7 @@ function QuestionBank() {
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
-                        imageKey: null,
+                        imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
@@ -2928,7 +3041,7 @@ function QuestionBank() {
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
-                        imageKey: null,
+                        imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
@@ -2963,7 +3076,7 @@ function QuestionBank() {
                         questionType: question.data.questionType,
                         difficultyLevel: question.data.difficulty,
                         questionText: question.data.question,
-                        imageKey: null,
+                        imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
                         totalPoints: 1,
                     });
@@ -2999,7 +3112,7 @@ function QuestionBank() {
         }
     };
 
-    async function handleGenerateQuestionsFromFiles(selectedDocuments) {
+    async function handleGenerateQuestionsFromFiles(selectedDocuments, generationOptions) {
         if (!selectedCertification) {
             throw new Error(
                 "Please select a certification before generating questions.",
@@ -3020,9 +3133,11 @@ function QuestionBank() {
             const generationResponse = await generateQuestionsFromFiles(
                 certificationId,
                 selectedDocuments,
-                null,
+                generationOptions.questionType === "AUTO"
+                    ? null
+                    : { [generationOptions.questionType]: generationOptions.total },
                 {
-                    targetQuestionCount: DEFAULT_GENERATION_TARGET,
+                    targetQuestionCount: generationOptions.total,
                     additionalInstructions: `
 You are REBYU's Certification-Aware Question Bank Generation AI.
 
@@ -3040,6 +3155,15 @@ CERTIFICATION-AWARE RULES:
 4. Generate only question types that match the certification and are supported by the uploaded file, certification content, or lesson/module content.
 5. Every question must be based only on the uploaded files, certification content, or lesson/module content.
 6. Do not invent topics that are not found in the uploaded/source content.
+
+PROFESSIONAL EXAM STYLE:
+- Write concise, technical questions for IT professionals and aspiring IT professionals.
+- Match official TOPCIT/PhilNITS-style wording: calculations, binary and logic operations, algorithms, code or SQL interpretation, data structures, databases, operating systems, networks, architecture, standards, and precise "Which of the following" questions.
+- Do not force every item into a workplace scenario.
+- Do not repeatedly start with "A company", "An enterprise", "An organization", "A team", "A developer", or a person's name.
+- Do not add fictional clients, deadlines, incidents, or business stories unless those facts are necessary to solve the technical problem.
+- Scenarios are allowed only when technically useful. Prefer direct, objective exam stems and mature professional language.
+- Questions must test certification-level knowledge or reasoning, not childish trivia or high-school-style filler.
 
 CERTIFICATION-SPECIFIC RULES:
 - If the certification is TOPCIT:
@@ -3076,11 +3200,13 @@ QUESTION TYPE RULES:
 - DIAGRAM: Generate only when BOTH conditions are true: the certification allows diagram/performance-based questions, and the source contains workflows, activity diagrams, class diagrams, component diagrams, ER diagrams, flowcharts, sequence diagrams, UI designs, use case diagrams, database/schema design, architecture, network diagrams, or process modeling material. Return diagramType, instructions, authoringNotes, difficulty, and lesson.
 
 QUANTITY RULES:
-- Generate at least ${DEFAULT_GENERATION_TARGET} total high-quality draft questions when the source content can support it.
+- Generate exactly ${generationOptions.total} high-quality draft questions when the source content can support it.
+- Required difficulty distribution: ${generationOptions.easy} easy, ${generationOptions.average} average, and ${generationOptions.hard} difficult.
+- Required question type: ${generationOptions.questionType === "AUTO" ? "Choose a suitable mix based on the certification and source." : generationOptions.questionType}.
 - Do not stop after a small sample. Produce a full batch for each backend request.
-- Use at least 3 different question types when the certification style and source content support them.
+- ${generationOptions.questionType === "AUTO" ? "Use varied supported question types when the certification style and source content support them." : `Generate only ${generationOptions.questionType} questions.`}
 - If the certification is MCQ-only, generate MCQ questions only.
-- If the source content is not enough to create ${DEFAULT_GENERATION_TARGET} high-quality questions, generate the maximum valid number and include a warning.
+- If the source content is not enough to create ${generationOptions.total} high-quality questions, generate the maximum valid number and include a warning.
 - Do not create duplicate or near-duplicate questions.
 
 OUTPUT RULES:

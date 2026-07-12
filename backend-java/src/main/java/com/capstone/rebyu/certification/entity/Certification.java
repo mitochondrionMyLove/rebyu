@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,9 +39,6 @@ public class Certification {
 
     @Column(name = "date_created", nullable = true)
     private LocalDateTime dateCreated;
-
-    @Column(nullable = false)
-    private BigDecimal price = BigDecimal.ZERO;
 
     @OneToMany(mappedBy = "certification", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("majorCategoryId ASC")

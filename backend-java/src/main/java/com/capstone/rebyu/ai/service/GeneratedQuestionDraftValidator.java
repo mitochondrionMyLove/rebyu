@@ -3,7 +3,6 @@ package com.capstone.rebyu.ai.service;
 import com.capstone.rebyu.ai.common.InvalidAiGeneratedQuestionException;
 import com.capstone.rebyu.ai.dto.GeneratedChoiceDto;
 import com.capstone.rebyu.ai.dto.GeneratedCheckingMethod;
-import com.capstone.rebyu.ai.dto.GeneratedDiagramType;
 import com.capstone.rebyu.ai.dto.GeneratedQuestionDifficulty;
 import com.capstone.rebyu.ai.dto.GeneratedQuestionDraftDto;
 import com.capstone.rebyu.ai.dto.GeneratedQuestionType;
@@ -259,14 +258,8 @@ public class GeneratedQuestionDraftValidator {
                     "The AI returned a diagram draft without a diagram type at index " + index + "."
             );
         }
-        if (draft.diagramType() != GeneratedDiagramType.ERD
-                && draft.diagramType() != GeneratedDiagramType.UML_CLASS
-                && draft.diagramType() != GeneratedDiagramType.FLOWCHART
-                && draft.diagramType() != GeneratedDiagramType.DFD) {
-            throw new InvalidAiGeneratedQuestionException(
-                    "The AI returned a diagram draft with an invalid diagram type at index " + index + "."
-            );
-        }
+        // GeneratedDiagramType is exhaustive over the supported types, so any
+        // successfully-deserialized value is valid — nothing further to check.
         requireText(draft.instructions(), "instructions", index);
         requireText(draft.authoringNotes(), "authoringNotes", index);
     }

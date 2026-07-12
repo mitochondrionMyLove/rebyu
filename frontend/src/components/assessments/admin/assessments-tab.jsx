@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  ListPlus,
   PencilIcon,
   Search,
   Trash2Icon,
@@ -49,7 +48,6 @@ import {
 import { getQuestions } from "@/services/questionService.js"
 import AssessmentDialog from "./assessment-dialog.jsx"
 import AssessmentPreviewDialog from "./assessment-preview-dialog.jsx"
-import QuestionSelectionDialog from "./question-selection-dialog.jsx"
 
 const ASSESSMENT_FILTER_TYPES = [
   { value: "DIAGNOSTIC", label: "Diagnostic Exam" },
@@ -185,7 +183,6 @@ export default function AssessmentsTab({
   const handledCreateRequestRef = useRef(null)
   const [editTarget, setEditTarget] = useState(null)
   const [previewTarget, setPreviewTarget] = useState(null)
-  const [manageQuestionsTarget, setManageQuestionsTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   // Publishing-requirement buttons open the exact assessment or existing
@@ -418,14 +415,6 @@ export default function AssessmentsTab({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Add questions to ${exam.title}`}
-                                onClick={() => setManageQuestionsTarget(exam)}
-                            >
-                              <ListPlus />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
                                 aria-label={`Preview ${exam.title}`}
                                 onClick={() => setPreviewTarget(exam)}
                             >
@@ -493,24 +482,6 @@ export default function AssessmentsTab({
             examTypeByIdText={data.examTypeByIdText}
             examQuestions={data.examQuestions}
             questionById={data.questionById}
-        />
-
-        <QuestionSelectionDialog
-            open={manageQuestionsTarget != null}
-            onOpenChange={(open) => {
-              if (!open) setManageQuestionsTarget(null)
-            }}
-            exam={manageQuestionsTarget}
-            onQuestionsAdded={() => {
-              data.refetch?.()
-              queryClient.invalidateQueries({
-                queryKey: [
-                  "certification-publishing-requirements",
-                  certification.certificationId,
-                ],
-              })
-              setManageQuestionsTarget(null)
-            }}
         />
 
         <AlertDialog

@@ -59,6 +59,7 @@ export default function AssessmentQuestionPickerDialog({
                                                          certification,
                                                          alreadySelectedIds = new Set(),
                                                          onAddQuestions,
+                                                         currentExamId = null,
                                                          initialLessonId = null,
                                                          initialMiddleCategoryId = null,
                                                          initialMajorCategoryId = null,
@@ -107,11 +108,18 @@ export default function AssessmentQuestionPickerDialog({
 
     return new Set(
         list
+            // When editing, this exam's own questions are managed locally via
+            // the current selection — don't treat them as "used elsewhere".
+            .filter(
+                (examQuestion) =>
+                    currentExamId == null ||
+                    String(examQuestion.examId) !== String(currentExamId)
+            )
             .map((examQuestion) => examQuestion.questionId)
             .filter((questionId) => questionId != null)
             .map((questionId) => String(questionId))
     )
-  }, [examQuestionsQuery.data])
+  }, [examQuestionsQuery.data, currentExamId])
 
   const middleCategories = useMemo(() => {
     const seen = new Map()

@@ -167,6 +167,19 @@ function isDiagnosticCompleted(certification, data) {
     return true
   }
 
+  const completedEnrollment = collectArrays(data?.enrollments).some(
+      (enrollment) =>
+          String(enrollment?.certificationId ?? "") === certificationId &&
+          Boolean(
+              enrollment?.diagnosticCompletedAt ??
+              enrollment?.diagnosticAttemptId ??
+              enrollment?.diagnosticCompleted
+          )
+  )
+  if (completedEnrollment) {
+    return true
+  }
+
   const results = collectArrays(
       certification?.assessmentResults,
       certification?.examResults,
