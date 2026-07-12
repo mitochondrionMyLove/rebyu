@@ -6,6 +6,12 @@ import { defineConfig } from "vite"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    // Route-level lazy loading keeps the entry chunk below Vite's default
+    // budget. Two self-contained feature routes are slightly larger while
+    // remaining under 200 kB gzip, so retain a meaningful higher ceiling.
+    chunkSizeWarningLimit: 650,
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

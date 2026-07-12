@@ -1,62 +1,58 @@
+import { lazy, Suspense } from "react"
 import { Navigate, Routes, Route } from "react-router-dom"
 import ProtectedRoute from "./components/ProtectedRoute"
-import DashboardLayout from "./layouts/DashboardLayout"
-import LearnerLayout from "./layouts/learner-layout.jsx"
-import EnterpriseLayout from "./layouts/enterprise-layout.jsx"
 import { roleHomePath, useAuth } from "./context/auth-context.jsx"
-import LoginPage from "./pages/auth/login-page.jsx"
-import RegisterPage from "./pages/auth/register-page.jsx"
-import VerifyEmailPage from "./pages/auth/verify-email-page.jsx"
-import ForgotPasswordPage from "./pages/auth/forgot-password-page.jsx"
-import SetNewPasswordPage from "@/pages/auth/set-new-password-page.jsx"
 
-import Certifications from "./pages/admin/Certifications"
-import Challenges from "./pages/admin/Challenges"
-import QuestionBank from "./pages/admin/QuestionBank"
-import Analytics from "./pages/admin/Analytics"
-import Learners from "./pages/admin/Learners"
-import Organizations from "./pages/admin/Organizations"
-import ViewCertificationAdmin from "./pages/admin/ViewCertificationAdmin"
-import AdminDashboard from "./pages/admin/AdminDashboard"
-import PartnershipRequests from "./pages/admin/PartnershipRequests"
-import AcceptEnterpriseInvitationPage from "./pages/admin/AcceptEnterpriseInvitationPage"
-
-
-import LandingPage from "./pages/public/LandingPage"
-import CreateLessons from "./pages/admin/CreateLessons"
-import LearnerProgressPage from "./pages/learner/learner-progress-page.jsx"
-import LearnerLearningPage from "./pages/learner/learner-learning-page.jsx"
-import LearnerDiagnosticGatePage from "./pages/learner/learner-diagnostic-page.jsx"
-import LearnerLessonPage from "./pages/learner/learner-lesson-page.jsx"
-import LearnerSubscriptionPage from "./pages/learner/learner-subscription-page.jsx"
-import LearnerCertificationDetailPage from "./pages/learner/learner-certification-detail-page.jsx"
-import LearnerCertificationsPage from "./pages/learner/learner-certifications-page.jsx"
-import LearnerChallengesPage from "./pages/learner/learner-challenges-page.jsx"
-import LearnerFilesPage from "./pages/learner/learner-files-page.jsx"
-import LearnerAccountPage from "./pages/learner/learner-account-page.jsx"
-import LearnerAssessmentAttemptPage from "./pages/learner/learner-assessment-attempt-page.jsx"
-import LearnerAssessmentResultPage from "./pages/learner/learner-assessment-result-page.jsx"
-import LearningStudyPlan from "./pages/learner/learner-study-plan.jsx"
-import MistakesBank from "./pages/learner/learner-mistakes-bank.jsx"
-import Community from "./pages/learner/learner-community-qa.jsx"
-
-
-import EnterpriseDashboardPage from "./pages/enterprise/enterprise-dashboard-page.jsx"
-import EnterpriseLearnersPage from "./pages/enterprise/enterprise-learners-page.jsx"
-import EnterpriseLearnerDetailPage from "./pages/enterprise/enterprise-learner-detail-page.jsx"
-import EnterpriseInvitationsPage from "./pages/enterprise/enterprise-invitations-page.jsx"
-import EnterpriseCertificationsPage from "./pages/enterprise/enterprise-certifications-page.jsx"
-import EnterpriseGroupsPage from "./pages/enterprise/enterprise-groups-page.jsx"
-import EnterpriseLicensePage from "./pages/enterprise/enterprise-license-page.jsx"
-import EnterpriseAnalyticsPage from "./pages/enterprise/enterprise-analytics-page.jsx"
-import EnterprisePartnershipPage from "./pages/enterprise/enterprise-partnership-page.jsx"
-import EnterpriseBillingPage from "./pages/enterprise/enterprise-billing-page.jsx"
-import EnterpriseFilesPage from "./pages/enterprise/enterprise-files-page.jsx"
-import EnterpriseOrganizationPage from "./pages/enterprise/enterprise-organization-page.jsx"
-import EnterpriseSettingsPage from "./pages/enterprise/enterprise-settings-page.jsx"
-import EnterpriseRequestAccessPage from "./pages/public/enterprise-request-access-page.jsx"
-
-import CompilerArea from "./components/challenges/compiler-area.jsx"
+const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"))
+const LearnerLayout = lazy(() => import("./layouts/learner-layout.jsx"))
+const EnterpriseLayout = lazy(() => import("./layouts/enterprise-layout.jsx"))
+const LoginPage = lazy(() => import("./pages/auth/login-page.jsx"))
+const RegisterPage = lazy(() => import("./pages/auth/register-page.jsx"))
+const VerifyEmailPage = lazy(() => import("./pages/auth/verify-email-page.jsx"))
+const ForgotPasswordPage = lazy(() => import("./pages/auth/forgot-password-page.jsx"))
+const SetNewPasswordPage = lazy(() => import("@/pages/auth/set-new-password-page.jsx"))
+const Certifications = lazy(() => import("./pages/admin/Certifications"))
+const Challenges = lazy(() => import("./pages/admin/Challenges"))
+const QuestionBank = lazy(() => import("./pages/admin/QuestionBank"))
+const Analytics = lazy(() => import("./pages/admin/Analytics"))
+const Learners = lazy(() => import("./pages/admin/Learners"))
+const Organizations = lazy(() => import("./pages/admin/Organizations"))
+const ViewCertificationAdmin = lazy(() => import("./pages/admin/ViewCertificationAdmin"))
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"))
+const PartnershipRequests = lazy(() => import("./pages/admin/PartnershipRequests"))
+const AcceptEnterpriseInvitationPage = lazy(() => import("./pages/admin/AcceptEnterpriseInvitationPage"))
+const LandingPage = lazy(() => import("./pages/public/LandingPage"))
+const CreateLessons = lazy(() => import("./pages/admin/CreateLessons"))
+const LearnerProgressPage = lazy(() => import("./pages/learner/learner-progress-page.jsx"))
+const LearnerLearningPage = lazy(() => import("./pages/learner/learner-learning-page.jsx"))
+const LearnerDiagnosticGatePage = lazy(() => import("./pages/learner/learner-diagnostic-page.jsx"))
+const LearnerLessonPage = lazy(() => import("./pages/learner/learner-lesson-page.jsx"))
+const LearnerSubscriptionPage = lazy(() => import("./pages/learner/learner-subscription-page.jsx"))
+const LearnerCertificationDetailPage = lazy(() => import("./pages/learner/learner-certification-detail-page.jsx"))
+const LearnerCertificationsPage = lazy(() => import("./pages/learner/learner-certifications-page.jsx"))
+const LearnerChallengesPage = lazy(() => import("./pages/learner/learner-challenges-page.jsx"))
+const LearnerFilesPage = lazy(() => import("./pages/learner/learner-files-page.jsx"))
+const LearnerAccountPage = lazy(() => import("./pages/learner/learner-account-page.jsx"))
+const LearnerAssessmentAttemptPage = lazy(() => import("./pages/learner/learner-assessment-attempt-page.jsx"))
+const LearnerAssessmentResultPage = lazy(() => import("./pages/learner/learner-assessment-result-page.jsx"))
+const LearningStudyPlan = lazy(() => import("./pages/learner/learner-study-plan.jsx"))
+const MistakesBank = lazy(() => import("./pages/learner/learner-mistakes-bank.jsx"))
+const Community = lazy(() => import("./pages/learner/learner-community-qa.jsx"))
+const EnterpriseDashboardPage = lazy(() => import("./pages/enterprise/enterprise-dashboard-page.jsx"))
+const EnterpriseLearnersPage = lazy(() => import("./pages/enterprise/enterprise-learners-page.jsx"))
+const EnterpriseLearnerDetailPage = lazy(() => import("./pages/enterprise/enterprise-learner-detail-page.jsx"))
+const EnterpriseInvitationsPage = lazy(() => import("./pages/enterprise/enterprise-invitations-page.jsx"))
+const EnterpriseCertificationsPage = lazy(() => import("./pages/enterprise/enterprise-certifications-page.jsx"))
+const EnterpriseGroupsPage = lazy(() => import("./pages/enterprise/enterprise-groups-page.jsx"))
+const EnterpriseLicensePage = lazy(() => import("./pages/enterprise/enterprise-license-page.jsx"))
+const EnterpriseAnalyticsPage = lazy(() => import("./pages/enterprise/enterprise-analytics-page.jsx"))
+const EnterprisePartnershipPage = lazy(() => import("./pages/enterprise/enterprise-partnership-page.jsx"))
+const EnterpriseBillingPage = lazy(() => import("./pages/enterprise/enterprise-billing-page.jsx"))
+const EnterpriseFilesPage = lazy(() => import("./pages/enterprise/enterprise-files-page.jsx"))
+const EnterpriseOrganizationPage = lazy(() => import("./pages/enterprise/enterprise-organization-page.jsx"))
+const EnterpriseSettingsPage = lazy(() => import("./pages/enterprise/enterprise-settings-page.jsx"))
+const EnterpriseRequestAccessPage = lazy(() => import("./pages/public/enterprise-request-access-page.jsx"))
+const CompilerArea = lazy(() => import("./components/challenges/compiler-area.jsx"))
 
 
 function RoleHomeRedirect() {
@@ -75,6 +71,7 @@ function RoleHomeRedirect() {
 
 export function App() {
     return (
+      <Suspense fallback={null}>
         <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/welcome" element={<Navigate to="/" replace />} />
@@ -185,6 +182,7 @@ export function App() {
 
             <Route path="*" element={<RoleHomeRedirect />} />
         </Routes>
+      </Suspense>
     )
 }
 

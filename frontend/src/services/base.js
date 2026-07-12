@@ -1,14 +1,13 @@
 import axios from "axios"
+import { fetchAuthSession } from "aws-amplify/auth"
 
 // In dev the Vite proxy forwards /api to the backend (see vite.config.ts),
 // which keeps requests same-origin regardless of the dev server port.
 export const API = import.meta.env.DEV ? "/api" : "http://localhost:8080/api"
 
-// Attaches the Cognito access token when a session exists. Imported lazily so
-// modules that use base() don't force Amplify to load before configuration.
+// Attaches the Cognito access token when a session exists.
 async function currentAccessToken() {
   try {
-    const { fetchAuthSession } = await import("aws-amplify/auth")
     const session = await fetchAuthSession()
     return session?.tokens?.accessToken?.toString() ?? null
   } catch {
