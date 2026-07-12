@@ -1,1 +1,99 @@
+import { base } from "./base"
+
+// Kept for existing importers.
 export { getLearnerPortalData } from "./learnerService.js"
+
+// ---------------------------------------------------------------------------
+// BKT analytics. The browser only ever calls Spring Boot; Spring Boot proxies
+// the internal FastAPI BKT service.
+// ---------------------------------------------------------------------------
+
+/** All lesson mastery for a learner, optionally filtered to specific lessons. */
+export async function getLearnerMastery(learnerId, lessonIds) {
+  const params = new URLSearchParams({ learnerId: String(learnerId) })
+  for (const lessonId of lessonIds ?? []) {
+    params.append("lessonId", String(lessonId))
+  }
+  return base(`learner/analytics/mastery?${params.toString()}`)
+}
+
+/** Lesson → middle → major priority hierarchy for a certification. */
+export async function getCertificationPriorities(learnerId, certificationId) {
+  return base(
+    `learner/analytics/priorities/certifications/${certificationId}?learnerId=${learnerId}`
+  )
+}
+
+/** Certification confidence summary. */
+export async function getCertificationConfidence(learnerId, certificationId) {
+  return base(
+    `learner/analytics/confidence/certifications/${certificationId}?learnerId=${learnerId}`
+  )
+}
+
+/** Weighted certification readiness. */
+export async function getReadiness(payload) {
+  return base("learner/analytics/readiness", { method: "POST", data: payload })
+}
+
+// ---------------------------------------------------------------------------
+// Shared priority-tag presentation metadata. Text labels are always shown, so
+// meaning never depends on color alone (accessibility).
+// ---------------------------------------------------------------------------
+
+export const PRIORITY_META = {
+  CRITICAL_PRIORITY: { label: "Critical Priority", tone: "critical", rank: 7 },
+  HIGH_PRIORITY: { label: "High Priority", tone: "high", rank: 6 },
+  MEDIUM_PRIORITY: { label: "Medium Priority", tone: "medium", rank: 5 },
+  LOW_PRIORITY: { label: "Low Priority", tone: "low", rank: 4 },
+  NEEDS_REASSESSMENT: { label: "Needs Reassessment", tone: "reassess", rank: 3 },
+  NOT_ENOUGH_DATA: { label: "Not Enough Data", tone: "muted", rank: 2 },
+  ON_TRACK: { label: "On Track", tone: "ontrack", rank: 1 },
+  STRONG: { label: "Strong Area", tone: "strong", rank: 0 },
+}
+
+/** Default learner ordering: most urgent first. */
+export function comparePriority(a, b) {
+  const ra = PRIORITY_META[a?.priorityTag]?.rank ?? -1
+  const rb = PRIORITY_META[b?.priorityTag]?.rank ?? -1
+  if (ra !== rb) return rb - ra
+  return (b?.priorityScore ?? 0) - (a?.priorityScore ?? 0)
+}
+
+/** Flattens the hierarchy response into a single ranked list of areas. */
+export function flattenPriorityAreas(hierarchy) {
+  const areas = []
+  for (const major of hierarchy?.majorCategories ?? []) {
+    areas.push({
+      categoryType: "MAJOR",
+      categoryId: major.majorCategoryId,
+      title: major.title,
+      priorityTag: major.priorityTag,
+      priorityScore: major.priorityScore,
+      primaryReason: major.primaryReason,
+    })
+    for (const middle of major.middleCategories ?? []) {
+      areas.push({
+        categoryType: "MIDDLE",
+        categoryId: middle.middleCategoryId,
+        title: middle.title,
+        priorityTag: middle.priorityTag,
+        priorityScore: middle.priorityScore,
+        primaryReason: middle.primaryReason,
+      })
+      for (const lesson of middle.lessons ?? []) {
+        areas.push({
+          categoryType: "LESSON",
+          categoryId: lesson.lessonId,
+          title: lesson.lessonTitle,
+          priorityTag: lesson.priorityTag,
+          priorityScore: lesson.priorityScore,
+          primaryReason: lesson.primaryReason,
+          masteryProbability: lesson.masteryProbability,
+          recommendedAction: lesson.recommendedAction,
+        })
+      }
+    }
+  }
+  return areas
+}

@@ -147,3 +147,22 @@ db:
   host: ${HOST}
   port: ${PORT}
   database: ${DATABASE}
+
+# Internal FastAPI Bayesian Knowledge Tracing (BKT) service integration.
+# The browser never calls FastAPI; only Spring Boot does, over the internal
+# network with a shared service key.
+bkt:
+  enabled: ${BKT_ENABLED:true}
+  service-url: ${BKT_SERVICE_URL:http://localhost:8000/api/v1/bkt}
+  api-key: ${BKT_SERVICE_API_KEY:}
+  connect-timeout-ms: ${BKT_CONNECT_TIMEOUT:2000}
+  read-timeout-ms: ${BKT_READ_TIMEOUT:5000}
+  dispatch-batch-size: ${BKT_DISPATCH_BATCH_SIZE:100}
+  dispatch-interval-ms: ${BKT_DISPATCH_INTERVAL:10000}
+  dispatch-initial-delay-ms: ${BKT_DISPATCH_INITIAL_DELAY:15000}
+  max-retries: ${BKT_MAX_RETRIES:8}
+  retry-initial-delay-seconds: ${BKT_RETRY_INITIAL_DELAY:15}
+  retry-max-delay-seconds: ${BKT_RETRY_MAX_DELAY:3600}
+  partial-credit-correct-threshold: ${BKT_PARTIAL_CREDIT_CORRECT_THRESHOLD:0.60}
+  fallback-assessment-type: ${BKT_FALLBACK_ASSESSMENT_TYPE:LESSON_QUIZ}
+  fallback-difficulty: ${BKT_FALLBACK_DIFFICULTY:AVERAGE}

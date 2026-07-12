@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import CodeMirrorProgrammingWorkspace from "@/components/assessments/attempt/code-mirror-programming-workspace.jsx"
 import PerformanceBreakdown from "@/components/assessments/attempt/performance-breakdown.jsx"
+import CertificationAnalyticsPanel from "@/components/analytics/certification-analytics-panel.jsx"
 import { getCurrentLearnerIdentity } from "@/services/learnerService.js"
 import {
   getAssessmentTypeLabel,
@@ -210,6 +211,13 @@ export default function LearnerAssessmentResultPage() {
             <Link to="/learner/learning">Continue Learning</Link>
           </Button>
         </div>
+
+        {result.certificationId != null && learnerId != null ? (
+          <CertificationAnalyticsPanel
+            learnerId={learnerId}
+            certificationId={result.certificationId}
+          />
+        ) : null}
 
         <PerformanceBreakdown
           lessonBreakdown={result.lessonBreakdown}

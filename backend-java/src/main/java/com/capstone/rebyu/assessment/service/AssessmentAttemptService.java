@@ -7,6 +7,7 @@ import com.capstone.rebyu.assessment.entity.*;
 import com.capstone.rebyu.assessment.repository.*;
 import com.capstone.rebyu.billing.entitlement.Entitlements;
 import com.capstone.rebyu.billing.service.LearnerEntitlementService;
+import com.capstone.rebyu.bkt.service.BktOutboxService;
 import com.capstone.rebyu.certification.entity.Lesson;
 import com.capstone.rebyu.certification.repository.LessonRepository;
 import com.capstone.rebyu.common.BusinessRuleException;
@@ -63,6 +64,7 @@ public class AssessmentAttemptService {
     private final QuestionRubricCriterionRepository rubricCriterionRepository;
     private final LessonRepository lessonRepository;
     private final LearnerEntitlementService learnerEntitlementService;
+    private final BktOutboxService bktOutboxService;
     private final ObjectMapper objectMapper;
 
     private static final int MAX_EXECUTION_HISTORY = 20;
@@ -348,6 +350,11 @@ public class AssessmentAttemptService {
         recordLegacyExamResult(attempt);
         completeDiagnosticGateIfApplicable(attempt);
 
+        // Transactional outbox: enqueue final, lesson-mapped BKT evidence in the
+        // SAME commit as the result. Dispatched to FastAPI asynchronously; an
+        // unavailable BKT service can never fail or roll back this submission.
+        bktOutboxService.enqueueForAttempt(attempt, questions, answersByQuestion);
+
         log.info("Attempt {} submitted: {}% ({} / {} points)",
                 attemptId, percentage, earnedPoints, totalPoints);
         return getResult(attemptId, request.learnerId());
@@ -481,7 +488,8 @@ public class AssessmentAttemptService {
                 attempt.getEarnedPoints(),
                 correct, incorrect, pending, unanswered,
                 reviews,
-                lessonBreakdown
+                lessonBreakdown,
+                exam.getCertification().getCertificationId()
         );
     }
 

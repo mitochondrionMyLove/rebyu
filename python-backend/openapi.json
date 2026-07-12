@@ -1,0 +1,2016 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Rebyu BKT Service",
+    "description": "Bayesian Knowledge Tracing microservice for Rebyu. It trains pyBKT models, stores lesson parameters, and updates learner mastery in real time.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/bkt/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness",
+        "operationId": "liveness_api_v1_bkt_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Liveness Api V1 Bkt Health Live Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness",
+        "operationId": "readiness_api_v1_bkt_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Readiness Api V1 Bkt Health Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/training/jobs": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Database Training Job",
+        "operationId": "create_database_training_job_api_v1_bkt_training_jobs_post",
+        "parameters": [
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainingJobCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Get Training Jobs",
+        "operationId": "get_training_jobs_api_v1_bkt_training_jobs_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingJobListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/training/jobs/from-csv": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Csv Training Job",
+        "operationId": "create_csv_training_job_api_v1_bkt_training_jobs_from_csv_post",
+        "parameters": [
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_csv_training_job_api_v1_bkt_training_jobs_from_csv_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/training/jobs/{run_id}": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Get Training Job",
+        "operationId": "get_training_job_api_v1_bkt_training_jobs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/training/jobs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Cancel Training Job",
+        "operationId": "cancel_training_job_api_v1_bkt_training_jobs__run_id__cancel_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/mastery/events": {
+      "post": {
+        "tags": [
+          "mastery"
+        ],
+        "summary": "Ingest Mastery Event",
+        "operationId": "ingest_mastery_event_api_v1_bkt_mastery_events_post",
+        "parameters": [
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MasteryEventCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MasteryEventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/mastery/events/batch": {
+      "post": {
+        "tags": [
+          "mastery"
+        ],
+        "summary": "Ingest Mastery Events",
+        "operationId": "ingest_mastery_events_api_v1_bkt_mastery_events_batch_post",
+        "parameters": [
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MasteryEventBatchCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MasteryEventResponse"
+                  },
+                  "title": "Response Ingest Mastery Events Api V1 Bkt Mastery Events Batch Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/mastery/learners/{learner_id}": {
+      "get": {
+        "tags": [
+          "mastery"
+        ],
+        "summary": "Get Learner Mastery",
+        "operationId": "get_learner_mastery_api_v1_bkt_mastery_learners__learner_id__get",
+        "parameters": [
+          {
+            "name": "learner_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "lesson_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lesson Id"
+            }
+          },
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnerMasteryListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/mastery/learners/{learner_id}/lessons/{lesson_id}": {
+      "get": {
+        "tags": [
+          "mastery"
+        ],
+        "summary": "Get Lesson Mastery",
+        "operationId": "get_lesson_mastery_api_v1_bkt_mastery_learners__learner_id__lessons__lesson_id__get",
+        "parameters": [
+          {
+            "name": "learner_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "lesson_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lesson Id"
+            }
+          },
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnerLessonMasteryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "mastery"
+        ],
+        "summary": "Reset Lesson Mastery",
+        "operationId": "reset_lesson_mastery_api_v1_bkt_mastery_learners__learner_id__lessons__lesson_id__delete",
+        "parameters": [
+          {
+            "name": "learner_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "lesson_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lesson Id"
+            }
+          },
+          {
+            "name": "delete_event_history",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Delete Event History"
+            }
+          },
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/models/active": {
+      "get": {
+        "tags": [
+          "models and parameters"
+        ],
+        "summary": "Active Model",
+        "operationId": "active_model_api_v1_bkt_models_active_get",
+        "parameters": [
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveModelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/models/lessons/{lesson_id}/parameters": {
+      "get": {
+        "tags": [
+          "models and parameters"
+        ],
+        "summary": "Lesson Parameters",
+        "operationId": "lesson_parameters_api_v1_bkt_models_lessons__lesson_id__parameters_get",
+        "parameters": [
+          {
+            "name": "lesson_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lesson Id"
+            }
+          },
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonParametersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bkt/analytics/readiness": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Readiness",
+        "operationId": "readiness_api_v1_bkt_analytics_readiness_post",
+        "parameters": [
+          {
+            "name": "x-service-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Service-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Root  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActiveModelResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "model_run_id": {
+            "type": "string",
+            "title": "Model Run Id"
+          },
+          "model_variant": {
+            "type": "string",
+            "title": "Model Variant"
+          },
+          "artifact_path": {
+            "type": "string",
+            "title": "Artifact Path"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "model_run_id",
+          "model_variant",
+          "artifact_path",
+          "sha256",
+          "is_active",
+          "created_at"
+        ],
+        "title": "ActiveModelResponse"
+      },
+      "Body_create_csv_training_job_api_v1_bkt_training_jobs_from_csv_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "num_fits": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Fits"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "test_size": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 0.5,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Size"
+          },
+          "min_interactions_per_skill": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Interactions Per Skill"
+          },
+          "min_learners_per_skill": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Learners Per Skill"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_csv_training_job_api_v1_bkt_training_jobs_from_csv_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LearnerLessonMasteryResponse": {
+        "properties": {
+          "learner_id": {
+            "type": "integer",
+            "title": "Learner Id"
+          },
+          "lesson_id": {
+            "type": "integer",
+            "title": "Lesson Id"
+          },
+          "mastery_probability": {
+            "type": "number",
+            "title": "Mastery Probability"
+          },
+          "mastery_level": {
+            "type": "string",
+            "title": "Mastery Level"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "last_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event Id"
+          },
+          "model_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Run Id"
+          },
+          "last_updated": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "learner_id",
+          "lesson_id",
+          "mastery_probability",
+          "mastery_level",
+          "attempt_count",
+          "last_event_id",
+          "model_run_id",
+          "last_updated"
+        ],
+        "title": "LearnerLessonMasteryResponse"
+      },
+      "LearnerMasteryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LearnerLessonMasteryResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "average_mastery_probability": {
+            "type": "number",
+            "title": "Average Mastery Probability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "average_mastery_probability"
+        ],
+        "title": "LearnerMasteryListResponse"
+      },
+      "LessonParametersResponse": {
+        "properties": {
+          "lesson_id": {
+            "type": "integer",
+            "title": "Lesson Id"
+          },
+          "prior_probability": {
+            "type": "number",
+            "title": "Prior Probability"
+          },
+          "learn_probability": {
+            "type": "number",
+            "title": "Learn Probability"
+          },
+          "guess_probability": {
+            "type": "number",
+            "title": "Guess Probability"
+          },
+          "slip_probability": {
+            "type": "number",
+            "title": "Slip Probability"
+          },
+          "forget_probability": {
+            "type": "number",
+            "title": "Forget Probability"
+          },
+          "model_variant": {
+            "type": "string",
+            "title": "Model Variant"
+          },
+          "model_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Run Id"
+          },
+          "last_trained_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Trained At"
+          },
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterClassResponse"
+            },
+            "type": "array",
+            "title": "Classes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lesson_id",
+          "prior_probability",
+          "learn_probability",
+          "guess_probability",
+          "slip_probability",
+          "forget_probability",
+          "model_variant",
+          "model_run_id",
+          "last_trained_at",
+          "classes"
+        ],
+        "title": "LessonParametersResponse"
+      },
+      "MasteryEventBatchCreate": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/MasteryEventCreate"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "MasteryEventBatchCreate"
+      },
+      "MasteryEventCreate": {
+        "properties": {
+          "source_event_id": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Source Event Id"
+          },
+          "learner_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Learner Id"
+          },
+          "lesson_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Lesson Id"
+          },
+          "question_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Id"
+          },
+          "is_correct": {
+            "type": "boolean",
+            "title": "Is Correct"
+          },
+          "difficulty_level": {
+            "type": "string",
+            "enum": [
+              "EASY",
+              "AVERAGE",
+              "HARD"
+            ],
+            "title": "Difficulty Level"
+          },
+          "assessment_type": {
+            "type": "string",
+            "enum": [
+              "DIAGNOSTIC",
+              "LESSON_QUIZ",
+              "MIDDLE_EXAM",
+              "MOCK_EXAM"
+            ],
+            "title": "Assessment Type"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_event_id",
+          "learner_id",
+          "lesson_id",
+          "is_correct",
+          "difficulty_level",
+          "assessment_type"
+        ],
+        "title": "MasteryEventCreate"
+      },
+      "MasteryEventResponse": {
+        "properties": {
+          "source_event_id": {
+            "type": "string",
+            "title": "Source Event Id"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          },
+          "learner_id": {
+            "type": "integer",
+            "title": "Learner Id"
+          },
+          "lesson_id": {
+            "type": "integer",
+            "title": "Lesson Id"
+          },
+          "question_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Id"
+          },
+          "is_correct": {
+            "type": "boolean",
+            "title": "Is Correct"
+          },
+          "predicted_correct_probability": {
+            "type": "number",
+            "title": "Predicted Correct Probability"
+          },
+          "mastery_before": {
+            "type": "number",
+            "title": "Mastery Before"
+          },
+          "mastery_posterior": {
+            "type": "number",
+            "title": "Mastery Posterior"
+          },
+          "mastery_after": {
+            "type": "number",
+            "title": "Mastery After"
+          },
+          "mastery_level": {
+            "type": "string",
+            "title": "Mastery Level"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "parameters_used": {
+            "$ref": "#/components/schemas/ParametersUsed"
+          },
+          "processed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Processed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_event_id",
+          "duplicate",
+          "learner_id",
+          "lesson_id",
+          "question_id",
+          "is_correct",
+          "predicted_correct_probability",
+          "mastery_before",
+          "mastery_posterior",
+          "mastery_after",
+          "mastery_level",
+          "attempt_count",
+          "parameters_used",
+          "processed_at"
+        ],
+        "title": "MasteryEventResponse"
+      },
+      "ParameterClassResponse": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "class_name": {
+            "type": "string",
+            "title": "Class Name"
+          },
+          "parameter_value": {
+            "type": "number",
+            "title": "Parameter Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "class_name",
+          "parameter_value"
+        ],
+        "title": "ParameterClassResponse"
+      },
+      "ParametersUsed": {
+        "properties": {
+          "prior": {
+            "type": "number",
+            "title": "Prior"
+          },
+          "learn": {
+            "type": "number",
+            "title": "Learn"
+          },
+          "guess": {
+            "type": "number",
+            "title": "Guess"
+          },
+          "slip": {
+            "type": "number",
+            "title": "Slip"
+          },
+          "forget": {
+            "type": "number",
+            "title": "Forget"
+          },
+          "model_variant": {
+            "type": "string",
+            "title": "Model Variant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prior",
+          "learn",
+          "guess",
+          "slip",
+          "forget",
+          "model_variant"
+        ],
+        "title": "ParametersUsed"
+      },
+      "ReadinessComponent": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "configured_weight": {
+            "type": "number",
+            "title": "Configured Weight"
+          },
+          "normalized_weight": {
+            "type": "number",
+            "title": "Normalized Weight"
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "score",
+          "configured_weight",
+          "normalized_weight",
+          "contribution"
+        ],
+        "title": "ReadinessComponent"
+      },
+      "ReadinessRequest": {
+        "properties": {
+          "learner_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Learner Id"
+          },
+          "lesson_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Lesson Ids"
+          },
+          "diagnostic_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnostic Score"
+          },
+          "lesson_quiz_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesson Quiz Score"
+          },
+          "middle_exam_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Exam Score"
+          },
+          "mock_exam_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mock Exam Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "learner_id",
+          "lesson_ids"
+        ],
+        "title": "ReadinessRequest"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "learner_id": {
+            "type": "integer",
+            "title": "Learner Id"
+          },
+          "lesson_count_requested": {
+            "type": "integer",
+            "title": "Lesson Count Requested"
+          },
+          "lesson_count_with_mastery": {
+            "type": "integer",
+            "title": "Lesson Count With Mastery"
+          },
+          "mastery_coverage": {
+            "type": "number",
+            "title": "Mastery Coverage"
+          },
+          "readiness_score": {
+            "type": "number",
+            "title": "Readiness Score"
+          },
+          "readiness_level": {
+            "type": "string",
+            "title": "Readiness Level"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessComponent"
+            },
+            "type": "array",
+            "title": "Components"
+          }
+        },
+        "type": "object",
+        "required": [
+          "learner_id",
+          "lesson_count_requested",
+          "lesson_count_with_mastery",
+          "mastery_coverage",
+          "readiness_score",
+          "readiness_level",
+          "components"
+        ],
+        "title": "ReadinessResponse"
+      },
+      "TrainingJobCreate": {
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "const": "database",
+            "title": "Source Type",
+            "default": "database"
+          },
+          "certification_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certification Id"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "num_fits": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Fits"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "test_size": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 0.5,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Size"
+          },
+          "min_interactions_per_skill": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Interactions Per Skill"
+          },
+          "min_learners_per_skill": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Learners Per Skill"
+          }
+        },
+        "type": "object",
+        "title": "TrainingJobCreate"
+      },
+      "TrainingJobListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrainingJobResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "TrainingJobListResponse"
+      },
+      "TrainingJobResponse": {
+        "properties": {
+          "model_run_id": {
+            "type": "string",
+            "title": "Model Run Id"
+          },
+          "run_type": {
+            "type": "string",
+            "title": "Run Type"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "celery_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Celery Task Id"
+          },
+          "certification_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certification Id"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          },
+          "model_variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Variant"
+          },
+          "evaluation_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Mode"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "num_fits": {
+            "type": "integer",
+            "title": "Num Fits"
+          },
+          "test_size": {
+            "type": "number",
+            "title": "Test Size"
+          },
+          "training_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Training Rows"
+          },
+          "learner_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learner Count"
+          },
+          "skill_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Count"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metrics"
+          },
+          "configuration": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration"
+          },
+          "artifact_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Path"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_run_id",
+          "run_type",
+          "trigger_type",
+          "source_type",
+          "status",
+          "requested_by",
+          "celery_task_id",
+          "certification_id",
+          "date_from",
+          "date_to",
+          "model_variant",
+          "evaluation_mode",
+          "seed",
+          "num_fits",
+          "test_size",
+          "training_rows",
+          "learner_count",
+          "skill_count",
+          "metrics",
+          "configuration",
+          "artifact_path",
+          "error_message",
+          "created_at",
+          "started_at",
+          "completed_at"
+        ],
+        "title": "TrainingJobResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

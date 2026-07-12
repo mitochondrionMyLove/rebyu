@@ -173,7 +173,8 @@ public final class LearnerAttemptDtos {
             Integer pendingCount,
             Integer unansweredCount,
             List<AttemptAnswerReviewDto> answers,
-            List<LessonPerformanceDto> lessonBreakdown
+            List<LessonPerformanceDto> lessonBreakdown,
+            Long certificationId
     ) {
     }
 }
