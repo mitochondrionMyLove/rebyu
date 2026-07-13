@@ -57,11 +57,11 @@ export function NavProjects({ projects }: NavProjectsProps) {
         {Object.values(projects).map((group) => (
             <SidebarGroup
                 key={group.name}
-                className="group-data-[collapsible=icon]:hidden"
+                className="group-data-[collapsible=icon]:p-1"
             >
               <SidebarGroupLabel>{group.name}</SidebarGroupLabel>
 
-              <SidebarMenu>
+              <SidebarMenu className="group-data-[collapsible=icon]:items-center">
                 {group.items.map((item) => {
                   const Icon = item.icon
 
@@ -84,7 +84,7 @@ export function NavProjects({ projects }: NavProjectsProps) {
                             tooltip={item.name}
                             isActive={isActive}
                             className={[
-                              "rounded-none border-l-4 transition-colors",
+                              "rounded-none border-l-4 transition-colors group-data-[collapsible=icon]:rounded-md group-data-[collapsible=icon]:border-l-0",
                               isActive
                                   ? "border-l-sidebar-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                                   : "border-l-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",

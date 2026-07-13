@@ -485,20 +485,6 @@ export default function LearnerLearningPage() {
 
   return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <BookOpen className="size-7 text-foreground" />
-
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              My Learning
-            </h1>
-
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Track your progress across the certifications you are enrolled in.
-            </p>
-          </div>
-        </div>
-
         {enrolledCertifications.length === 0 ? (
             <LearnerEmptyState
                 icon={BookOpen}

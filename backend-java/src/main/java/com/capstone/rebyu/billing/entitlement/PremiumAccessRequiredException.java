@@ -18,4 +18,12 @@ public class PremiumAccessRequiredException extends RuntimeException {
         this.feature = feature;
         this.eligiblePlan = "PRO_MONTHLY";
     }
+
+    public PremiumAccessRequiredException(String feature, boolean personalProOnly) {
+        super(personalProOnly
+                ? "This feature requires an active personal REBYU Pro subscription."
+                : "This feature requires REBYU Pro or an eligible institutional license.");
+        this.feature = feature;
+        this.eligiblePlan = "PRO_MONTHLY";
+    }
 }

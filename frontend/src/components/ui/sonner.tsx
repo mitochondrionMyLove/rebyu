@@ -1,4 +1,4 @@
-import { useTheme } from "next-themes"
+import { useTheme } from "@/components/theme-provider"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from "lucide-react"
 
@@ -9,7 +9,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
-      richColors
+      position="bottom-left"
+      closeButton
+      expand
+      gap={10}
+      visibleToasts={4}
       icons={{
         success: (
           <CircleCheckIcon className="size-4 text-emerald-600 dark:text-emerald-400" />
@@ -36,8 +40,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as React.CSSProperties
       }
       toastOptions={{
+        duration: 4500,
         classNames: {
-          toast: "cn-toast",
+          toast: "cn-toast netacad-toast",
+          content: "netacad-toast-content",
+          title: "netacad-toast-title",
+          description: "netacad-toast-description",
+          icon: "netacad-toast-icon",
+          actionButton: "netacad-toast-action",
+          cancelButton: "netacad-toast-cancel",
+          closeButton: "netacad-toast-close",
         },
       }}
       {...props}

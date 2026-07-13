@@ -12,31 +12,36 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function EnterprisePageHeader({ title, subtitle, actions }) {
-  return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {subtitle ? (
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-        ) : null}
-      </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+  void title
+  void subtitle
+
+  return actions ? (
+    <div className="flex justify-end">
+      <div className="flex items-center gap-2">{actions}</div>
     </div>
-  )
+  ) : null
 }
 
 export function EnterpriseStatCard({ icon: Icon, label, value, hint }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardDescription className="flex items-center gap-2">
-          {Icon ? <Icon className="size-4" aria-hidden="true" /> : null}
-          {label}
-        </CardDescription>
-        <CardTitle className="text-3xl tabular-nums">{value}</CardTitle>
+    <Card className="gap-3 border-border py-4 shadow-sm">
+      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-4 pb-0">
+        <div className="min-w-0">
+          <CardDescription className="truncate text-xs font-medium uppercase tracking-[0.08em]">
+            {label}
+          </CardDescription>
+          <CardTitle className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
+            {value}
+          </CardTitle>
+        </div>
+        {Icon ? (
+          <span className="flex size-9 items-center justify-center rounded bg-primary/10 text-primary">
+            <Icon className="size-4" aria-hidden="true" />
+          </span>
+        ) : null}
       </CardHeader>
       {hint ? (
-        <CardContent className="pt-0 text-xs text-muted-foreground">
+        <CardContent className="px-4 pt-0 text-xs leading-5 text-muted-foreground">
           {hint}
         </CardContent>
       ) : null}
@@ -49,12 +54,12 @@ export function EnterpriseLoadingSkeleton({ rows = 4 }) {
     <div className="space-y-4" aria-busy="true" aria-label="Loading">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-28 rounded-xl" />
+          <Skeleton key={index} className="h-24 rounded-md" />
         ))}
       </div>
       <div className="space-y-2">
         {Array.from({ length: rows }).map((_, index) => (
-          <Skeleton key={index} className="h-12 rounded-lg" />
+          <Skeleton key={index} className="h-11 rounded-md" />
         ))}
       </div>
     </div>

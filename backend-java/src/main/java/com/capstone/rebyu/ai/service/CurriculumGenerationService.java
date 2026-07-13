@@ -47,9 +47,6 @@ import java.util.stream.Collectors;
 public class CurriculumGenerationService {
 
     private static final int MAX_DOC_CHARS = 10_000;
-    private static final int MAX_MAJOR_CATEGORIES = 2;
-    private static final int MAX_MIDDLE_CATEGORIES = 2;
-    private static final int MAX_LESSONS = 1;
 
     record LessonCtx(Long lessonId, String lessonTitle, String midTitle, String majorTitle, String certTitle) {}
 
@@ -121,8 +118,10 @@ public class CurriculumGenerationService {
         Long certificationId = self.createCertificationWithPlan(dto, plan);
         log.info("Created certification {} with AI-generated structure", certificationId);
 
+        // Ingest the source so each lesson can later be generated (and previewed)
+        // from it. Lesson content itself is produced per lesson via the lesson
+        // editor's generate-draft flow, so this stays fast and never times out.
         ingestFiles(files, certificationId);
-        generateLessonContents(certificationId, additionalInstructions);
 
         return self.fetchCertificationDto(certificationId);
     }
@@ -155,8 +154,9 @@ public class CurriculumGenerationService {
         self.replaceStructureWithPlan(certificationId, plan);
         log.info("Replaced structure of certification {} with AI-generated plan", certificationId);
 
+        // Ingest the source for later per-lesson generation/preview; lesson
+        // content is produced and reviewed one lesson at a time.
         ingestFiles(files, certificationId);
-        generateLessonContents(certificationId, additionalInstructions);
 
         return self.fetchCertificationDto(certificationId);
     }
@@ -280,8 +280,7 @@ public class CurriculumGenerationService {
 
 
     private void appendPlanStructure(Certification cert, CurriculumPlanDTO plan) {
-        List<CurriculumMajorCategoryDTO> majorList = plan.getMajorCategories().stream()
-                .limit(MAX_MAJOR_CATEGORIES).toList();
+        List<CurriculumMajorCategoryDTO> majorList = plan.getMajorCategories();
 
         for (CurriculumMajorCategoryDTO majorDto : majorList) {
             MajorCategory major = new MajorCategory();
@@ -290,8 +289,7 @@ public class CurriculumGenerationService {
             major = majorCategoryRepository.save(major);
 
             if (majorDto.getMiddleCategories() == null) continue;
-            List<CurriculumMiddleCategoryDTO> middleList = majorDto.getMiddleCategories().stream()
-                    .limit(MAX_MIDDLE_CATEGORIES).toList();
+            List<CurriculumMiddleCategoryDTO> middleList = majorDto.getMiddleCategories();
 
             for (CurriculumMiddleCategoryDTO midDto : middleList) {
                 MiddleCategory middle = new MiddleCategory();
@@ -300,8 +298,7 @@ public class CurriculumGenerationService {
                 middle = middleCategoryRepository.save(middle);
 
                 if (midDto.getLessons() == null) continue;
-                List<CurriculumLessonDTO> lessonList = midDto.getLessons().stream()
-                        .limit(MAX_LESSONS).toList();
+                List<CurriculumLessonDTO> lessonList = midDto.getLessons();
 
                 for (CurriculumLessonDTO lessonDto : lessonList) {
                     Lesson lesson = new Lesson();

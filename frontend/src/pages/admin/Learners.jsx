@@ -407,25 +407,12 @@ export default function Learners({
 
   return (
       <section className="flex h-full min-h-0 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-border bg-background py-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-                Learners
-              </h1>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Manage learner accounts, enrollment access, certification progress,
-                and organization membership.
-              </p>
-            </div>
-
+        <div className="flex shrink-0 justify-end pb-4">
             <Button type="button" onClick={onCreate}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add Learner
             </Button>
-          </div>
-        </header>
+        </div>
 
         <div className="grid shrink-0 gap-3 border-b border-border bg-background py-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border bg-card px-4 py-3">

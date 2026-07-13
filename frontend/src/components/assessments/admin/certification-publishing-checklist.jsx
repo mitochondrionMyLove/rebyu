@@ -47,10 +47,12 @@ const TYPE_LABELS = {
   MODULE_EXAM: "Middle Exam",
   LESSON_QUIZ: "Lesson Quiz",
   QUIZ: "Lesson Quiz",
+  LESSON_CONTENT: "Lesson Content",
 }
 
 const REASON_LABELS = {
   ASSESSMENT_NOT_CREATED: "Not created yet",
+  LESSON_CONTENT_MISSING: "No lesson content yet",
   ASSESSMENT_HAS_NO_QUESTIONS: "No questions added",
   QUESTION_POINTS_REQUIRED: "Some questions have no points",
   ASSESSMENT_TOTAL_POINTS_INVALID: "Total points must be greater than zero",
@@ -241,15 +243,21 @@ export default function CertificationPublishingChecklist({
                           </div>
                         </div>
 
-                        <Button
-                            type="button"
-                            size="sm"
-                            className="shrink-0 sm:self-center"
-                            onClick={() => onCreateAssessment?.(createRequest)}
-                        >
-                          <PlusCircleIcon aria-hidden="true" />
-                          Create {typeLabel}
-                        </Button>
+                        {item.type === "LESSON_CONTENT" ? (
+                            <span className="shrink-0 text-xs text-muted-foreground sm:self-center">
+                              Add content in the lesson editor
+                            </span>
+                        ) : (
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="shrink-0 sm:self-center"
+                                onClick={() => onCreateAssessment?.(createRequest)}
+                            >
+                              <PlusCircleIcon aria-hidden="true" />
+                              Create {typeLabel}
+                            </Button>
+                        )}
                       </li>
                   )
                 })}

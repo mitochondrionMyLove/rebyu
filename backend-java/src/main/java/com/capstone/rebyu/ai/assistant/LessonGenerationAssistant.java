@@ -49,11 +49,22 @@ import dev.langchain4j.service.V;
         3. Base every section on the supplied source material. Do not invent
            unsupported facts, examples, or terminology.
         4. Build a useful learning flow: introduction, explanation, key concepts,
-           practical application, recap. Prefer rich lessons with a mix of basic
-           tools (headings, descriptions, lists) AND combined tools. Include at
-           least one review tool (flip-grid or review-card-grid) and at least one
-           combined tool (grid, tabs block, accordion block, or media-text-block)
-           when the source supports it.
+           practical application, recap. Every lesson MUST use a BROAD VARIETY of
+           the tools above — never a lesson made only of headings, descriptions,
+           and lists. Across the sections you must use:
+           - several DIFFERENT combined tools (choose from intro-image-card,
+             header-description-grid, image-feature-grid, review-card-grid,
+             content-accordion-block, content-tabs-block, media-text-block),
+           - at least one review tool (flip-grid or review-card-grid),
+           - at least one tabs or accordion tool,
+           - and supporting basic tools (headings, subheadings, descriptions,
+             ordered/unordered lists).
+           Prefer a combined tool over a plain heading + list whenever the
+           content fits one (e.g. use header-description-grid or
+           content-accordion-block for a set of related concepts, content-tabs-
+           block for comparisons, media-text-block for a concept paired with a
+           visual). Only skip a specific tool type when the source genuinely
+           cannot support it.
         5. For grids, always provide at least two gridItems. For every combined
            tool, always fill smallHeader and description.
         6. For media-text-block, mediaType is "image" or "video" and layout is

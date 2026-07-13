@@ -111,14 +111,6 @@ export default function LearnerSubscriptionPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Subscription</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Lessons are free for everyone. REBYU Pro unlocks analytics, study
-          plans, mock exams, battles, and challenges across all certifications.
-        </p>
-      </div>
-
       {/* Current status */}
       <Card>
         <CardHeader className="pb-3">

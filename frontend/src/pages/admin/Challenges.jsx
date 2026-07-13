@@ -276,19 +276,6 @@ export default function Challenges({
 
   return (
       <section className="space-y-6">
-        <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Challenges
-            </h1>
-
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Manage challenge availability and assign each challenge to one or
-              more industries.
-            </p>
-          </div>
-        </header>
-
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border bg-card px-4 py-3">
             <p className="text-xs font-medium text-muted-foreground">

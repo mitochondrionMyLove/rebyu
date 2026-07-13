@@ -82,16 +82,6 @@ function Certifications() {
   return (
       <section className="flex h-full flex-col gap-5 bg-background">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="font-heading text-2xl font-semibold text-foreground">
-              Active Certifications
-            </h1>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage the certification reviews available to learners.
-            </p>
-          </div>
-
           <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
             {isFetching && (
                 <span className="text-xs text-muted-foreground">

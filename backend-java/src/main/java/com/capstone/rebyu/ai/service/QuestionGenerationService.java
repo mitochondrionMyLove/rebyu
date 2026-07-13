@@ -53,7 +53,7 @@ import java.util.Set;
 public class QuestionGenerationService {
 
     private static final int MAX_DOC_CHARS = 50_000;
-    private static final int MAX_QUESTIONS_PER_TYPE = 50;
+    private static final int MAX_QUESTIONS_PER_TYPE = 100;
     private static final int DEFAULT_TARGET = 100;
     private static final int MAX_TARGET = 250;
     private static final int TARGET_BATCH_SIZE = 20;

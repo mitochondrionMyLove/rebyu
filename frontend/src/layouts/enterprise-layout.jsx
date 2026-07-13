@@ -1,11 +1,10 @@
 import { useMemo } from "react"
 import { Outlet, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { Bell, Building2Icon, LogOutIcon, SettingsIcon, UserIcon } from "lucide-react"
+import { Building2Icon, LogOutIcon, SettingsIcon, UserIcon } from "lucide-react"
 
 import { EnterpriseAppSidebar } from "@/components/enterprise/enterprise-sidebar.jsx"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +21,10 @@ import {
 } from "@/components/ui/sidebar"
 import { getEnterpriseById } from "@/services/enterpriseService.js"
 import { useAuth } from "@/context/auth-context.jsx"
+import { getEnterpriseInvitations } from "@/services/partnershipService.js"
+import { NotificationBell } from "@/components/notification-bell.jsx"
+import { usePortalTheme } from "@/hooks/use-portal-theme.js"
+import { PortalThemeToggle } from "@/components/portal-theme-toggle"
 
 function getInitials(name = "") {
   return (
@@ -35,6 +38,7 @@ function getInitials(name = "") {
 }
 
 export default function EnterpriseLayout() {
+  usePortalTheme()
   const navigate = useNavigate()
   const { user, logout: authLogout } = useAuth()
   // A signed-in enterprise account is scoped to its own organization via the
@@ -67,6 +71,33 @@ export default function EnterpriseLayout() {
   )
 
   const orgName = enterprise?.enterpriseName ?? "Organization"
+  const invitationsQuery = useQuery({
+    queryKey: ["enterprise-invitations", authEnterpriseId],
+    queryFn: () => getEnterpriseInvitations(authEnterpriseId),
+    enabled: authEnterpriseId != null,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    retry: 1,
+  })
+  const notifications = (Array.isArray(invitationsQuery.data) ? invitationsQuery.data : [])
+    .map((invitation) => {
+      const status = String(invitation.status ?? "PENDING").toUpperCase()
+      const accepted = status === "ACCEPTED"
+      const cancelled = status === "EXPIRED" || status === "REVOKED"
+      return {
+        id: `invitation-${invitation.invitationId}-${status}`,
+        type: accepted ? "accepted" : cancelled ? "cancelled" : "invitation",
+        title: accepted
+          ? "Learner accepted invitation"
+          : cancelled
+            ? `Invitation ${status.toLowerCase()}`
+            : "Certification invitation sent",
+        description: `${invitation.email} · ${invitation.certificationTitle}`,
+        createdAt: invitation.sentAt,
+        href: "/enterprise/invitations",
+      }
+    })
+    .sort((a, b) => new Date(b.createdAt ?? 0) - new Date(a.createdAt ?? 0))
 
   const logout = async () => {
     await authLogout()
@@ -76,16 +107,21 @@ export default function EnterpriseLayout() {
   }
 
   return (
-    <SidebarProvider>
-      <EnterpriseAppSidebar />
+    <SidebarProvider
+      className="netacad-portal enterprise-portal"
+      open={false}
+      style={{ "--sidebar-width-icon": "3.25rem" }}
+    >
+      <EnterpriseAppSidebar collapsible="icon" className="border-r border-sidebar-border" />
 
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
+        <header className="sticky top-0 z-40 h-16 shrink-0 border-b bg-white/95 shadow-sm backdrop-blur">
+          <div className="mx-auto flex h-full w-full max-w-[1280px] items-center justify-between gap-5 px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <SidebarTrigger className="-ml-1 md:hidden" />
             <Separator
               orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
+              className="mr-2 hidden data-[orientation=vertical]:h-4 md:block"
             />
             <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
               <Building2Icon className="size-4 shrink-0" aria-hidden="true" />
@@ -93,29 +129,14 @@ export default function EnterpriseLayout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 px-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Open notifications"
-                >
-                  <Bell />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={10} className="w-72 p-2">
-                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <div className="px-3 py-8 text-center">
-                  <Bell className="mx-auto size-5 text-muted-foreground" />
-                  <p className="mt-2 text-sm font-medium">No notifications yet</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Partnership and invitation updates will appear here.
-                  </p>
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex min-w-0 items-center justify-end gap-2">
+            <NotificationBell
+              items={notifications}
+              loading={invitationsQuery.isLoading}
+              emptyMessage="Learner invitation updates will appear here."
+            />
+
+            <PortalThemeToggle />
 
            <DropdownMenu>
              <DropdownMenuTrigger asChild>
@@ -157,9 +178,10 @@ export default function EnterpriseLayout() {
              </DropdownMenuContent>
            </DropdownMenu>
           </div>
+          </div>
         </header>
 
-        <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
           <Outlet context={outletContext} />
         </div>
       </SidebarInset>

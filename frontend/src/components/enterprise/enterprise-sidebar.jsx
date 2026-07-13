@@ -103,8 +103,8 @@ const enterpriseNav = {
 
 export function EnterpriseAppSidebar(props) {
   return (
-    <Sidebar variant="inset" {...props}>
-      <SidebarHeader>
+    <Sidebar variant="sidebar" {...props}>
+      <SidebarHeader className="h-16 justify-center border-b border-sidebar-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
@@ -122,7 +122,7 @@ export function EnterpriseAppSidebar(props) {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="justify-center">
         <NavProjects projects={enterpriseNav} />
       </SidebarContent>
 

@@ -478,20 +478,6 @@ function StudyPlanCalendar({
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex items-center gap-3">
-                    <CalendarCheck className="size-7 text-foreground" />
-
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                            Generated Study Calendar
-                        </h1>
-
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Your REBYU certification study plan has been converted into a calendar.
-                        </p>
-                    </div>
-                </div>
-
                 <Button variant="outline" onClick={onBackToForm} className="gap-2">
                     <ArrowLeft className="size-4" />
                     Edit Plan
@@ -721,20 +707,6 @@ function StudyPlanContent() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex items-center gap-3">
-                    <CalendarCheck className="size-7 text-foreground" />
-
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                            Study Plan
-                        </h1>
-
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Build a personalized study calendar for your REBYU certification.
-                        </p>
-                    </div>
-                </div>
-
                 <Button className="gap-2" onClick={handleGeneratePlan}>
                     <Sparkles className="size-4" />
                     Generate Calendar

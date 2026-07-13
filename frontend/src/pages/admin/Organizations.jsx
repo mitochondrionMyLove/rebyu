@@ -330,24 +330,12 @@ export default function Organizations({
 
   return (
       <section className="flex h-full min-h-0 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-border bg-background py-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-                Organizations
-              </h1>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Manage enterprise organizations, learner access, and certification assignments.
-              </p>
-            </div>
-
+        <div className="flex shrink-0 justify-end pb-4">
             <Button type="button" onClick={onCreate}>
               <Plus className="mr-2 h-4 w-4" />
               Add Organization
             </Button>
-          </div>
-        </header>
+        </div>
 
         <div className="grid shrink-0 gap-3 border-b border-border bg-background py-4 sm:grid-cols-3">
           <div className="rounded-xl border bg-card px-4 py-3">

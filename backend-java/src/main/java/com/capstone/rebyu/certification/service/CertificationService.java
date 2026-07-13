@@ -139,6 +139,18 @@ public class CertificationService {
     }
 
     private void deleteRelatedCertificationData(Long certificationId) {
+        // Executions reference both attempt_questions and attempts, so they must
+        // be removed before either of those tables.
+        executeDelete("""
+                DELETE FROM assessment_attempt_executions
+                WHERE assessment_attempt_id IN (
+                    SELECT aa.assessment_attempt_id
+                    FROM assessment_attempts aa
+                    JOIN exams e ON e.exam_id = aa.exam_id
+                    WHERE e.certification_id = :certificationId
+                )
+                """, certificationId);
+
         executeDelete("""
                 DELETE FROM assessment_attempt_answers
                 WHERE assessment_attempt_id IN (
@@ -658,6 +670,11 @@ public class CertificationService {
                 List<Lesson> lessons = middle.getLessons() == null ? List.of() : middle.getLessons();
                 for (Lesson lesson : lessons) {
                     hasAnyLesson = true;
+                    // A lesson with no content cannot be published to learners.
+                    if (!hasLessonContent(lesson)) {
+                        missing.add(new MissingRequirementDto("LESSON_CONTENT", lesson.getLessonId(),
+                                lesson.getName() + " Content", "LESSON_CONTENT_MISSING"));
+                    }
                     if (!coveredLessons.contains(lesson.getLessonId())) {
                         missing.add(new MissingRequirementDto("LESSON_QUIZ", lesson.getLessonId(),
                                 lesson.getName() + " Quiz", "ASSESSMENT_NOT_CREATED"));
@@ -703,6 +720,12 @@ public class CertificationService {
                 && StringUtils.hasText(certification.getTitle())
                 && !majors.isEmpty() && hasAnyLesson;
         return new CertificationPublishRequirementsDto(publishable, missing, invalid);
+    }
+
+    /** A lesson is publishable only once it has real component content (not empty "[]"). */
+    private boolean hasLessonContent(Lesson lesson) {
+        String structure = lesson.getLessonComponentStructure();
+        return structure != null && !structure.isBlank() && !"[]".equals(structure.trim());
     }
 
     private BigDecimal effectivePoints(ExamQuestion examQuestion) {

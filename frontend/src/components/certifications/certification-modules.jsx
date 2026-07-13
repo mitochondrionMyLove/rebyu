@@ -642,7 +642,7 @@ function CertificationModules({
 
                 toast.success("Certification structure generated", {
                     description:
-                        "The generated categories and lessons were saved.",
+                        "Categories and lessons were created. Open each lesson to generate and preview its content.",
                 })
 
                 return
@@ -697,16 +697,15 @@ function CertificationModules({
                         "Reading your documents",
                         "Planning major categories",
                         "Creating middle categories and lessons",
-                        "Writing starter lesson content",
-                        "Saving everything",
+                        "Organizing the curriculum",
+                        "Saving the structure",
                     ]}
                     sentences={[
-                        "This is the longest AI task — it writes content for every lesson.",
                         "Planning a curriculum that covers your documents...",
-                        "Each lesson gets its own generated content.",
-                        "Still working — this can take a few minutes.",
+                        "Creating categories with multiple lessons each...",
                         "Structuring categories so learners progress logically...",
-                        "Hang tight, the finish line is close.",
+                        "You'll generate and preview each lesson's content afterward.",
+                        "Almost done building the structure.",
                     ]}
                 />
             </>

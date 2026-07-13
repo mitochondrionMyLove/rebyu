@@ -570,7 +570,7 @@ export default function AdminViewLesson() {
                   type="button"
                   disabled={!nextTopic}
                   onClick={() => nextTopic && selectTopic(nextTopic)}
-                  className="flex items-center gap-2 rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex items-center gap-2 rounded bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next
                   <ArrowRight className="h-4 w-4" />

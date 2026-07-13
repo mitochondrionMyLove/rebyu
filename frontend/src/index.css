@@ -85,6 +85,439 @@
     --sidebar-ring: oklch(0.53 0.19 260);
 }
 
+/* Portal system: white surfaces with a clear blue interaction language. */
+.netacad-portal,
+body.netacad-overlay-theme {
+    --background: #ffffff;
+    --foreground: #202124;
+    --card: #ffffff;
+    --card-foreground: #202124;
+    --popover: #ffffff;
+    --popover-foreground: #202124;
+    --primary: #1769aa;
+    --primary-foreground: #ffffff;
+    --secondary: #edf5fb;
+    --secondary-foreground: #174d78;
+    --muted: #f5f5f5;
+    --muted-foreground: #6b7280;
+    --accent: #eaf3fa;
+    --accent-foreground: #12588d;
+    --border: #e1e4e8;
+    --input: #c9cdd2;
+    --ring: #2b7fbd;
+    --radius: 0.35rem;
+    --chart-1: #1769aa;
+    --chart-2: #35a4d4;
+    --chart-3: #6abf4b;
+    --chart-4: #f5a623;
+    --chart-5: #6f5bd3;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #292929;
+    --sidebar-primary: #1769aa;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #eaf3fa;
+    --sidebar-accent-foreground: #12588d;
+    --sidebar-border: #e1e4e8;
+    --sidebar-ring: #2b7fbd;
+    background: var(--background);
+}
+
+.dark .netacad-portal,
+.dark body.netacad-overlay-theme {
+    --background: #111827;
+    --foreground: #f3f4f6;
+    --card: #182233;
+    --card-foreground: #f3f4f6;
+    --popover: #182233;
+    --popover-foreground: #f3f4f6;
+    --primary: #62aee2;
+    --primary-foreground: #08131f;
+    --secondary: #223249;
+    --secondary-foreground: #e5eef6;
+    --muted: #202b3b;
+    --muted-foreground: #aeb9c7;
+    --accent: #253a52;
+    --accent-foreground: #eaf4fb;
+    --border: #334155;
+    --input: #475569;
+    --ring: #62aee2;
+    --sidebar: #131d2b;
+    --sidebar-foreground: #e5e7eb;
+    --sidebar-primary: #62aee2;
+    --sidebar-primary-foreground: #08131f;
+    --sidebar-accent: #253a52;
+    --sidebar-accent-foreground: #f3f4f6;
+    --sidebar-border: #334155;
+    --sidebar-ring: #62aee2;
+    color-scheme: dark;
+}
+
+.dark .netacad-portal > [data-slot="sidebar-inset"] > header {
+    background: rgb(19 29 43 / 0.96);
+}
+
+.dark .netacad-portal [data-slot="card"],
+.dark .netacad-portal [data-slot="table-container"],
+.dark :is(.admin-portal, .enterprise-portal) :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border:is(.bg-card, .bg-background, .bg-white),
+.dark :is(.admin-portal, .enterprise-portal) :is(section, article).rounded-xl.border {
+    background-color: var(--card);
+}
+
+.dark .netacad-portal .bg-white {
+    background-color: var(--card);
+}
+
+.dark .netacad-portal :is(.text-zinc-950, .text-zinc-900, .text-neutral-900) {
+    color: var(--foreground);
+}
+
+.dark .netacad-portal :is(.text-zinc-500, .text-zinc-600, .text-neutral-500, .text-neutral-600) {
+    color: var(--muted-foreground);
+}
+
+.dark body.netacad-overlay-theme :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="select-content"]
+) {
+    background: var(--popover);
+    color: var(--popover-foreground);
+    border-color: var(--border);
+}
+
+.netacad-portal [data-slot="sidebar-container"] > div,
+.netacad-portal [data-mobile="true"] {
+    border-color: var(--sidebar-border);
+    box-shadow: 4px 0 18px rgb(15 42 67 / 0.12);
+}
+
+.netacad-portal [data-slot="sidebar-inset"] {
+    background: var(--background);
+}
+
+.netacad-portal > [data-slot="sidebar-inset"] > header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border-top: 1px solid #e1e4e8;
+    border-bottom: 1px solid var(--border);
+    background: rgb(255 255 255 / 0.96);
+    box-shadow: 0 2px 8px rgb(23 43 77 / 0.06);
+    backdrop-filter: blur(12px);
+}
+
+.netacad-portal [data-slot="card"] {
+    border-color: var(--border);
+    border-radius: 0.35rem;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgb(23 43 77 / 0.08);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.netacad-portal [data-slot="table-container"] {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgb(23 43 77 / 0.06);
+}
+
+/* Normalize older page-local panels to the same card treatment used by the
+   shared Card primitive. */
+:is(.admin-portal, .enterprise-portal) :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border:is(.bg-card, .bg-background, .bg-white),
+:is(.admin-portal, .enterprise-portal) :is(section, article).rounded-xl.border {
+    border-color: var(--border);
+    border-radius: 0.35rem;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgb(23 43 77 / 0.07);
+}
+
+.netacad-portal h1,
+.netacad-portal h2,
+.netacad-portal h3 {
+    letter-spacing: -0.015em;
+}
+
+/* Component language shared by inline portal UI and Radix content portaled to
+   document.body. Explicit data slots keep this independent from page markup. */
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"] {
+    border-radius: 0.25rem;
+    font-weight: 650;
+    letter-spacing: 0.005em;
+    box-shadow: none;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="default"] {
+    background: #1769aa;
+    border: 1px solid #1769aa;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="default"]:hover {
+    background: #12588d;
+    border-color: #12588d;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="outline"] {
+    border-color: #8798a8;
+    background: #ffffff;
+    color: #292929;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="outline"]:hover {
+    border-color: #1769aa;
+    background: #edf5fb;
+    color: #12588d;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"]
+) {
+    border-radius: 0.25rem;
+    border-color: #b9c5d0;
+    background: #ffffff;
+    box-shadow: inset 0 1px 1px rgb(23 43 77 / 0.04);
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"]
+):focus-visible {
+    border-color: #2b7fbd;
+    box-shadow: 0 0 0 3px rgb(0 169 224 / 0.18);
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"]
+) {
+    border: 1px solid #c6d0d9;
+    border-top: 4px solid #173b63;
+    border-radius: 0.3rem;
+    box-shadow: 0 20px 55px rgb(15 42 67 / 0.24);
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="dialog-title"],
+    [data-slot="alert-dialog-title"],
+    [data-slot="sheet-title"],
+    [data-slot="drawer-title"]
+) {
+    color: #172b4d;
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"]
+) {
+    border-color: #c6d0d9;
+    background: #ffffff;
+    box-shadow: 0 10px 40px rgb(15 42 67 / 0.2);
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"]
+) {
+    border: 1px solid #c6d0d9;
+    border-radius: 0.25rem;
+    box-shadow: 0 10px 25px rgb(15 42 67 / 0.16);
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="tabs-list"] {
+    gap: 0;
+    border-bottom: 1px solid #b9c5d0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="tabs-trigger"] {
+    min-height: 2.75rem;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="tabs-trigger"][data-state="active"] {
+    border-bottom-color: #1769aa;
+    background: #edf5fb;
+    color: #12588d;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="tabs-content"] {
+    outline: none;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="table-header"] {
+    background: #f3f6f8;
+    color: #292929;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="table-head"] {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="table-row"] {
+    border-color: #d5dce3;
+    transition: background-color 140ms ease;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="table-body"] [data-slot="table-row"]:hover {
+    background: #fafafa;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="badge"] {
+    border-radius: 0.2rem;
+    font-weight: 700;
+    letter-spacing: 0.035em;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="accordion-item"],
+    [data-slot="collapsible-content"]
+) {
+    border-color: var(--border);
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="accordion-trigger"] {
+    border-radius: 0.25rem;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="accordion-trigger"]:hover {
+    background: var(--accent);
+    color: var(--accent-foreground);
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="skeleton"] {
+    border-radius: 0.3rem;
+    background: #e9edf1;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="alert"] {
+    border-radius: 0.25rem;
+    border-left-width: 4px;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="progress"] {
+    border-radius: 999px;
+    background: #dce3e9;
+}
+
+body.netacad-overlay-theme [data-sonner-toaster] {
+    --width: min(500px, calc(100vw - 32px));
+    font-family: var(--font-sans);
+}
+
+body.netacad-overlay-theme [data-sonner-toast].netacad-toast {
+    min-height: 0;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    border: 1px solid #c6d0d9;
+    border-left: 5px solid #1769aa;
+    border-radius: 0.3rem;
+    background: #ffffff;
+    color: #172b4d;
+    padding: 13px 48px 13px 14px;
+    box-shadow: 0 12px 32px rgb(15 42 67 / 0.18);
+}
+
+body.netacad-overlay-theme .netacad-toast-content {
+    min-width: 0;
+    flex: 1;
+    padding-top: 0;
+}
+
+body.netacad-overlay-theme [data-sonner-toast][data-type="success"] {
+    border-left-color: #3f9c35;
+}
+
+body.netacad-overlay-theme [data-sonner-toast][data-type="error"] {
+    border-left-color: #c4314b;
+}
+
+body.netacad-overlay-theme [data-sonner-toast][data-type="warning"] {
+    border-left-color: #e79b19;
+}
+
+body.netacad-overlay-theme [data-sonner-toast][data-type="info"] {
+    border-left-color: #35a4d4;
+}
+
+body.netacad-overlay-theme .netacad-toast-title {
+    color: #172b4d;
+    font-size: 0.925rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+body.netacad-overlay-theme .netacad-toast-description {
+    margin-top: 3px;
+    color: #5d6b7a;
+    font-size: 0.825rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+body.netacad-overlay-theme .netacad-toast-icon {
+    display: flex;
+    width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    margin-top: 0;
+}
+
+body.netacad-overlay-theme .netacad-toast-action,
+body.netacad-overlay-theme .netacad-toast-cancel {
+    align-self: center;
+    flex-shrink: 0;
+    height: 30px;
+    border-radius: 0.2rem;
+    padding-inline: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+body.netacad-overlay-theme .netacad-toast-action {
+    background: #1769aa;
+    color: #ffffff;
+}
+
+body.netacad-overlay-theme .netacad-toast-cancel {
+    border: 1px solid #8798a8;
+    background: #ffffff;
+    color: #292929;
+}
+
+body.netacad-overlay-theme .netacad-toast-close {
+    position: absolute !important;
+    top: 50% !important;
+    right: 12px !important;
+    left: auto !important;
+    width: 24px !important;
+    height: 24px !important;
+    transform: translateY(-50%) !important;
+    border: 0;
+    background: transparent;
+    color: #5d6b7a;
+    box-shadow: none;
+}
+
 .dark {
     --background: oklch(0.17 0.025 265);
     --foreground: oklch(0.975 0.004 255);

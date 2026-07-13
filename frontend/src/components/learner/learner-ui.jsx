@@ -264,21 +264,12 @@ export function LearnerMobileSidebar({ open, onOpenChange, data }) {
 }
 
 export function LearnerPageHeader({ title, subtitle, children }) {
-  return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-950 sm:text-3xl">
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-            {subtitle}
-          </p>
-        )}
-      </div>
-      {children}
-    </div>
-  )
+  void title
+  void subtitle
+
+  return children ? (
+    <div className="flex justify-end">{children}</div>
+  ) : null
 }
 
 export function LearnerEmptyState({ icon: Icon = BookOpen, title, description, action }) {
@@ -317,7 +308,7 @@ export function LearnerLoadingSkeleton() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
         {[1, 2, 3, 4].map((item) => (
-          <Skeleton key={item} className="h-32 rounded-2xl" />
+      <Skeleton key={item} className="h-32 rounded-2xl" />
         ))}
       </div>
       <Skeleton className="h-80 rounded-2xl" />

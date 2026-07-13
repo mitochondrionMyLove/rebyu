@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import {
     BrainCircuit,
     CheckCircle2,
@@ -25,6 +25,8 @@ import {
     LearnerEmptyState,
     LearnerPageHeader,
 } from "@/components/learner/learner-ui.jsx"
+import { getMistakes, setMistakeReviewed } from "@/services/learnerToolsService"
+import { toast } from "sonner"
 
 const ALL_VALUE = "all"
 
@@ -102,12 +104,16 @@ function MasteryBadge({ status }) {
 }
 
 export default function MistakesBank() {
-    const [mistakes, setMistakes] = useState(INITIAL_MISTAKES)
+    const [mistakes, setMistakes] = useState([])
     const [searchQuery, setSearchQuery] = useState("")
     const [certificationFilter, setCertificationFilter] = useState(ALL_VALUE)
     const [typeFilter, setTypeFilter] = useState(ALL_VALUE)
     const [statusFilter, setStatusFilter] = useState(ALL_VALUE)
     const [expandedIds, setExpandedIds] = useState(new Set())
+
+    useEffect(() => {
+        getMistakes().then(setMistakes).catch(() => toast.error("Your mistake bank could not be loaded."))
+    }, [])
 
     const certifications = useMemo(
         () => [
@@ -138,8 +144,8 @@ export default function MistakesBank() {
             const matchesSearch =
                 !query ||
                 mistake.question.toLowerCase().includes(query) ||
-                mistake.lessonTitle.toLowerCase().includes(query) ||
-                mistake.certificationTitle.toLowerCase().includes(query)
+                (mistake.lessonTitle || "").toLowerCase().includes(query) ||
+                (mistake.certificationTitle || "").toLowerCase().includes(query)
 
             const matchesCertification =
                 certificationFilter === ALL_VALUE ||
@@ -189,7 +195,10 @@ export default function MistakesBank() {
         })
     }
 
-    function markReviewed(mistakeId) {
+    async function markReviewed(mistakeId) {
+        const mistake = mistakes.find((item) => item.mistakeId === mistakeId)
+        if (!mistake) return
+        try { await setMistakeReviewed(mistake.questionId, true) } catch { toast.error("Review status could not be saved."); return }
         setMistakes((current) =>
             current.map((mistake) =>
                 mistake.mistakeId === mistakeId

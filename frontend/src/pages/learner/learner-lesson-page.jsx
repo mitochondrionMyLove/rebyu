@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useOutletContext, useParams } from "react-router-dom"
 import { toast } from "sonner"
@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Bot,
   BotIcon,
+  BookOpenCheck,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -14,6 +15,8 @@ import {
   Menu,
   PlayCircle,
   Plus,
+  Layers3,
+  LockKeyhole,
   Search,
   SendHorizontal,
   Sparkles,
@@ -37,6 +40,7 @@ import {
 } from "@/components/ui/message-scroller"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 import { cn } from "@/lib/utils"
 import { base } from "@/services/base"
@@ -48,6 +52,8 @@ import {
   parseLessonStructure,
 } from "@/services/learnerService.js"
 import { LearnerEmptyState } from "@/components/learner/learner-ui.jsx"
+import { useLearnerEntitlements } from "@/hooks/use-learner-entitlements.js"
+import { generateStudyAid } from "@/services/learnerToolsService.js"
 
 const AI_TUTOR_ENDPOINT = "ai/tutor"
 
@@ -222,6 +228,186 @@ function LessonTool({ tool }) {
                 </p>
               </div>
           ))}
+        </div>
+    )
+  }
+
+  if (tool.type === "intro-image-card") {
+    return (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-500">{data.smallHeader}</p>
+            {renderText(data.description, "mt-2 text-base leading-8 text-zinc-600")}
+          </div>
+          {data.imageKey ? (
+              <img
+                  src={getFileViewUrl(data.imageKey)}
+                  alt=""
+                  className="max-h-[520px] w-full rounded-2xl bg-zinc-50 object-contain"
+              />
+          ) : null}
+        </div>
+    )
+  }
+
+  if (tool.type === "header-description-grid" || tool.type === "image-feature-grid") {
+    return (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-500">{data.smallHeader}</p>
+            {renderText(data.description, "mt-2 text-base leading-8 text-zinc-600")}
+          </div>
+          {tool.type === "image-feature-grid" && data.imageKey ? (
+              <img
+                  src={getFileViewUrl(data.imageKey)}
+                  alt=""
+                  className="max-h-[420px] w-full rounded-2xl bg-zinc-50 object-contain"
+              />
+          ) : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            {(data.gridItems ?? []).map((item, index) => (
+                <div
+                    key={item.id ?? index}
+                    className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4"
+                >
+                  <h4 className="font-semibold text-zinc-950">{item.title}</h4>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    {item.description}
+                  </p>
+                </div>
+            ))}
+          </div>
+        </div>
+    )
+  }
+
+  if (tool.type === "review-card-grid") {
+    return (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-500">{data.smallHeader}</p>
+            {renderText(data.description, "mt-2 text-base leading-8 text-zinc-600")}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {(data.cards ?? []).map((card, index) => (
+                <div
+                    key={card.id ?? index}
+                    className="rounded-2xl border border-zinc-200 bg-white p-5"
+                >
+                  <p className="font-semibold text-zinc-950">{card.frontTitle}</p>
+                  <p className="mt-3 text-sm font-medium text-zinc-600">
+                    {card.backTitle}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500">
+                    {card.description}
+                  </p>
+                </div>
+            ))}
+          </div>
+        </div>
+    )
+  }
+
+  if (tool.type === "content-accordion-block") {
+    return (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-500">{data.smallHeader}</p>
+            {renderText(data.description, "mt-2 text-base leading-8 text-zinc-600")}
+          </div>
+          <div className="divide-y divide-zinc-100 rounded-2xl border border-zinc-200">
+            {(data.items ?? []).map((item, index) => (
+                <details key={item.id ?? index} className="group p-4">
+                  <summary className="cursor-pointer list-none font-semibold text-zinc-950">
+                    {item.title}
+                  </summary>
+                  <p className="mt-3 text-sm leading-6 text-zinc-600">
+                    {item.content}
+                  </p>
+                </details>
+            ))}
+          </div>
+        </div>
+    )
+  }
+
+  if (tool.type === "content-tabs-block") {
+    return (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-500">{data.smallHeader}</p>
+            {renderText(data.description, "mt-2 text-base leading-8 text-zinc-600")}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(data.items ?? []).map((item, index) => (
+                <div
+                    key={item.id ?? index}
+                    className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4"
+                >
+                  <p className="text-sm font-semibold text-zinc-500">{item.label}</p>
+                  <h3 className="mt-2 font-semibold text-zinc-950">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    {item.description}
+                  </p>
+                </div>
+            ))}
+          </div>
+        </div>
+    )
+  }
+
+  if (tool.type === "media-text-block") {
+    const mediaOnRight = data.layout === "image-right"
+    const media =
+        data.mediaType === "video" ? (
+            data.videoKey ? (
+                <video
+                    controls
+                    className="w-full rounded-2xl bg-zinc-950"
+                    src={getFileViewUrl(data.videoKey)}
+                />
+            ) : (
+                <div className="flex h-72 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-400">
+                  No video
+                </div>
+            )
+        ) : data.imageKey ? (
+            <img
+                src={getFileViewUrl(data.imageKey)}
+                alt={data.supportingTitle ?? ""}
+                className="h-72 w-full rounded-2xl object-cover"
+            />
+        ) : (
+            <div className="flex h-72 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-400">
+              No media
+            </div>
+        )
+
+    const text = (
+        <div>
+          {data.supportingTitle ? (
+              <h3 className="text-xl font-semibold text-zinc-950">
+                {data.supportingTitle}
+              </h3>
+          ) : null}
+          {data.supportingDescription ? (
+              <p className="mt-3 leading-7 text-zinc-600">
+                {data.supportingDescription}
+              </p>
+          ) : null}
+        </div>
+    )
+
+    return (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-500">{data.smallHeader}</p>
+            {renderText(data.description, "mt-2 text-base leading-8 text-zinc-600")}
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 md:items-center">
+            {mediaOnRight ? text : media}
+            {mediaOnRight ? media : text}
+          </div>
         </div>
     )
   }
@@ -424,6 +610,9 @@ function GeminiStyleTutor({
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState("")
   const [pending, setPending] = useState(false)
+  const [generating, setGenerating] = useState(null)
+  const entitlements = useLearnerEntitlements()
+  const navigate = useNavigate()
 
   useEffect(() => {
     setMessages([])
@@ -491,6 +680,31 @@ function GeminiStyleTutor({
   function handleSubmit(event) {
     event.preventDefault()
     sendTutorMessage(draft)
+  }
+
+  async function createStudyAid(type) {
+    if (!entitlements.personalProActive) {
+      toast.error("AI Quiz and Flashcard generation requires REBYU Pro.", {
+        action: { label: "View plans", onClick: () => navigate("/learner/subscription") },
+      })
+      return
+    }
+    if (generating) return
+    setGenerating(type)
+    try {
+      const item = await generateStudyAid(type, lessonName, Number(lessonId))
+      const label = type === "quiz" ? "practice quiz" : "flashcard set"
+      setMessages((current) => [...current, {
+        id: createTutorMessageId("assistant"),
+        role: "assistant",
+        text: `Your ${label} has been generated and saved to Library.\n\n${item.description}`,
+      }])
+      toast.success(`${type === "quiz" ? "Quiz" : "Flashcards"} saved to Library.`)
+    } catch (error) {
+      toast.error(error?.response?.data?.message ?? "The study aid could not be generated.")
+    } finally {
+      setGenerating(null)
+    }
   }
 
   function handleKeyDown(event) {
@@ -654,15 +868,30 @@ function GeminiStyleTutor({
             />
 
             <div className="flex items-center justify-between px-1 pb-1">
-              <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 text-zinc-500"
-                  aria-label="Add attachment"
-              >
-                <Plus className="size-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon" className="size-8 text-zinc-500" aria-label="Create study aid">
+                    {generating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuLabel>
+                    <span className="block text-sm">Create with AI</span>
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Generated items are saved to Library.</span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => createStudyAid("quiz")} disabled={Boolean(generating)}>
+                    <BookOpenCheck className="mr-2 size-4" />
+                    <span className="flex-1">Generate quiz</span>
+                    {!entitlements.personalProActive ? <LockKeyhole className="size-3.5 text-amber-600" /> : <span className="text-[10px] font-semibold text-primary">PRO</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => createStudyAid("flashcard")} disabled={Boolean(generating)}>
+                    <Layers3 className="mr-2 size-4" />
+                    <span className="flex-1">Generate flashcards</span>
+                    {!entitlements.personalProActive ? <LockKeyhole className="size-3.5 text-amber-600" /> : <span className="text-[10px] font-semibold text-primary">PRO</span>}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <div className="flex items-center gap-2">
               <span className="hidden text-[10px] text-zinc-400 sm:inline">
@@ -804,31 +1033,35 @@ function CourseOutline({
   }
 
   return (
-      <div className="flex h-full min-h-0 flex-col bg-white">
-        <div className="border-b border-zinc-200 px-4 py-4">
-          <p className="text-sm font-semibold text-zinc-950">
-            Course Outline
+      <div className="flex h-full min-h-0 flex-col bg-white text-foreground">
+        <div className="border-b bg-neutral-50 px-5 py-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            Course content
           </p>
 
-          <p className="mt-1 text-xs text-zinc-500">
-            Browse modules and continue your lessons.
+          <p className="mt-1 text-base font-semibold text-neutral-900">
+            Modules &amp; Lessons
+          </p>
+
+          <p className="mt-1 text-xs leading-5 text-neutral-500">
+            Follow the course in order and track each completed lesson.
           </p>
 
           <div className="relative mt-4">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
 
             <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search course outline"
-                className="h-9 rounded-lg pl-9 text-xs"
+                className="h-9 rounded border-neutral-300 bg-white pl-9 text-xs text-neutral-900 placeholder:text-neutral-400 focus-visible:border-primary focus-visible:ring-primary/20"
             />
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
           {visibleModules.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-zinc-500">
+              <p className="px-4 py-10 text-center text-sm text-neutral-500">
                 No lessons found.
               </p>
           ) : (
@@ -862,34 +1095,34 @@ function CourseOutline({
                     : 0
 
                 return (
-                    <div key={moduleKey} className="border-b border-zinc-200">
+                    <div key={moduleKey} className="border-b border-neutral-200">
                       <button
                           type="button"
                           onClick={() => toggleModule(moduleKey)}
-                          className="w-full px-4 py-3.5 text-left transition hover:bg-zinc-50"
+                          className="w-full px-5 py-4 text-left transition hover:bg-neutral-50"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate text-xs font-semibold text-zinc-900">
+                            <p className="truncate text-xs font-semibold uppercase tracking-wide text-neutral-900">
                               Module {majorIndex + 1}:{" "}
                               {getMajorTitle(major, majorIndex)}
                             </p>
 
-                            <p className="mt-1 text-[11px] text-zinc-500">
+                            <p className="mt-1 text-[11px] text-neutral-500">
                               {completedCount} of {allModuleLessons.length} lessons
                               completed
                             </p>
                           </div>
 
                           {isExpanded ? (
-                              <ChevronDown className="mt-0.5 size-4 shrink-0 text-zinc-500" />
+                              <ChevronDown className="mt-0.5 size-4 shrink-0 text-primary" />
                           ) : (
-                              <ChevronRight className="mt-0.5 size-4 shrink-0 text-zinc-500" />
+                              <ChevronRight className="mt-0.5 size-4 shrink-0 text-neutral-400" />
                           )}
                         </div>
 
                         <div className="mt-3 flex items-center gap-2.5">
-                          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-200">
+                          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200">
                             <div
                                 className="h-full rounded-full bg-primary transition-all"
                                 style={{
@@ -898,7 +1131,7 @@ function CourseOutline({
                             />
                           </div>
 
-                          <span className="w-8 shrink-0 text-right text-[11px] font-medium tabular-nums text-zinc-500">
+                          <span className="w-8 shrink-0 text-right text-[11px] font-medium tabular-nums text-neutral-500">
                       {moduleProgress}%
                     </span>
                         </div>
@@ -926,11 +1159,11 @@ function CourseOutline({
                                         className={cn(
                                             "border-y px-4 py-2.5",
                                             isCurrentMiddle
-                                                ? "border-primary/20 bg-primary/10"
-                                                : "border-zinc-100 bg-zinc-50"
+                                                ? "border-primary/25 bg-primary/5"
+                                                : "border-neutral-200 bg-neutral-50"
                                         )}
                                     >
-                                      <p className="text-xs font-semibold text-zinc-800">
+                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-700">
                                         {getMiddleTitle(middle, middleIndex)}
                                       </p>
                                     </div>
@@ -954,14 +1187,16 @@ function CourseOutline({
                                                 className={cn(
                                                     "flex w-full items-center gap-2 border-l-2 px-4 py-2 text-left transition",
                                                     active
-                                                        ? "border-primary bg-primary/10 text-primary"
-                                                        : "border-transparent text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950"
+                                                        ? "border-primary bg-primary/10 font-medium text-primary"
+                                                        : "border-transparent text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                                                 )}
                                             >
                                               {isCompleted(learnerLesson) ? (
-                                                  <CheckCircle2 className="size-3.5 shrink-0 text-primary" />
+                                                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary text-white">
+                                                    <CheckCircle2 className="size-3" />
+                                                  </span>
                                               ) : (
-                                                  <Circle className="size-3.5 shrink-0 text-zinc-400" />
+                                                  <Circle className="size-4 shrink-0 text-neutral-400" />
                                               )}
 
                                               <span className="min-w-0 truncate text-xs">
@@ -995,6 +1230,9 @@ export default function LearnerLessonPage() {
 
   const [navOpen, setNavOpen] = useState(false)
   const [coachOpen, setCoachOpen] = useState(false)
+  const [locallyCompleted, setLocallyCompleted] = useState(false)
+  const completionSentRef = useRef(false)
+  const completionSentinelRef = useRef(null)
 
   const isXl = useIsXl()
 
@@ -1025,13 +1263,23 @@ export default function LearnerLessonPage() {
   )
 
   const lessonById = useMemo(() => {
+    const completedIds = new Set(
+      completedLessons.map((item) => String(item.lessonId))
+    )
+
     return new Map(
         certificationLessons.map((lesson) => [
           String(lesson.lessonId),
-          lesson,
+          {
+            ...lesson,
+            completed:
+              Boolean(lesson.completed) ||
+              completedIds.has(String(lesson.lessonId)) ||
+              (locallyCompleted && String(lesson.lessonId) === String(lessonId)),
+          },
         ])
     )
-  }, [certificationLessons])
+  }, [certificationLessons, completedLessons, lessonId, locallyCompleted])
 
   const modules = useMemo(() => {
     return normalizeModules(certification, certificationLessons)
@@ -1063,6 +1311,7 @@ export default function LearnerLessonPage() {
   ])
 
   const completed =
+      locallyCompleted ||
       Boolean(currentLesson?.completed) ||
       completedLessons.some(
           (item) => String(item.lessonId) === String(lessonId)
@@ -1084,7 +1333,10 @@ export default function LearnerLessonPage() {
         }),
 
     onSuccess: async () => {
-      toast.success("Lesson marked complete")
+      setLocallyCompleted(true)
+      toast.success("Lesson completed", {
+        description: "Your certification progress has been updated.",
+      })
 
       await queryClient.invalidateQueries({
         queryKey: ["learner-portal-data"],
@@ -1092,6 +1344,7 @@ export default function LearnerLessonPage() {
     },
 
     onError: (error) => {
+      completionSentRef.current = false
       toast.error("Could not mark lesson complete", {
         description:
             error?.response?.data?.message ??
@@ -1100,6 +1353,39 @@ export default function LearnerLessonPage() {
       })
     },
   })
+
+  useEffect(() => {
+    setLocallyCompleted(false)
+    completionSentRef.current = false
+  }, [lessonId])
+
+  useEffect(() => {
+    const sentinel = completionSentinelRef.current
+
+    if (
+      !sentinel ||
+      completed ||
+      sections.length === 0 ||
+      !data?.learnerId ||
+      completeMutation.isPending
+    ) {
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        if (completionSentRef.current) return
+
+        completionSentRef.current = true
+        completeMutation.mutate()
+      },
+      { threshold: 0.8 }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [completed, completeMutation, data?.learnerId, lessonId, sections.length])
 
   function openLesson(lesson) {
     setNavOpen(false)
@@ -1126,17 +1412,17 @@ export default function LearnerLessonPage() {
   }
 
   return (
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+      <div className="-mx-4 -my-6 overflow-hidden border-y border-zinc-300 bg-white shadow-sm sm:-mx-6 lg:-mx-8">
         <div
             className={cn(
                 "grid min-h-[calc(100dvh-8rem)]",
                 coachOpen && isXl
-                    ? "xl:grid-cols-[292px_minmax(0,1fr)_380px]"
-                    : "xl:grid-cols-[292px_minmax(0,1fr)]"
+                    ? "xl:grid-cols-[320px_minmax(0,1fr)_400px]"
+                    : "xl:grid-cols-[320px_minmax(0,1fr)]"
             )}
         >
           {/* LEFT: Course Outline */}
-          <aside className="hidden min-h-0 border-r border-zinc-200 xl:block">
+          <aside className="hidden min-h-0 border-r border-neutral-200 xl:block">
             <div className="sticky top-0 h-[calc(100dvh-8rem)]">
               <CourseOutline
                   modules={modules}
@@ -1150,7 +1436,7 @@ export default function LearnerLessonPage() {
           {/* CENTER: Lesson Content */}
           <main className="min-w-0 bg-white">
             <div className="min-h-[calc(100dvh-8rem)] px-5 py-10 sm:px-10 sm:py-12 xl:px-14">
-              <article className="mx-auto w-full max-w-3xl">
+              <article className="mx-auto w-full max-w-3xl rounded border border-zinc-200 bg-white px-6 py-8 shadow-sm sm:px-10">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
@@ -1209,6 +1495,48 @@ export default function LearnerLessonPage() {
                     </div>
                 )}
 
+                {sections.length > 0 ? (
+                    <div
+                        ref={completionSentinelRef}
+                        className={cn(
+                            "mt-12 flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors",
+                            completed
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : "border-zinc-200 bg-zinc-50 text-zinc-600"
+                        )}
+                        aria-live="polite"
+                    >
+                      <span
+                          className={cn(
+                              "flex size-7 shrink-0 items-center justify-center rounded-full border-2",
+                              completed
+                                  ? "border-emerald-600 bg-emerald-600 text-white"
+                                  : "border-zinc-300 bg-white text-transparent"
+                          )}
+                      >
+                        {completeMutation.isPending ? (
+                            <Loader2 className="size-4 animate-spin text-primary" />
+                        ) : (
+                            <CheckCircle2 className="size-4" />
+                        )}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {completed
+                              ? "Lesson complete"
+                              : completeMutation.isPending
+                                  ? "Saving lesson progress..."
+                                  : "You reached the end of this lesson"}
+                        </p>
+                        <p className="mt-0.5 text-xs opacity-80">
+                          {completed
+                              ? "This lesson is checked off in your course outline."
+                              : "Completion is saved automatically when you reach the end."}
+                        </p>
+                      </div>
+                    </div>
+                ) : null}
+
                 <div className="mt-14 flex flex-col gap-3 border-t border-zinc-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
                   <Button
                       variant="outline"
@@ -1221,21 +1549,6 @@ export default function LearnerLessonPage() {
                   </Button>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                        disabled={
-                            completed ||
-                            completeMutation.isPending ||
-                            !data?.learnerId
-                        }
-                        onClick={() => completeMutation.mutate()}
-                    >
-                      {completed
-                          ? "Completed"
-                          : completeMutation.isPending
-                              ? "Saving..."
-                              : "Mark as Complete"}
-                    </Button>
-
                     <Button
                         variant="outline"
                         disabled={!nextLesson}
@@ -1253,7 +1566,7 @@ export default function LearnerLessonPage() {
 
           {/* RIGHT: AI Tutor */}
           {coachOpen && isXl ? (
-              <aside className="hidden min-h-0 border-l border-zinc-200 bg-white xl:block">
+              <aside className="hidden min-h-0 border-l border-zinc-300 bg-white xl:block">
                 <div className="sticky top-0 h-[calc(100dvh-8rem)] overflow-hidden">
                   <GeminiStyleTutor
                       lessonId={lessonId}

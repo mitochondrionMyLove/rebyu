@@ -206,7 +206,7 @@ function CertificationCard({
           <button
               type="button"
               onClick={onAction}
-              className="mt-auto h-11 w-full rounded-lg bg-zinc-950 text-sm font-semibold text-white transition hover:bg-zinc-700 active:scale-[0.99]"
+              className="mt-auto h-11 w-full rounded bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 active:scale-[0.99]"
           >
             {enrolled ? "Continue Learning" : "View Certification"}
           </button>
@@ -428,17 +428,6 @@ export default function LearnerCertificationsPage() {
 
   return (
       <div className="w-full min-w-0 space-y-7 pb-10">
-        <header className="border-b border-border pb-6">
-          <h1 className="font-heading text-2xl font-semibold text-foreground">
-            Certifications
-          </h1>
-
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Explore certification reviews designed to help you study smarter,
-            practice with confidence, and prepare for exam day.
-          </p>
-        </header>
-
         <div className="grid gap-6 xl:grid-cols-[180px_minmax(0,1fr)]">
           <CategoryFilter
               categories={categories}

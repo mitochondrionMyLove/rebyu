@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import {
   BookOpenCheck,
   BrainCircuit,
@@ -10,11 +10,20 @@ import {
   Search,
   Share2,
   UsersRound,
+  Plus,
+  Trash2,
+  Link,
+  StickyNote,
 } from "lucide-react"
 import { useNavigate, useOutletContext } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { toast } from "sonner"
+import { addLibraryItem, deleteLibraryItem, getLibraryItems } from "@/services/learnerToolsService"
 import {
   LearnerEmptyState,
   LearnerPageHeader,
@@ -46,6 +55,16 @@ const libraryTypeMeta = {
     icon: UsersRound,
     badge:
         "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  },
+  link: {
+    label: "Link",
+    icon: Link,
+    badge: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-300",
+  },
+  note: {
+    label: "Note",
+    icon: StickyNote,
+    badge: "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300",
   },
 }
 
@@ -224,6 +243,17 @@ export default function LearnerFilesPage() {
   const [localSearch, setLocalSearch] = useState("")
   const [certificationId, setCertificationId] = useState("")
   const [category, setCategory] = useState(ALL_VALUE)
+  const [storedItems, setStoredItems] = useState([])
+  const [addOpen, setAddOpen] = useState(false)
+  const [newType, setNewType] = useState("link")
+  const [newTitle, setNewTitle] = useState("")
+  const [newDescription, setNewDescription] = useState("")
+  const [newUrl, setNewUrl] = useState("")
+  const [viewItem, setViewItem] = useState(null)
+
+  useEffect(() => {
+    getLibraryItems().then(setStoredItems).catch(() => toast.error("Your library could not be loaded."))
+  }, [])
 
   const quizzes = useMemo(
       () =>
@@ -273,13 +303,32 @@ export default function LearnerFilesPage() {
 
   const allItems = useMemo(
       () => [
+        ...storedItems,
         ...quizzes,
         ...flashcards,
         ...files,
         ...communityResources,
       ],
-      [communityResources, files, flashcards, quizzes]
+      [communityResources, files, flashcards, quizzes, storedItems]
   )
+
+  async function saveResource() {
+    if (!newTitle.trim() || (newType !== "note" && !newUrl.trim())) {
+      toast.error("Add a title and resource URL.")
+      return
+    }
+    try {
+      const item = await addLibraryItem({ itemType: newType, title: newTitle.trim(), description: newDescription.trim(), resourceUrl: newType === "note" ? null : newUrl.trim() })
+      setStoredItems((current) => [item, ...current])
+      setNewTitle(""); setNewDescription(""); setNewUrl(""); setAddOpen(false)
+      toast.success("Resource added to your library.")
+    } catch { toast.error("The resource could not be saved.") }
+  }
+
+  async function removeResource(item) {
+    try { await deleteLibraryItem(item.id); setStoredItems((current) => current.filter((entry) => entry.id !== item.id)); toast.success("Resource removed.") }
+    catch { toast.error("The resource could not be removed.") }
+  }
 
   const certifications = useMemo(() => {
     const existingCertifications = safeArray(data.certifications)
@@ -342,7 +391,10 @@ export default function LearnerFilesPage() {
   )
 
   function openItem(item) {
-    if (!item.route) return
+    if (!item.route) {
+      setViewItem(item)
+      return
+    }
 
     if (/^https?:\/\//i.test(item.route)) {
       window.open(item.route, "_blank", "noopener,noreferrer")
@@ -354,10 +406,9 @@ export default function LearnerFilesPage() {
 
   return (
       <div className="space-y-6">
-        <LearnerPageHeader
-            title="Library"
-            subtitle="Access your generated quizzes, flashcards, study files, and community-shared resources."
-        />
+        <LearnerPageHeader title="Library" subtitle="Access your generated quizzes, flashcards, study files, and community-shared resources.">
+          <Button type="button" onClick={() => setAddOpen(true)}><Plus className="mr-2 h-4 w-4" />Add resource</Button>
+        </LearnerPageHeader>
 
         <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 pb-4">
           {[
@@ -540,8 +591,7 @@ export default function LearnerFilesPage() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => openItem(item)}
-                                      disabled={!item.route}
-                                  >
+                                    >
                                     <Eye className="mr-2 h-4 w-4" />
                                     View
                                   </Button>
@@ -570,6 +620,11 @@ export default function LearnerFilesPage() {
                                   Source
                                 </Button>
                             ) : null}
+                            {item.ownedByMe ? (
+                                <Button type="button" size="icon" variant="ghost" onClick={() => removeResource(item)} aria-label="Remove from library">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -579,6 +634,28 @@ export default function LearnerFilesPage() {
               </table>
             </div>
         )}
+
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader><DialogTitle>Add to library</DialogTitle><DialogDescription>Save a useful link, file URL, quiz, flashcard set, or personal note.</DialogDescription></DialogHeader>
+            <div className="grid gap-4">
+              <select value={newType} onChange={(event) => setNewType(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+                <option value="link">Link</option><option value="file">File URL</option><option value="quiz">Quiz</option><option value="flashcard">Flashcards</option><option value="note">Note</option>
+              </select>
+              <Input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder="Resource title" />
+              {newType !== "note" ? <Input type="url" value={newUrl} onChange={(event) => setNewUrl(event.target.value)} placeholder="https://..." /> : null}
+              <Textarea value={newDescription} onChange={(event) => setNewDescription(event.target.value)} placeholder={newType === "note" ? "Write your study note..." : "Why is this resource useful?"} className="min-h-28" />
+            </div>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button><Button type="button" onClick={saveResource}>Save resource</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(viewItem)} onOpenChange={(open) => !open && setViewItem(null)}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader><DialogTitle>{viewItem?.title}</DialogTitle><DialogDescription>{viewItem?.details || "Library resource"}</DialogDescription></DialogHeader>
+            <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{viewItem?.description || "No description was added."}</p>
+          </DialogContent>
+        </Dialog>
       </div>
   )
 }

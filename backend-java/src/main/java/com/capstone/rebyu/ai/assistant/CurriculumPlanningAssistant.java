@@ -23,12 +23,19 @@ public interface CurriculumPlanningAssistant {
             - Each lesson object must contain only a title.
             - Each middle category must contain only a title and lessons.
             - Each major category must contain only a title and middleCategories.
-            - Exactly 2 major categories total.
-            - Exactly 2 middle categories per major category.
-            - Exactly 1 lesson per middle category.
-            - Total lessons must not exceed 4.
-            - Lesson titles must be specific.
-            - Cover all major topics from the reference document.
+            - Derive the structure from the certification and the reference
+              document. Model the certification's real knowledge domains as major
+              categories (usually 3 to 6), each divided into focused middle
+              categories (usually 2 to 5 per major).
+            - EVERY middle category MUST contain MULTIPLE lessons — at least 3,
+              and more when the material supports it. Never output a middle
+              category with only one lesson.
+            - Each lesson is one distinct, specific sub-topic. Do not merge
+              several sub-topics into a single lesson, and do not pad with
+              duplicate or near-duplicate lessons.
+            - Cover ALL major topics from the reference document across the
+              lessons; every important concept should map to a lesson.
+            - Lesson titles must be specific and self-explanatory.
 
             Certification details:
             {{requestJson}}

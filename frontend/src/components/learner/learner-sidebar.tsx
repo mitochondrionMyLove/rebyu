@@ -1,5 +1,4 @@
 import * as React from "react"
-import { NavLink } from "react-router-dom"
 import {
   AwardIcon,
   BarChart3Icon,
@@ -9,10 +8,8 @@ import {
   CircleAlertIcon,
   CrownIcon,
   FilesIcon,
-  FlameIcon,
   MessagesSquareIcon,
   SwordsIcon,
-  UserRoundCogIcon,
 } from "lucide-react"
 
 import { NavProjects } from "@/components/nav-projects"
@@ -25,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useLearnerEntitlements } from "@/hooks/use-learner-entitlements.js"
 
 const learnerNav = {
   main: {
@@ -70,16 +68,6 @@ const learnerNav = {
     name: "Resources",
     items: [
       {
-        name: "Subscription",
-        url: "/learner/subscription",
-        icon: CrownIcon,
-      },
-      {
-        name: "Account",
-        url: "/learner/account",
-        icon: UserRoundCogIcon,
-      },
-      {
         name: "Library",
         url: "/learner/library",
         icon: FilesIcon,
@@ -106,13 +94,24 @@ const learnerNav = {
 export function LearnerAppSidebar({
                                     ...props
                                   }: React.ComponentProps<typeof Sidebar>) {
+  const entitlements = useLearnerEntitlements()
+  const planLabel = entitlements.institutionalActive
+    ? "Organization access"
+    : entitlements.personalProActive
+      ? "Pro learner"
+      : "Free learner"
+  const planDescription = entitlements.institutionalActive
+    ? "Sponsored by your organization"
+    : entitlements.personalProActive
+      ? "Premium features enabled"
+      : "Standard learning access"
+
   return (
-      <Sidebar variant="inset" {...props}>
-        <SidebarHeader>
+      <Sidebar variant="sidebar" {...props}>
+        <SidebarHeader className="h-16 justify-center border-b border-sidebar-border p-2">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" asChild>
-                <NavLink to="/learner/progress">
+              <SidebarMenuButton size="lg" className="cursor-default hover:bg-transparent" aria-label="REBYU learner portal">
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                     <BrainCircuitIcon className="size-4" />
                   </div>
@@ -122,17 +121,16 @@ export function LearnerAppSidebar({
                     REBYU
                   </span>
 
-                    <span className="truncate text-xs text-sidebar-foreground/60">
+                  <span className="truncate text-xs text-sidebar-foreground/60">
                     Learner Portal
                   </span>
                   </div>
-                </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="justify-center">
           <NavProjects projects={learnerNav} />
         </SidebarContent>
 
@@ -142,19 +140,23 @@ export function LearnerAppSidebar({
               <SidebarMenuButton
                   size="lg"
                   className="cursor-default"
-                  tooltip="Keep your learning streak active"
+                  tooltip={planLabel}
               >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
-                  <FlameIcon className="size-4" />
+                <div className={`flex aspect-square size-8 items-center justify-center rounded-lg ${
+                  entitlements.hasPremium
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  <CrownIcon className="size-4" />
                 </div>
 
                 <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">
-                  Keep learning
+                  {planLabel}
                 </span>
 
                   <span className="truncate text-xs text-sidebar-foreground/60">
-                  Build your daily streak
+                  {planDescription}
                 </span>
                 </div>
               </SidebarMenuButton>

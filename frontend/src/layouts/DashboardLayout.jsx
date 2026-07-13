@@ -32,8 +32,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/auth-context.jsx"
+import { usePortalTheme } from "@/hooks/use-portal-theme.js"
+import { PortalThemeToggle } from "@/components/portal-theme-toggle"
 
 export default function DashboardLayout() {
+  usePortalTheme()
   const navigate = useNavigate()
   const { logout } = useAuth()
 
@@ -43,19 +46,25 @@ export default function DashboardLayout() {
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
+    <SidebarProvider
+      className="netacad-portal admin-portal"
+      open={false}
+      style={{ "--sidebar-width-icon": "3.25rem" }}
+    >
+      <AppSidebar collapsible="icon" className="border-r border-sidebar-border" />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
+        <header className="sticky top-0 z-40 h-16 shrink-0 border-b bg-white/95 shadow-sm backdrop-blur">
+          <div className="mx-auto flex h-full w-full max-w-[1280px] items-center justify-between gap-5 px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <SidebarTrigger className="-ml-1 md:hidden" />
             <Separator
               orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
+              className="mr-2 hidden data-[orientation=vertical]:h-4 md:block"
             />
           </div>
-          <div className="flex items-center gap-2 px-4">
+          <div className="flex min-w-0 items-center justify-end gap-2">
             <Bell />
+            <PortalThemeToggle />
             <DropdownMenu className="w-48 p-2">
               <DropdownMenuTrigger asChild>
                 <Avatar>
@@ -84,8 +93,9 @@ export default function DashboardLayout() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 px-5 py-3">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </div>
       </SidebarInset>

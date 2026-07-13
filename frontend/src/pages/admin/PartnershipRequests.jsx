@@ -140,15 +140,6 @@ export default function PartnershipRequests() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold tracking-tight">
-          Partnership Requests
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Review organization partnership requests and grant certification access.
-        </p>
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard icon={Clock} label="Pending" value={counts.PENDING} />
         <SummaryCard icon={CheckCircle2} label="Approved" value={counts.APPROVED} />

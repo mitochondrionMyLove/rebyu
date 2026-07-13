@@ -1897,8 +1897,8 @@ function QuestionFileGeneratorDialog({
         setSubmitError("");
 
         const difficultyTotal = generationOptions.easy + generationOptions.average + generationOptions.hard;
-        if (generationOptions.total < 1 || generationOptions.total > 50) {
-            setSubmitError("Number of items must be between 1 and 50.");
+        if (generationOptions.total < 1 || generationOptions.total > 100) {
+            setSubmitError("Number of items must be between 1 and 100.");
             return;
         }
         if (difficultyTotal !== generationOptions.total) {
@@ -1952,7 +1952,7 @@ function QuestionFileGeneratorDialog({
                                     id="ai-question-total"
                                     type="number"
                                     min="1"
-                                    max="50"
+                                    max="100"
                                     value={generationOptions.total}
                                     disabled={isGenerating}
                                     onChange={(event) => setGenerationOptions((current) => ({
@@ -2486,14 +2486,12 @@ const QuestionCardWrapper = React.memo(function QuestionCardWrapper({
     );
 });
 
-// `mode` splits this screen into three routed pages that reuse the exact same
-// editor: "bank" (view/filter/edit/delete), "generate" (AI modal + preview),
-// and "manual" (pick certification + lesson, add questions). "all" keeps the
-// original combined two-tab screen as a fallback.
-function QuestionBank({ mode = "all" }) {
-    const [activeTab, setActiveTab] = useState(
-        mode === "generate" || mode === "manual" ? "question-builder" : "all-questions"
-    );
+function QuestionBank() {
+    const [activeTab, setActiveTab] = useState("all-questions");
+    // Sub-mode inside the single Question Builder tab. "" shows the centered
+    // Create Manually / Generate with AI chooser; selecting one swaps the same
+    // builder area in place (manual form vs AI generation interface).
+    const [builderMode, setBuilderMode] = useState("");
 
     const [filterCertificationId, setFilterCertificationId] = useState("");
 
@@ -2982,6 +2980,9 @@ function QuestionBank({ mode = "all" }) {
     }
 
     const submitQuestions = async () => {
+        // Sent with each save so the backend verifies the lesson belongs to this
+        // certification before persisting the question.
+        const certificationId = selectedCertification?.certificationId ?? null;
         for (const question of questions) {
             const lessonId = question.data.lessonId || selectedLesson?.id;
             if (!lessonId) {
@@ -2996,6 +2997,7 @@ function QuestionBank({ mode = "all" }) {
                         questionText: question.data.question,
                         imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
+                        certificationId,
                         totalPoints: 1,
                     });
 
@@ -3017,12 +3019,16 @@ function QuestionBank({ mode = "all" }) {
                         questionText: question.data.question,
                         imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
+                        certificationId,
                         totalPoints: 1,
                     });
                     await saveTextQuestion({
                         questionId: savedShortAnswer.questionId,
                         correctAnswer: question.data.correctAnswer,
                         checkingMethod: question.data.checkingMethod,
+                        acceptedVariations: Array.isArray(question.data.acceptedVariations)
+                            ? question.data.acceptedVariations
+                            : null,
                     });
                     break;
                 }
@@ -3033,6 +3039,7 @@ function QuestionBank({ mode = "all" }) {
                         questionText: question.data.question,
                         imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
+                        certificationId,
                         totalPoints: 1,
                     });
                     await saveTextQuestion({
@@ -3049,6 +3056,7 @@ function QuestionBank({ mode = "all" }) {
                         questionText: question.data.question,
                         imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
+                        certificationId,
                         totalPoints: 1,
                     });
                     await saveProgrammingQuestion({
@@ -3084,6 +3092,7 @@ function QuestionBank({ mode = "all" }) {
                         questionText: question.data.question,
                         imageKey: question.data.imageKey ?? null,
                         lessonId: Number(lessonId),
+                        certificationId,
                         totalPoints: 1,
                     });
                     await saveDiagramQuestion({
@@ -3348,56 +3357,31 @@ OUTPUT RULES:
                 onValueChange={setActiveTab}
                 className="flex h-full min-h-0 flex-1 flex-col"
             >
-                <header className="shrink-0 border-b border-border bg-background py-5">
-                    <div>
-                        <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-                            {mode === "generate"
-                                ? "AI Question Generation"
-                                : mode === "manual"
-                                    ? "Manual Question Creation"
-                                    : "Question Bank"}
-                        </h1>
-
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {mode === "generate"
-                                ? "Generate draft questions from certification knowledge or uploaded files, then review, edit, and save them."
-                                : mode === "manual"
-                                    ? "Select a certification and lesson, then add and save questions by hand."
-                                    : "View, filter, edit, preview, and delete saved questions."}
-                        </p>
-                    </div>
-                </header>
-
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-background">
-                    {mode === "all" ? (
-                        <TabsList className="h-11 w-fit rounded-none bg-transparent p-0">
-                            <TabsTrigger
-                                value="all-questions"
-                                className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                            >
-                                <ListChecks className="mr-2 h-4 w-4" />
-                                All Questions
-                            </TabsTrigger>
+                    <TabsList className="h-11 w-fit rounded-none bg-transparent p-0">
+                        <TabsTrigger
+                            value="all-questions"
+                            className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                        >
+                            <ListChecks className="mr-2 h-4 w-4" />
+                            All Questions
+                        </TabsTrigger>
 
-                            <TabsTrigger
-                                value="question-builder"
-                                className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                            >
-                                <BookOpen className="mr-2 h-4 w-4" />
-                                Question Builder
-                            </TabsTrigger>
-                        </TabsList>
-                    ) : (
-                        <span className="py-3" />
-                    )}
+                        <TabsTrigger
+                            value="question-builder"
+                            className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                        >
+                            <BookOpen className="mr-2 h-4 w-4" />
+                            Question Builder
+                        </TabsTrigger>
+                    </TabsList>
 
-                    {activeTab === "question-builder" && (
+                    {activeTab === "question-builder" && builderMode !== "" && (
                         <div className="flex shrink-0 items-center gap-2 py-1.5">
-                            {mode !== "manual" && (
+                            {builderMode === "generate" && (
                                 <Button
                                     type="button"
                                     size="sm"
-                                    variant={mode === "generate" ? "default" : "outline"}
                                     disabled={
                                         !selectedCertification ||
                                         isSavingQuestions ||
@@ -3413,7 +3397,6 @@ OUTPUT RULES:
                             <Button
                                 type="button"
                                 size="sm"
-                                variant={mode === "generate" ? "outline" : "default"}
                                 disabled={
                                     isSavingQuestions || !selectedLesson || questions.length === 0
                                 }
@@ -3918,7 +3901,206 @@ OUTPUT RULES:
                     value="question-builder"
                     className="m-0 min-h-0 flex-1 overflow-hidden py-5 data-[state=active]:flex data-[state=active]:flex-col"
                 >
-                    <div className="grid min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[360px_minmax(0,1fr)_300px] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
+                    {builderMode === "" ? (
+                        <div className="flex flex-1 items-center justify-center p-6">
+                            <div className="w-full max-w-2xl rounded-xl border border-border bg-background p-8 text-center shadow-sm">
+                                <h2 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                                    Question Builder
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Choose how you want to add questions to this
+                                    certification.
+                                </p>
+
+                                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBuilderMode("manual")}
+                                        className="group flex flex-col items-center gap-3 rounded-xl border border-border bg-background p-6 text-center transition hover:border-primary hover:bg-primary/5"
+                                    >
+                                        <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                            <FileQuestion className="h-6 w-6" />
+                                        </span>
+                                        <span className="font-medium text-foreground">
+                                            Create Manually
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Pick a lesson and build each question by hand.
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setBuilderMode("generate")}
+                                        className="group flex flex-col items-center gap-3 rounded-xl border border-border bg-background p-6 text-center transition hover:border-primary hover:bg-primary/5"
+                                    >
+                                        <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                            <UploadIcon className="h-6 w-6" />
+                                        </span>
+                                        <span className="font-medium text-foreground">
+                                            Generate with AI
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Draft questions from certification knowledge or
+                                            uploaded files.
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex min-h-0 flex-1 flex-col gap-3">
+                            <div className="flex shrink-0 justify-center">
+                                <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBuilderMode("manual")}
+                                        className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+                                            builderMode === "manual"
+                                                ? "bg-background text-foreground shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        Create Manually
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setBuilderMode("generate")}
+                                        className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+                                            builderMode === "generate"
+                                                ? "bg-background text-foreground shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        Generate with AI
+                                    </button>
+                                </div>
+                            </div>
+
+                            {builderMode === "generate" ? (
+                                <div className="flex min-h-0 flex-1 flex-col gap-3">
+                                    <div className="shrink-0 space-y-2">
+                                            <p className="text-sm font-medium text-foreground">
+                                                Certification
+                                            </p>
+                                            <Select
+                                                value={selectedCertificationId}
+                                                onValueChange={handleBuilderCertificationChange}
+                                                disabled={isPending}
+                                            >
+                                                <SelectTrigger className="h-10 w-full min-w-0 rounded-lg bg-background px-3 text-sm [&>span]:truncate">
+                                                    <SelectValue placeholder="Select a certification" />
+                                                </SelectTrigger>
+                                                <SelectContent
+                                                    position="popper"
+                                                    align="start"
+                                                    sideOffset={6}
+                                                    className="max-h-72 w-[min(440px,calc(100vw-2rem))] overflow-y-auto rounded-xl p-1"
+                                                >
+                                                    <SelectGroup>
+                                                        {certifications.map((certification, index) => (
+                                                            <SelectItem
+                                                                key={
+                                                                    certification.certificationId ??
+                                                                    certification.id ??
+                                                                    index
+                                                                }
+                                                                value={getCertificationValue(certification)}
+                                                                title={getCertificationTitle(certification)}
+                                                                className="h-auto min-h-10 whitespace-normal py-2 pr-8 text-sm leading-5"
+                                                            >
+                                                                {getCertificationTitle(certification)}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-xs text-muted-foreground">
+                                                Choose a certification, then use “Generate Questions” to
+                                                create draft questions you can review and save.
+                                            </p>
+                                    </div>
+
+                                    <div className="grid min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[minmax(0,1fr)_300px] xl:grid-rows-[minmax(0,1fr)]">
+                                        <main className="min-h-0 min-w-0 overflow-y-auto">
+                                            <div className="mx-auto w-full max-w-4xl space-y-4 p-5 sm:p-6">
+                                        {Object.keys(validationErrors).length > 0 && (
+                                            <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                                <div>
+                                                    <p className="font-semibold">
+                                                        Some required question details are missing.
+                                                    </p>
+                                                    <p className="mt-1 text-xs leading-5">
+                                                        Review the highlighted question cards, complete the
+                                                        required fields, then save again.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {questions.length === 0 ? (
+                                            <EmptyState
+                                                icon={FileQuestion}
+                                                title="No questions generated yet"
+                                                description={
+                                                    selectedCertification
+                                                        ? "Click “Generate Questions” to create draft questions for this certification."
+                                                        : "Select a certification to begin."
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {questions.map((question, index) => {
+                                                    function handleRemove() {
+                                                        removeQuestion(question.id);
+                                                    }
+                                                    function handleDataChange(updater) {
+                                                        updateQuestionData(question.id, updater);
+                                                    }
+                                                    return (
+                                                        <QuestionCardWrapper
+                                                            key={question.id}
+                                                            question={question}
+                                                            index={index}
+                                                            validationErrors={validationErrors}
+                                                            onRemove={handleRemove}
+                                                            onDataChange={handleDataChange}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                            </div>
+                                        </main>
+                                        <aside className="min-h-0 border-t border-border bg-background xl:overflow-y-auto xl:border-l xl:border-t-0">
+                                            <div className="space-y-4 p-4">
+                                                <div>
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        Add Question
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        {selectedLesson
+                                                            ? `Add a question to ${selectedLesson.name}.`
+                                                            : "Generate first, then add or edit questions here."}
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {questionTypes.map((questionType) => (
+                                                        <QuestionTypeButton
+                                                            key={questionType.id}
+                                                            questionType={questionType}
+                                                            onAdd={addQuestion}
+                                                            disabled={!selectedLesson}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </aside>
+                                    </div>
+                                </div>
+                            ) : (
+                            <div className="grid min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[360px_minmax(0,1fr)_300px] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
                         <aside className="min-h-0 border-b border-border bg-background xl:overflow-y-auto xl:border-b-0 xl:border-r">
                             <div className="space-y-4 p-4">
                                 <div>
@@ -4203,7 +4385,10 @@ OUTPUT RULES:
                                 </div>
                             </div>
                         </aside>
-                    </div>
+                            </div>
+                            )}
+                        </div>
+                    )}
                 </TabsContent>
             </Tabs>
 
