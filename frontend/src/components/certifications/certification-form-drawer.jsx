@@ -613,15 +613,28 @@ export default function CertificationFormDrawer({
 
         await onSaved?.(savedCertification)
 
-        setModuleCategories(
-            mapCertificationToModuleStructure(savedCertification)
-        )
+        // Module categories and the "created" dialog are handled by the
+        // caller (CertificationModules) once lesson content generation for
+        // every lesson has also finished — see handleGenerateDocuments.
+        return savedCertification
+    }
+
+    function handleNewCertificationGenerationComplete(summary) {
+        const lessonSummary =
+            summary == null
+                ? ""
+                : summary.total === 0
+                    ? " No lessons were created to generate content for."
+                    : summary.failed === 0
+                        ? ` Content was generated and saved for all ${summary.total} lesson${summary.total === 1 ? "" : "s"}.`
+                        : ` Content was generated for ${summary.succeeded} of ${summary.total} lessons; ${summary.failedLessons.join(", ")} still need it — open them individually to generate.`
 
         setSubmissionDialog({
             open: true,
             title: "Certification created successfully",
             description:
-                "The certification and its AI-generated categories, modules, and lessons were saved.",
+                "The certification and its AI-generated categories and lessons were saved." +
+                lessonSummary,
         })
     }
 
@@ -692,6 +705,9 @@ export default function CertificationFormDrawer({
                                     isEditing
                                         ? undefined
                                         : handleGenerateForNewCertification
+                                }
+                                onGenerationComplete={
+                                    isEditing ? undefined : handleNewCertificationGenerationComplete
                                 }
                             />
                         )}

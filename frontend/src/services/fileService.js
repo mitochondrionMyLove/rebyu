@@ -29,3 +29,7 @@ export function savePhotoCertification(file) {
 export function getFileViewUrl(key) {
   return `${API}/files/view?key=${encodeURIComponent(key)}`
 }
+
+export function getFileDownloadUrl(key) {
+  return `${API}/files/download?key=${encodeURIComponent(key)}`
+}

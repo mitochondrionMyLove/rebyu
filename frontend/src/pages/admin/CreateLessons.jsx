@@ -438,90 +438,51 @@ function LessonToolCard({ action, onClick, disabled }) {
   )
 }
 
+/**
+ * Persistent left tools panel — always visible (no collapse-to-icon-rail),
+ * matching the community feed's left navigation aside: a bordered card with
+ * a muted header, sticky within its scroll container, sitting beside a
+ * scrollable center area.
+ */
 function LessonToolsPanel({ isLoadingLesson, onAddTool }) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  function handleAddTool(toolType) {
-    onAddTool(toolType)
-  }
-
   return (
-      <aside
-          className={`sticky top-0 z-10 flex h-full max-h-full min-h-0 shrink-0  overflow-hidden  bg-background transition-[width] duration-300 ease-in-out ${
-              isOpen ? "w-[360px]" : "w-14"
-          }`}
-      >
-        <div className="flex h-full w-14 shrink-0 flex-col items-center border-r bg-muted/20 py-4">
-          <Button
-              type="button"
-              variant={isOpen ? "default" : "outline"}
-              disabled={isLoadingLesson}
-              aria-label={isOpen ? "Close lesson tools" : "Open lesson tools"}
-              onClick={() => setIsOpen((currentValue) => !currentValue)}
-              className="h-32 w-10 flex-col gap-2 rounded-full px-0 py-3 shadow-sm disabled:opacity-50"
-          >
-            <PanelLeft className="h-4 w-4" />
-          </Button>
+      <aside className="flex h-full max-h-full w-[300px] shrink-0 flex-col overflow-hidden border-r bg-background">
+        <div className="shrink-0 border-b bg-muted/40 px-5 py-4">
+          <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">
+            Lesson Tools
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Add tools to the selected lesson section.
+          </p>
         </div>
 
-        <div
-            className={`flex h-full min-h-0 w-[306px] shrink-0 flex-col bg-background transition-opacity duration-200 ${
-                isOpen ? "opacity-100" : "pointer-events-none opacity-0"
-            }`}
-            aria-hidden={!isOpen}
-        >
-          <div className="shrink-0 border-b px-5 py-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold tracking-tight">
-                  Lesson Tools
-                </h2>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Add tools to the selected lesson section.
-                </p>
-              </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+          <div className="space-y-6 pb-6">
+            {actionGroups.map((group) => (
+                <section key={group.label} className="space-y-3">
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {group.label}
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {group.label === "Individual tools"
+                          ? "Use these for custom, block-by-block lesson building."
+                          : "Use these when you want one ready-made layout with multiple fields."}
+                    </p>
+                  </div>
 
-              <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Close lesson tools"
-                  onClick={() => setIsOpen(false)}
-                  className="h-8 w-8 shrink-0"
-              >
-                <PanelLeft className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-            <div className="space-y-6 pb-6">
-              {actionGroups.map((group) => (
-                  <section key={group.label} className="space-y-3">
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {group.label}
-                      </h3>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        {group.label === "Individual tools"
-                            ? "Use these for custom, block-by-block lesson building."
-                            : "Use these when you want one ready-made layout with multiple fields."}
-                      </p>
-                    </div>
-
-                    <div className="grid gap-2">
-                      {group.items.map((action) => (
-                          <LessonToolCard
-                              key={action.type}
-                              action={action}
-                              disabled={isLoadingLesson}
-                              onClick={() => handleAddTool(action.type)}
-                          />
-                      ))}
-                    </div>
-                  </section>
-              ))}
-            </div>
+                  <div className="grid gap-2">
+                    {group.items.map((action) => (
+                        <LessonToolCard
+                            key={action.type}
+                            action={action}
+                            disabled={isLoadingLesson}
+                            onClick={() => onAddTool(action.type)}
+                        />
+                    ))}
+                  </div>
+                </section>
+            ))}
           </div>
         </div>
       </aside>

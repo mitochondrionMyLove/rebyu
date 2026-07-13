@@ -163,7 +163,10 @@ public class LessonDraftJsonParser {
     private GeneratedLessonToolDraftDto mapTool(JsonNode toolNode, List<String> warnings) {
         if (toolNode == null || !toolNode.isObject()) return null;
         String type = firstText(toolNode, "type", "toolType", "componentType");
-        if (type == null) return null;
+        if (type == null) {
+            warnings.add("Skipped a generated tool with no recognizable type field.");
+            return null;
+        }
         type = type.trim().toLowerCase().replace('_', '-').replace(' ', '-');
         if (type.equals("bullet-list") || type.equals("bulletlist")) type = "unordered-list";
         if (type.equals("numbered-list") || type.equals("numberedlist")) type = "ordered-list";
@@ -442,11 +445,27 @@ public class LessonDraftJsonParser {
         return text(node, keys);
     }
 
+    /**
+     * Looks for an array under one of the given key names first. Models
+     * reliably produce AN array for list/tab/accordion/grid/card tools but
+     * don't always use the exact key we expect (e.g. "options" instead of
+     * "items") — rather than silently discarding the whole tool on a naming
+     * miss, fall back to the first array-valued field found anywhere on the
+     * node. A section-level object realistically has only one such field, so
+     * this fallback is unambiguous in practice.
+     */
     private JsonNode firstArray(JsonNode node, String... keys) {
         if (node == null) return null;
         for (String key : keys) {
             JsonNode value = node.get(key);
-            if (value != null && value.isArray()) return value;
+            if (value != null && value.isArray() && !value.isEmpty()) return value;
+        }
+        var fields = node.fields();
+        while (fields.hasNext()) {
+            var entry = fields.next();
+            if (entry.getValue() != null && entry.getValue().isArray() && !entry.getValue().isEmpty()) {
+                return entry.getValue();
+            }
         }
         return null;
     }

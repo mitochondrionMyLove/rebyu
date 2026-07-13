@@ -1,21 +1,37 @@
 import { base } from "./base"
 
+const relativeHours = (value) => {
+  const time = value ? new Date(value).getTime() : NaN
+  if (!Number.isFinite(time)) {
+    return "recently"
+  }
+  const hoursAgo = Math.max(0, Math.round((Date.now() - time) / 3600000))
+  return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(-hoursAgo, "hour")
+}
+
 const postView = (post) => ({
   ...post,
   badge: post.ownedByMe ? "You" : "Learner",
   badgeClass: "border-blue-200 bg-blue-50 text-blue-700",
   community: post.community || "Community",
-  createdAt: new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
-    -Math.max(0, Math.round((Date.now() - new Date(post.createdAt).getTime()) / 3600000)), "hour"
-  ),
+  createdAt: relativeHours(post.createdAt),
   attachment: post.attachmentName ? {
     name: post.attachmentName,
     type: post.attachmentType || "PDF",
     meta: "Community resource",
+    key: post.attachmentKey || null,
   } : null,
 })
 
-export const getCommunityPosts = async () => (await base("community/posts")).map(postView)
+export async function getCommunityPosts({ type, search, saved } = {}) {
+  const params = new URLSearchParams()
+  if (type) params.set("type", type)
+  if (search) params.set("search", search)
+  if (saved) params.set("saved", "true")
+  const query = params.toString()
+  const posts = await base(query ? `community/posts?${query}` : "community/posts")
+  return posts.map(postView)
+}
 export const getCommunityCircles = () => base("community/circles")
 export const createCommunityPost = async (payload) => postView(await base("community/posts", { method: "POST", data: payload }))
 export const createCommunityCircle = (payload) => base("community/circles", { method: "POST", data: payload })
@@ -25,3 +41,10 @@ export const toggleCircleMembership = (id) => base(`community/circles/${id}/memb
 export const getCommunityComments = (id) => base(`community/posts/${id}/comments`)
 export const addCommunityComment = (id, body, parentCommentId = null) => base(`community/posts/${id}/comments`, { method: "POST", data: { body, parentCommentId } })
 export const deleteCommunityPost = (id) => base(`community/posts/${id}`, { method: "DELETE" })
+
+/** Uploads a real PDF/DOCX attachment; returns { attachmentKey }. Call before createCommunityPost. */
+export async function uploadCommunityAttachment(file) {
+  const formData = new FormData()
+  formData.append("file", file)
+  return base("community/posts/attachment", { method: "POST", data: formData })
+}

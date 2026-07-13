@@ -495,6 +495,15 @@ public class CertificationService {
                 """, certificationId);
 
         executeDelete("""
+                DELETE FROM knowledge_document_images
+                WHERE knowledge_document_id IN (
+                    SELECT knowledge_document_id
+                    FROM knowledge_documents
+                    WHERE certification_id = :certificationId
+                )
+                """, certificationId);
+
+        executeDelete("""
                 DELETE FROM knowledge_documents
                 WHERE certification_id = :certificationId
                 """, certificationId);

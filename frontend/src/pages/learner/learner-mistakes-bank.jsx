@@ -30,55 +30,6 @@ import { toast } from "sonner"
 
 const ALL_VALUE = "all"
 
-const INITIAL_MISTAKES = [
-    {
-        mistakeId: 1,
-        question: "Which security principle ensures users receive only the permissions required for their work?",
-        correctAnswer: "Principle of least privilege",
-        learnerAnswer: "Separation of duties",
-        questionType: "MCQ",
-        difficulty: "average",
-        certificationTitle: "IT Passport",
-        lessonTitle: "Information Security",
-        attemptSource: "Lesson Quiz",
-        mistakeCount: 2,
-        masteryStatus: "weak",
-        reviewed: false,
-    },
-    {
-        mistakeId: 2,
-        question: "Explain the difference between authentication and authorization.",
-        correctAnswer:
-            "Authentication verifies identity, while authorization determines permitted actions.",
-        learnerAnswer:
-            "Authentication gives access and authorization confirms the password.",
-        questionType: "DESCRIPTIVE",
-        difficulty: "average",
-        certificationTitle: "IT Passport",
-        lessonTitle: "Access Control",
-        attemptSource: "Middle Exam",
-        mistakeCount: 1,
-        masteryStatus: "developing",
-        reviewed: false,
-    },
-    {
-        mistakeId: 3,
-        question: "Write an SQL query that returns every learner with their organization name.",
-        correctAnswer:
-            "Use a JOIN between learners and organizations using the organization foreign key.",
-        learnerAnswer:
-            "SELECT * FROM learners, organizations;",
-        questionType: "PROGRAMMING",
-        difficulty: "hard",
-        certificationTitle: "TOPCIT",
-        lessonTitle: "SQL Joins",
-        attemptSource: "Mock Exam",
-        mistakeCount: 3,
-        masteryStatus: "weak",
-        reviewed: true,
-    },
-]
-
 const masteryStyles = {
     weak:
         "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
@@ -143,7 +94,7 @@ export default function MistakesBank() {
         return mistakes.filter((mistake) => {
             const matchesSearch =
                 !query ||
-                mistake.question.toLowerCase().includes(query) ||
+                (mistake.question || "").toLowerCase().includes(query) ||
                 (mistake.lessonTitle || "").toLowerCase().includes(query) ||
                 (mistake.certificationTitle || "").toLowerCase().includes(query)
 
@@ -385,7 +336,7 @@ export default function MistakesBank() {
                                                 <span>{mistake.attemptSource}</span>
                                                 <span>·</span>
                                                 <span className="capitalize">
-                            {mistake.difficulty}
+                            {(mistake.difficulty || "").toLowerCase()}
                           </span>
                                             </div>
                                         </td>

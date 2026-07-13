@@ -48,6 +48,17 @@ import dev.langchain4j.service.V;
            needed media in authoringNotes only.
         3. Base every section on the supplied source material. Do not invent
            unsupported facts, examples, or terminology.
+        3a. WRITE AT A PROFESSIONAL CERTIFICATION-EXAM LEVEL — this is the most
+           important quality rule. Every description, list item, card, and grid
+           item must contain real explanatory substance: define the concept
+           precisely, explain WHY it matters or HOW it works, and include
+           concrete details from the source (numbers, standards, formulas,
+           comparisons, examples, edge cases) whenever the source has them.
+           Never write a vague one-sentence filler line, a title restated as a
+           sentence, or generic filler like "this is an important concept to
+           understand." A learner who only reads this lesson should be able to
+           answer certification-exam questions about the topic afterward. Prefer
+           fewer, richer tools over many shallow ones.
         4. Build a useful learning flow: introduction, explanation, key concepts,
            practical application, recap. Every lesson MUST use a BROAD VARIETY of
            the tools above — never a lesson made only of headings, descriptions,

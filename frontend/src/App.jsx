@@ -158,6 +158,10 @@ export function App() {
                     path="/learner/assessments/:examId/history"
                     element={<LearnerAssessmentHistoryPage />}
                 />
+
+                {/* Sprint Challenge destination — the standalone compiler
+                    playground the challenges carousel links to. */}
+                <Route path="/challenges" element={<CompilerArea />} />
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={["ENTERPRISE"]} />}>

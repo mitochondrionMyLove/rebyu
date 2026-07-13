@@ -87,24 +87,37 @@ public class LessonGenerationService {
             List<MultipartFile> files,
             String additionalInstructions
     ) throws IOException {
-        aiUploadValidator.validate(files);
+        // Uploaded files are optional: with none, the lesson is generated from
+        // the certification's indexed knowledge (embeddings) alone, the same
+        // way question generation already supports a file-less mode.
+        List<MultipartFile> uploadedFiles = files == null
+                ? List.of()
+                : files.stream().filter(file -> file != null && !file.isEmpty()).toList();
+
+        if (!uploadedFiles.isEmpty()) {
+            aiUploadValidator.validate(uploadedFiles);
+        }
 
         LessonContext ctx = self.loadLessonContext(lessonId);
         List<String> warnings = new ArrayList<>();
 
         StringBuilder rawText = new StringBuilder();
-        int uploadedFiles = 0;
-        for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
-                uploadedFiles++;
-                rawText.append(documentIngestionService.extractDocumentText(file)).append("\n\n");
-                documentIngestionService.ingest(file, ctx.certId(), KnowledgeDocument.UseCase.LESSON);
-            }
+        for (MultipartFile file : uploadedFiles) {
+            rawText.append(documentIngestionService.extractDocumentText(file)).append("\n\n");
+            documentIngestionService.ingest(file, ctx.certId(), KnowledgeDocument.UseCase.LESSON);
         }
-        aiUploadValidator.requireReadableText(rawText.toString());
+        if (!uploadedFiles.isEmpty()) {
+            aiUploadValidator.requireReadableText(rawText.toString());
+        }
 
         String retrievedKnowledge = retrieveRelatedKnowledge(ctx);
         List<SourceChunk> sourceChunks = buildSourceChunks(rawText.toString(), retrievedKnowledge);
+
+        if (sourceChunks.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "No source material is available for this lesson. Upload a document, "
+                            + "or add and index certification knowledge first.");
+        }
 
         lessonDraftCollector.clear();
         generationExecutionContext.clear();
@@ -158,7 +171,7 @@ public class LessonGenerationService {
                         sections.size(),
                         toolCount,
                         sourceChunks.size(),
-                        uploadedFiles
+                        uploadedFiles.size()
                 ),
                 List.copyOf(warnings)
         );

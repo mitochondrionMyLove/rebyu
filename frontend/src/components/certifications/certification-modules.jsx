@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import AiGenerationProgress from "@/components/commons/ai-generation-progress.jsx"
 import { generateCertificationStructure } from "@/services/certificationService"
 import { mapCertificationToModuleStructure } from "@/utils/certification-structure"
+import { generateContentForAllLessons } from "@/utils/generate-all-lesson-content"
 
 const createId = () =>
     globalThis.crypto?.randomUUID?.() ??
@@ -365,10 +366,12 @@ function CertificationModules({
                                   onChange,
                                   onCreateMiddleExam,
                                   onGenerateForNewCertification,
+                                  onGenerationComplete,
                               }) {
     const [localCategories, setLocalCategories] = useState([])
     const [currentPage, setCurrentPage] = useState("default")
     const [isGeneratingStructure, setIsGeneratingStructure] = useState(false)
+    const [lessonGenerationProgress, setLessonGenerationProgress] = useState(null)
 
     const categories = Array.isArray(value) ? value : localCategories
 
@@ -624,42 +627,69 @@ function CertificationModules({
     const handleGenerateDocuments = async (selectedDocuments) => {
         try {
             setIsGeneratingStructure(true)
+            setLessonGenerationProgress(null)
+
+            let savedCertification = null
 
             if (certificationId != null) {
-
-
-                const savedCertification =
-                    await generateCertificationStructure(
-                        certificationId,
-                        selectedDocuments
-                    )
-
-                updateCategories(
-                    mapCertificationToModuleStructure(savedCertification)
+                savedCertification = await generateCertificationStructure(
+                    certificationId,
+                    selectedDocuments
                 )
-
-                setCurrentPage("default")
-
-                toast.success("Certification structure generated", {
-                    description:
-                        "Categories and lessons were created. Open each lesson to generate and preview its content.",
-                })
-
-                return
+            } else if (onGenerateForNewCertification) {
+                savedCertification =
+                    await onGenerateForNewCertification(selectedDocuments)
+            } else {
+                throw new Error(
+                    "Save the certification first before generating its structure."
+                )
             }
 
-            if (onGenerateForNewCertification) {
-
-
-                await onGenerateForNewCertification(selectedDocuments)
-                return
-            }
-
-            throw new Error(
-                "Save the certification first before generating its structure."
+            // Structure is created; now write and save real content for every
+            // lesson (one at a time, so no single request can time out).
+            const summary = await generateContentForAllLessons(
+                savedCertification,
+                {
+                    onProgress: ({ index, total, lessonName }) =>
+                        setLessonGenerationProgress({ index, total, lessonName }),
+                }
             )
+
+            updateCategories(
+                mapCertificationToModuleStructure(savedCertification)
+            )
+            setCurrentPage("default")
+
+            if (certificationId != null) {
+                if (summary.total === 0) {
+                    toast.success("Certification structure generated", {
+                        description:
+                            "Add lessons, then generate their content individually.",
+                    })
+                } else if (summary.failed === 0) {
+                    toast.success("Certification and lesson content generated", {
+                        description: `${summary.succeeded} lesson${
+                            summary.succeeded === 1 ? "" : "s"
+                        } were written and saved.${
+                            summary.skippedToolCount > 0
+                                ? ` ${summary.skippedToolCount} generated block(s) couldn't be saved and were left out — review lessons for gaps.`
+                                : ""
+                        }`,
+                    })
+                } else {
+                    toast.warning(
+                        "Certification generated with some lessons incomplete",
+                        {
+                            description: `${summary.succeeded} of ${summary.total} lessons were generated. Open these individually to generate: ${summary.failedLessons.join(", ")}`,
+                        }
+                    )
+                }
+            } else {
+                onGenerationComplete?.(summary)
+            }
         } finally {
             setIsGeneratingStructure(false)
+            setLessonGenerationProgress(null)
         }
     }
 
@@ -690,23 +720,49 @@ function CertificationModules({
 
                 <AiGenerationProgress
                     open={isGeneratingStructure}
-                    title="Generating certification structure"
-                    description="Building categories, lessons, and starter content"
+                    title={
+                        lessonGenerationProgress
+                            ? "Generating lesson content"
+                            : "Generating certification structure"
+                    }
+                    description={
+                        lessonGenerationProgress
+                            ? `Lesson ${lessonGenerationProgress.index + 1} of ${lessonGenerationProgress.total}: ${lessonGenerationProgress.lessonName}`
+                            : "Building categories and lessons"
+                    }
                     stepDurationMs={18000}
-                    steps={[
-                        "Reading your documents",
-                        "Planning major categories",
-                        "Creating middle categories and lessons",
-                        "Organizing the curriculum",
-                        "Saving the structure",
-                    ]}
-                    sentences={[
-                        "Planning a curriculum that covers your documents...",
-                        "Creating categories with multiple lessons each...",
-                        "Structuring categories so learners progress logically...",
-                        "You'll generate and preview each lesson's content afterward.",
-                        "Almost done building the structure.",
-                    ]}
+                    steps={
+                        lessonGenerationProgress
+                            ? [
+                                "Reading source material for this lesson",
+                                "Writing in-depth, exam-level content",
+                                "Adding tools and layouts",
+                                "Saving the lesson",
+                            ]
+                            : [
+                                "Reading your documents",
+                                "Planning major categories",
+                                "Creating middle categories and lessons",
+                                "Organizing the curriculum",
+                                "Saving the structure",
+                            ]
+                    }
+                    sentences={
+                        lessonGenerationProgress
+                            ? [
+                                "Writing clear, exam-focused explanations...",
+                                "Adding a mix of tools for each lesson...",
+                                "Certifications with many lessons take a while — thanks for your patience.",
+                                "Each lesson is saved as soon as it's ready.",
+                            ]
+                            : [
+                                "Planning a curriculum that covers your documents...",
+                                "Creating categories with multiple lessons each...",
+                                "Structuring categories so learners progress logically...",
+                                "Lesson content generation starts right after this.",
+                                "Almost done building the structure.",
+                            ]
+                    }
                 />
             </>
         )

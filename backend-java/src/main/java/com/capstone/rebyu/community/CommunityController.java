@@ -4,9 +4,11 @@ import com.capstone.rebyu.auth.dto.CurrentUserDto;
 import com.capstone.rebyu.auth.service.CognitoAuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -15,31 +17,88 @@ import java.util.Map;
 @RequestMapping("/api/community")
 @RequiredArgsConstructor
 public class CommunityController {
+
     private final CommunityService service;
     private final CognitoAuthService auth;
 
     @GetMapping("/posts")
-    public List<CommunityService.Post> posts(@AuthenticationPrincipal Jwt jwt,
-            @RequestParam(required=false) String type, @RequestParam(required=false) String search,
-            @RequestParam(defaultValue="false") boolean saved) { return service.posts(me(jwt), type, search, saved); }
-    @PostMapping("/posts") @ResponseStatus(HttpStatus.CREATED)
-    public CommunityService.Post createPost(@AuthenticationPrincipal Jwt jwt, @RequestBody CommunityService.PostRequest request) { return service.createPost(me(jwt), request); }
-    @DeleteMapping("/posts/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deletePost(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) { service.deletePost(me(jwt), id); }
-    @PostMapping("/posts/{id}/like") public Map<String,Boolean> like(@AuthenticationPrincipal Jwt jwt,@PathVariable Long id){return Map.of("active",service.toggleLike(me(jwt),id));}
-    @PostMapping("/posts/{id}/save") public Map<String,Boolean> save(@AuthenticationPrincipal Jwt jwt,@PathVariable Long id){return Map.of("active",service.toggleSave(me(jwt),id));}
-    @GetMapping("/posts/{id}/comments") public List<CommunityService.Comment> comments(@AuthenticationPrincipal Jwt jwt,@PathVariable Long id){return service.comments(me(jwt),id);}
-    @PostMapping("/posts/{id}/comments") @ResponseStatus(HttpStatus.CREATED)
-    public CommunityService.Comment comment(@AuthenticationPrincipal Jwt jwt,@PathVariable Long id,@RequestBody CommunityService.CommentRequest request){return service.addComment(me(jwt),id,request);}
-    @GetMapping("/circles") public List<CommunityService.Circle> circles(@AuthenticationPrincipal Jwt jwt){return service.circles(me(jwt));}
-    @PostMapping("/circles") @ResponseStatus(HttpStatus.CREATED)
-    public CommunityService.Circle createCircle(@AuthenticationPrincipal Jwt jwt,@RequestBody CommunityService.CircleRequest request){return service.createCircle(me(jwt),request);}
-    @PostMapping("/circles/{id}/membership") public Map<String,Boolean> membership(@AuthenticationPrincipal Jwt jwt,@PathVariable Long id){return Map.of("joined",service.toggleJoin(me(jwt),id));}
+    public List<CommunityService.Post> posts(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean saved) {
+        return service.posts(me(jwt), type, search, saved);
+    }
+
+    @PostMapping("/posts")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommunityService.Post createPost(
+            @AuthenticationPrincipal Jwt jwt, @RequestBody CommunityService.PostRequest request) {
+        return service.createPost(me(jwt), request);
+    }
+
+    /** Upload a PDF/DOCX before creating a post; the returned key is passed as attachmentKey. */
+    @PostMapping(value = "/posts/attachment", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadAttachment(
+            @AuthenticationPrincipal Jwt jwt, @RequestParam("file") MultipartFile file) {
+        me(jwt); // require an authenticated learner even though the upload itself is stateless
+        return Map.of("attachmentKey", service.uploadAttachment(file));
+    }
+
+    @DeleteMapping("/posts/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePost(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        service.deletePost(me(jwt), id);
+    }
+
+    @PostMapping("/posts/{id}/like")
+    public Map<String, Boolean> like(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return Map.of("active", service.toggleLike(me(jwt), id));
+    }
+
+    @PostMapping("/posts/{id}/save")
+    public Map<String, Boolean> save(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return Map.of("active", service.toggleSave(me(jwt), id));
+    }
+
+    @GetMapping("/posts/{id}/comments")
+    public List<CommunityService.Comment> comments(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return service.comments(me(jwt), id);
+    }
+
+    @PostMapping("/posts/{id}/comments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommunityService.Comment comment(
+            @AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+            @RequestBody CommunityService.CommentRequest request) {
+        return service.addComment(me(jwt), id, request);
+    }
+
+    @GetMapping("/circles")
+    public List<CommunityService.Circle> circles(@AuthenticationPrincipal Jwt jwt) {
+        return service.circles(me(jwt));
+    }
+
+    @PostMapping("/circles")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommunityService.Circle createCircle(
+            @AuthenticationPrincipal Jwt jwt, @RequestBody CommunityService.CircleRequest request) {
+        return service.createCircle(me(jwt), request);
+    }
+
+    @PostMapping("/circles/{id}/membership")
+    public Map<String, Boolean> membership(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return Map.of("joined", service.toggleJoin(me(jwt), id));
+    }
 
     private Long me(Jwt jwt) {
-        if (jwt == null) throw new IllegalArgumentException("Authentication is required");
-        CurrentUserDto user=auth.syncCurrentUser(jwt,jwt.getTokenValue());
-        if (user.learnerId()==null) throw new IllegalArgumentException("A learner account is required");
+        if (jwt == null) {
+            throw new IllegalArgumentException("Authentication is required");
+        }
+        CurrentUserDto user = auth.syncCurrentUser(jwt, jwt.getTokenValue());
+        if (user.learnerId() == null) {
+            throw new IllegalArgumentException("A learner account is required");
+        }
         return user.learnerId();
     }
 }
