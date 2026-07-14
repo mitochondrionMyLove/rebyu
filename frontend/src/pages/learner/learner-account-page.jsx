@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import {
   Bell,
   Bot,
+  Award,
   CheckCircle2,
   ChevronRight,
   CircleUserRound,
@@ -48,6 +49,31 @@ function initials(name) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("")
+}
+
+function achievementTitle(achievement) {
+  return achievement?.title ?? achievement?.achievementTitle ?? achievement?.name ?? "Achievement"
+}
+
+function achievementDescription(achievement) {
+  return achievement?.description ?? achievement?.achievementDescription ?? "Learning milestone earned in REBYU."
+}
+
+function achievementImage(achievement) {
+  return achievement?.iconUrl ?? achievement?.imageUrl ?? achievement?.badgeUrl ?? null
+}
+
+function AchievementMark({ achievement }) {
+  const image = achievementImage(achievement)
+  return (
+    <div className="group min-w-0 text-center" title={achievementDescription(achievement)}>
+      <div className="mx-auto flex size-20 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/40 transition group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-md">
+        {image ? <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" /> : <Award className="size-9 text-primary" aria-hidden="true" />}
+      </div>
+      <p className="mt-2 truncate text-xs font-medium text-foreground">{achievementTitle(achievement)}</p>
+      {achievement?.earnedAt ? <p className="mt-0.5 text-[11px] text-muted-foreground">{new Date(achievement.earnedAt).toLocaleDateString()}</p> : null}
+    </div>
+  )
 }
 
 function SectionHeader({ title, description }) {
@@ -116,6 +142,11 @@ export default function LearnerAccountPage() {
 
   const canSave = Boolean(learner?.learnerId && user?.userId)
   const featureList = useMemo(() => [...entitlements.features].sort(), [entitlements.features])
+  const achievements = Array.isArray(data?.latestAchievements)
+    ? data.latestAchievements
+    : Array.isArray(data?.achievements)
+      ? data.achievements
+      : []
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -160,15 +191,28 @@ export default function LearnerAccountPage() {
     if (activeTab === "profile") {
       return (
         <form
-          className="overflow-hidden rounded-md border bg-card shadow-sm"
+          className="border-y border-border/70 bg-background"
           onSubmit={(event) => {
             event.preventDefault()
             saveMutation.mutate()
           }}
         >
-          <SectionHeader title="Public profile" description="Update how your learner identity appears across REBYU." />
-          <div className="grid gap-6 p-5 sm:grid-cols-[1fr_180px] sm:p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+          <SectionHeader title="Profile details" description="Update how your learner identity appears across REBYU." />
+          <div className="p-5 sm:p-6">
+            <section className="border-b border-border/70 pb-6">
+              <div className="flex items-end justify-between gap-4">
+                <div><h3 className="text-base font-semibold">Achievements</h3><p className="mt-1 text-sm text-muted-foreground">Milestones earned through lessons, assessments, and learning streaks.</p></div>
+                <span className="text-sm font-medium text-muted-foreground">{achievements.length} earned</span>
+              </div>
+              {achievements.length ? (
+                <div className="mt-5 grid grid-cols-3 gap-5 sm:grid-cols-5 lg:grid-cols-7">
+                  {achievements.slice(0, 7).map((achievement, index) => <AchievementMark key={achievement.achievementId ?? achievement.id ?? `${achievementTitle(achievement)}-${index}`} achievement={achievement} />)}
+                </div>
+              ) : (
+                <div className="mt-5 flex items-center gap-3 py-3 text-sm text-muted-foreground"><span className="flex size-10 items-center justify-center rounded-full bg-muted"><Award className="size-5" /></span>Complete lessons and assessments to earn your first achievement.</div>
+              )}
+            </section>
+            <div className="mt-6 grid max-w-2xl gap-4 sm:grid-cols-2">
               <label className="space-y-2">
                 <span className="text-sm font-medium">First name</span>
                 <Input value={form.firstName} onChange={(e) => updateField("firstName", e.target.value)} disabled={!canSave} required />
@@ -182,13 +226,6 @@ export default function LearnerAccountPage() {
                 <Input value={form.username} onChange={(e) => updateField("username", e.target.value)} disabled={!canSave} required />
                 <span className="block text-xs text-muted-foreground">Used in community posts and learner activity.</span>
               </label>
-            </div>
-            <div className="flex flex-col items-center border-t pt-5 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
-              <Avatar className="size-24">
-                <AvatarFallback className="bg-primary/10 text-2xl text-primary">{initials(fullName)}</AvatarFallback>
-              </Avatar>
-              <p className="mt-3 text-center text-sm font-semibold">{fullName}</p>
-              <Badge variant="secondary" className="mt-2">Learner</Badge>
             </div>
           </div>
           <div className="flex justify-end border-t bg-muted/20 px-5 py-4 sm:px-6">
@@ -335,19 +372,20 @@ export default function LearnerAccountPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-5">
-      <header className="overflow-hidden rounded-md border bg-card shadow-sm">
-        <div className="flex items-center gap-3 px-4 py-4 sm:px-5">
-          <Avatar className="size-11">
-            <AvatarFallback className="bg-primary/10 text-primary">{initials(fullName)}</AvatarFallback>
+    <div className="mx-auto w-full max-w-6xl space-y-6">
+      <header className="border-b border-border/70">
+        <div className="flex flex-col gap-5 pb-6 sm:flex-row sm:items-center">
+          <Avatar className="size-24 border border-border shadow-sm">
+            <AvatarFallback className="bg-primary/10 text-2xl font-semibold text-primary">{initials(fullName)}</AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{fullName}</p>
-            <p className="truncate text-xs text-muted-foreground">{user?.email || "Learner account"}</p>
+            <p className="truncate font-heading text-2xl font-semibold tracking-tight">{fullName}</p>
+            <p className="mt-1 truncate text-base text-muted-foreground">@{learner?.username || "learner"}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2"><Badge variant="secondary">Learner</Badge><span className="text-sm text-muted-foreground">{user?.email || "Learner account"}</span></div>
           </div>
         </div>
 
-        <nav className="flex overflow-x-auto border-t px-2" aria-label="Account settings">
+        <nav className="flex overflow-x-auto" aria-label="Account settings">
           {ACCOUNT_TABS.map((tab) => {
             const Icon = tab.icon
             const active = activeTab === tab.id

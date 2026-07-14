@@ -40,9 +40,12 @@ import java.util.UUID;
 
 /**
  * Parses the lesson assistant's JSON response into editable draft sections,
- * mapping each tool into the exact frontend {type, data} shape. Media fields
- * are always forced empty because media is admin-controlled. Unknown tool
- * types are skipped with a warning rather than failing the batch.
+ * mapping each tool into the exact frontend {type, data} shape. Media-carrying
+ * tools pass through whatever imageKey/videoKey the model returned as-is;
+ * only a server-computed trusted set of keys survives sanitization downstream
+ * (see LessonGenerationService), so an untrusted or invented key here is
+ * harmless. Unknown tool types are skipped with a warning rather than failing
+ * the batch.
  */
 @Slf4j
 @Component
@@ -201,35 +204,56 @@ public class LessonDraftJsonParser {
                         new AccordionToolDataDto(accordionItems(data)), notes);
                 case "flip-grid" -> tool(id, "flip-grid",
                         new FlipGridToolDataDto(flipCards(data)), notes);
-                case "image-left-text" -> tool(id, "image-left-text",
-                        ImageLeftTextToolDataDto.draft(
-                                requireText(data, "image-left-text", "title"),
-                                requireText(data, "image-left-text", "description", "text")),
-                        notesOrDefault(notes));
-                case "image-right-text" -> tool(id, "image-right-text",
-                        ImageRightTextToolDataDto.draft(
-                                requireText(data, "image-right-text", "title"),
-                                requireText(data, "image-right-text", "description", "text")),
-                        notesOrDefault(notes));
-                case "image" -> tool(id, "image", ImageToolDataDto.draft(), notesOrDefault(notes));
-                case "video" -> tool(id, "video", VideoToolDataDto.draft(), notesOrDefault(notes));
-                case "intro-image-card" -> tool(id, "intro-image-card",
-                        IntroImageCardToolDataDto.draft(
-                                requireText(data, "intro-image-card", "smallHeader", "header", "title"),
-                                requireText(data, "intro-image-card", "description", "text")),
-                        notesOrDefault(notes));
+                case "image-left-text" -> {
+                    String imageKey = mediaKey(data, "imageKey", "image_key", "imageId");
+                    yield tool(id, "image-left-text",
+                            ImageLeftTextToolDataDto.draft(
+                                    requireText(data, "image-left-text", "title"),
+                                    requireText(data, "image-left-text", "description", "text"),
+                                    imageKey),
+                            notesOrDefault(notes, imageKey));
+                }
+                case "image-right-text" -> {
+                    String imageKey = mediaKey(data, "imageKey", "image_key", "imageId");
+                    yield tool(id, "image-right-text",
+                            ImageRightTextToolDataDto.draft(
+                                    requireText(data, "image-right-text", "title"),
+                                    requireText(data, "image-right-text", "description", "text"),
+                                    imageKey),
+                            notesOrDefault(notes, imageKey));
+                }
+                case "image" -> {
+                    String imageKey = mediaKey(data, "imageKey", "image_key", "imageId");
+                    yield tool(id, "image", ImageToolDataDto.draft(imageKey), notesOrDefault(notes, imageKey));
+                }
+                case "video" -> {
+                    String videoKey = mediaKey(data, "videoKey", "video_key", "videoId");
+                    yield tool(id, "video", VideoToolDataDto.draft(videoKey), notesOrDefault(notes, videoKey));
+                }
+                case "intro-image-card" -> {
+                    String imageKey = mediaKey(data, "imageKey", "image_key", "imageId");
+                    yield tool(id, "intro-image-card",
+                            IntroImageCardToolDataDto.draft(
+                                    requireText(data, "intro-image-card", "smallHeader", "header", "title"),
+                                    requireText(data, "intro-image-card", "description", "text"),
+                                    imageKey),
+                            notesOrDefault(notes, imageKey));
+                }
                 case "header-description-grid" -> tool(id, "header-description-grid",
                         new HeaderDescriptionGridToolDataDto(
                                 requireText(data, "header-description-grid", "smallHeader", "header", "title"),
                                 requireText(data, "header-description-grid", "description", "text"),
                                 gridItems(data)),
                         notes);
-                case "image-feature-grid" -> tool(id, "image-feature-grid",
-                        ImageFeatureGridToolDataDto.draft(
-                                requireText(data, "image-feature-grid", "smallHeader", "header", "title"),
-                                requireText(data, "image-feature-grid", "description", "text"),
-                                gridItems(data)),
-                        notesOrDefault(notes));
+                case "image-feature-grid" -> {
+                    String imageKey = mediaKey(data, "imageKey", "image_key", "imageId");
+                    yield tool(id, "image-feature-grid",
+                            ImageFeatureGridToolDataDto.draft(
+                                    requireText(data, "image-feature-grid", "smallHeader", "header", "title"),
+                                    requireText(data, "image-feature-grid", "description", "text"),
+                                    gridItems(data), imageKey),
+                            notesOrDefault(notes, imageKey));
+                }
                 case "review-card-grid" -> tool(id, "review-card-grid",
                         new ReviewCardGridToolDataDto(
                                 requireText(data, "review-card-grid", "smallHeader", "header", "title"),
@@ -372,11 +396,13 @@ public class LessonDraftJsonParser {
         layout = "image-right".equalsIgnoreCase(layout == null ? "" : layout.trim()) ? "image-right" : "image-left";
         String supportingTitle = text(data, "supportingTitle", "mediaTitle", "caption");
         String supportingDescription = text(data, "supportingDescription", "mediaDescription");
+        String imageKey = mediaKey(data, "imageKey", "image_key", "imageId");
+        String videoKey = mediaKey(data, "videoKey", "video_key", "videoId");
         return MediaTextBlockToolDataDto.draft(
                 smallHeader, description,
                 supportingTitle == null ? "" : supportingTitle.trim(),
                 supportingDescription == null ? "" : supportingDescription.trim(),
-                mediaType, layout);
+                mediaType, layout, imageKey, videoKey);
     }
 
     // ---- JSON helpers ------------------------------------------------------
@@ -471,9 +497,24 @@ public class LessonDraftJsonParser {
     }
 
     private String notesOrDefault(String notes) {
-        return isBlank(notes)
+        return notesOrDefault(notes, null);
+    }
+
+    /**
+     * Media-carrying tools only need the "upload media" nudge when no key was
+     * actually resolved for them; a tool that already has a linked imageKey
+     * or videoKey shouldn't tell the admin to go upload something manually.
+     */
+    private String notesOrDefault(String notes, String resolvedMediaKey) {
+        if (!isBlank(notes)) return notes.trim();
+        return isBlank(resolvedMediaKey)
                 ? "Upload the appropriate media and review before saving."
-                : notes.trim();
+                : "Media sourced from certification content; review before publishing.";
+    }
+
+    private String mediaKey(JsonNode data, String... keys) {
+        String value = text(data, keys);
+        return isBlank(value) ? null : value.trim();
     }
 
     private boolean isBlank(String value) {

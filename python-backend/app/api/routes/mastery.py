@@ -5,15 +5,16 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.core.security import require_service_key
-from app.db.models import BktMasteryEvent, LearnerLessonMastery
+from app.db.models import BktMasteryEvent, LearnerLessonMastery, LearnerLessonMasteryHistory
 from app.db.session import get_db
-from app.repositories.bkt import list_learner_mastery
+from app.repositories.bkt import list_learner_mastery, list_mastery_history
 from app.schemas.mastery import (
     LearnerLessonMasteryResponse,
     LearnerMasteryListResponse,
     MasteryEventBatchCreate,
     MasteryEventCreate,
     MasteryEventResponse,
+    MasteryHistoryResponse,
 )
 from app.services.mastery_service import process_mastery_event
 
@@ -75,6 +76,19 @@ def get_lesson_mastery(
     if mastery is None:
         raise HTTPException(status_code=404, detail="Mastery record not found")
     return mastery
+
+
+@router.get(
+    "/learners/{learner_id}/certifications/{certification_id}/history",
+    response_model=list[MasteryHistoryResponse],
+)
+def get_mastery_history(
+    learner_id: int,
+    certification_id: int,
+    limit: int = Query(default=100, le=500),
+    db: Session = Depends(get_db),
+) -> list[LearnerLessonMasteryHistory]:
+    return list_mastery_history(db, learner_id, certification_id, limit=limit)
 
 
 @router.delete(

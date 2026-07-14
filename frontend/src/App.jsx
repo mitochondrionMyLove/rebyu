@@ -24,6 +24,7 @@ const AcceptEnterpriseInvitationPage = lazy(() => import("./pages/admin/AcceptEn
 const LandingPage = lazy(() => import("./pages/public/LandingPage"))
 const CreateLessons = lazy(() => import("./pages/admin/CreateLessons"))
 const LearnerProgressPage = lazy(() => import("./pages/learner/learner-progress-page.jsx"))
+const LearnerStudyPlanCalendarPage = lazy(() => import("./components/learner/learner-study-plan-modal.jsx"))
 const LearnerLearningPage = lazy(() => import("./pages/learner/learner-learning-page.jsx"))
 const LearnerDiagnosticGatePage = lazy(() => import("./pages/learner/learner-diagnostic-page.jsx"))
 const LearnerLessonPage = lazy(() => import("./pages/learner/learner-lesson-page.jsx"))
@@ -36,7 +37,6 @@ const LearnerAccountPage = lazy(() => import("./pages/learner/learner-account-pa
 const LearnerAssessmentAttemptPage = lazy(() => import("./pages/learner/learner-assessment-attempt-page.jsx"))
 const LearnerAssessmentResultPage = lazy(() => import("./pages/learner/learner-assessment-result-page.jsx"))
 const LearnerAssessmentHistoryPage = lazy(() => import("./pages/learner/learner-assessment-history-page.jsx"))
-const LearningStudyPlan = lazy(() => import("./pages/learner/learner-study-plan.jsx"))
 const MistakesBank = lazy(() => import("./pages/learner/learner-mistakes-bank.jsx"))
 const Community = lazy(() => import("./pages/learner/learner-community-qa.jsx"))
 const EnterpriseDashboardPage = lazy(() => import("./pages/enterprise/enterprise-dashboard-page.jsx"))
@@ -70,17 +70,31 @@ function RoleHomeRedirect() {
     return <Navigate to="/login" replace />
 }
 
+function GuestOnlyRoute({ children }) {
+    const { user, status } = useAuth()
+
+    if (status === "loading") {
+        return null
+    }
+
+    if (status === "authenticated") {
+        return <Navigate to={roleHomePath(user?.role)} replace />
+    }
+
+    return children
+}
+
 export function App() {
     return (
       <Suspense fallback={null}>
         <Routes>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<GuestOnlyRoute><LandingPage /></GuestOnlyRoute>} />
             <Route path="/welcome" element={<Navigate to="/" replace />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/set-new-password" element={<SetNewPasswordPage />} />
+            <Route path="/login" element={<GuestOnlyRoute><LoginPage /></GuestOnlyRoute>} />
+            <Route path="/register" element={<GuestOnlyRoute><RegisterPage /></GuestOnlyRoute>} />
+            <Route path="/verify-email" element={<GuestOnlyRoute><VerifyEmailPage /></GuestOnlyRoute>} />
+            <Route path="/forgot-password" element={<GuestOnlyRoute><ForgotPasswordPage /></GuestOnlyRoute>} />
+            <Route path="/set-new-password" element={<GuestOnlyRoute><SetNewPasswordPage /></GuestOnlyRoute>} />
 
             {/* Public: organization representatives request Enterprise access with no account. */}
             <Route
@@ -113,7 +127,8 @@ export function App() {
 
             <Route element={<ProtectedRoute allowedRoles={["LEARNER"]} />}>
                 <Route path="/learner" element={<LearnerLayout />}>
-                    <Route index element={<Navigate to="progress" replace />} />
+                    <Route index element={<Navigate to="analytics" replace />} />
+                    <Route path="analytics" element={<LearnerProgressPage />} />
                     <Route path="progress" element={<LearnerProgressPage />} />
                     <Route path="learning" element={<LearnerLearningPage />} />
 
@@ -128,7 +143,7 @@ export function App() {
                         element={<LearnerLearningPage />}
                     />
                     <Route path="lessons/:lessonId" element={<LearnerLessonPage />} />
-                    <Route path="plan" element={<LearningStudyPlan />} />
+                    <Route path="plan" element={<LearnerStudyPlanCalendarPage />} />
                     <Route
                         path="certifications"
                         element={<LearnerCertificationsPage />}

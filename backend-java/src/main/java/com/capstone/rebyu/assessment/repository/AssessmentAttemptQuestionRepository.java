@@ -10,4 +10,7 @@ public interface AssessmentAttemptQuestionRepository
 
     List<AssessmentAttemptQuestion> findByAttempt_AssessmentAttemptIdOrderByDisplayOrderAsc(
             Long assessmentAttemptId);
+
+    List<AssessmentAttemptQuestion> findByAttempt_AssessmentAttemptIdIn(
+            List<Long> assessmentAttemptIds);
 }

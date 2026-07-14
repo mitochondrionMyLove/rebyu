@@ -1,24 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate, useOutletContext } from "react-router-dom"
-import { Award, ChevronDown, ExternalLink } from "lucide-react"
+import { Award, ExternalLink } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LearnerEmptyState } from "@/components/learner/learner-ui.jsx"
 import { getFileViewUrl } from "@/services/fileService.js"
+import { getCertificationFallbackImage, getCuratedCertificationCover } from "@/lib/certification-cover-images.js"
 
 const INITIAL_VISIBLE_COUNT = 8
 const LOAD_MORE_COUNT = 8
 
-const DEFAULT_IMAGE =
-    "https://www.eclosio.ong/wp-content/uploads/2018/08/default.png"
-
 const CATEGORY_STYLES = [
-  "bg-violet-100 text-violet-700",
+  "bg-blue-100 text-blue-700",
   "bg-sky-100 text-sky-700",
   "bg-emerald-100 text-emerald-700",
   "bg-amber-100 text-amber-700",
   "bg-rose-100 text-rose-700",
-  "bg-indigo-100 text-indigo-700",
+  "bg-yellow-100 text-yellow-800",
 ]
 
 function getCertificationId(certification) {
@@ -41,14 +40,18 @@ function getCertificationDescription(certification) {
 }
 
 function getCertificationImageUrl(certification) {
+  const curatedCover = getCuratedCertificationCover(getCertificationTitle(certification))
+  if (curatedCover) return curatedCover
+
+  const fallbackImage = getCertificationFallbackImage(getCertificationTitle(certification))
   if (!certification?.imageKey) {
-    return DEFAULT_IMAGE
+    return fallbackImage
   }
 
   try {
-    return getFileViewUrl(certification.imageKey) || DEFAULT_IMAGE
+    return getFileViewUrl(certification.imageKey) || fallbackImage
   } catch {
-    return DEFAULT_IMAGE
+    return fallbackImage
   }
 }
 
@@ -447,23 +450,22 @@ export default function LearnerCertificationsPage() {
                 {filteredCertifications.length === 1 ? "" : "s"}
               </p>
 
-              <label className="relative flex items-center">
+              <div className="flex items-center">
               <span className="mr-2 whitespace-nowrap text-sm text-muted-foreground">
                 Sort by
               </span>
 
-                <select
-                    value={sortBy}
-                    onChange={(event) => setSortBy(event.target.value)}
-                    className="h-10 appearance-none rounded-lg border border-border bg-card px-3 pr-10 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-                >
-                  <option value="popular">Popular</option>
-                  <option value="title-asc">Name: A–Z</option>
-                  <option value="title-desc">Name: Z–A</option>
-                </select>
-
-                <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" />
-              </label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue aria-label="Sort certifications" />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    <SelectItem value="popular">Popular</SelectItem>
+                    <SelectItem value="title-asc">Name: A–Z</SelectItem>
+                    <SelectItem value="title-desc">Name: Z–A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {visibleCertifications.length === 0 ? (

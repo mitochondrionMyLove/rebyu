@@ -17,7 +17,10 @@ import java.util.Set;
 @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class LessonGenerationExecutionContext {
 
-    public record SourceChunk(String id, String text) {
+    public record SourceChunk(String id, String text, Set<String> imageKeys) {
+        public SourceChunk(String id, String text) {
+            this(id, text, Set.of());
+        }
     }
 
     private final Map<String, SourceChunk> sourceChunks = new LinkedHashMap<>();
@@ -72,6 +75,16 @@ public class LessonGenerationExecutionContext {
 
     public Set<String> chunkIds() {
         return Set.copyOf(sourceChunks.keySet());
+    }
+
+    public Set<String> allImageKeys() {
+        Set<String> keys = new java.util.LinkedHashSet<>();
+        for (SourceChunk chunk : sourceChunks.values()) {
+            if (chunk.imageKeys() != null) {
+                keys.addAll(chunk.imageKeys());
+            }
+        }
+        return keys;
     }
 
     public void clear() {

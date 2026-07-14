@@ -1,13 +1,10 @@
 import * as React from "react"
 import {
   AwardIcon,
-  BarChart3Icon,
   BookOpenCheckIcon,
   BrainCircuitIcon,
-  CalendarDaysIcon,
   CircleAlertIcon,
   CrownIcon,
-  FilesIcon,
   MessagesSquareIcon,
   SwordsIcon,
 } from "lucide-react"
@@ -28,16 +25,6 @@ const learnerNav = {
   main: {
     name: "Learning",
     items: [
-      {
-        name: "Progress",
-        url: "/learner/progress",
-        icon: BarChart3Icon,
-      },
-      {
-        name: "Study Plan",
-        url: "/learner/plan",
-        icon: CalendarDaysIcon,
-      },
       {
         name: "Certifications",
         url: "/learner/certifications",
@@ -67,11 +54,6 @@ const learnerNav = {
   pages: {
     name: "Resources",
     items: [
-      {
-        name: "Library",
-        url: "/learner/library",
-        icon: FilesIcon,
-      },
       {
         name: "Mistakes Bank",
         url: "/learner/mistakes",

@@ -102,8 +102,8 @@ export default function AcceptEnterpriseInvitationPage() {
 
   if (!hasValidToken) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-5 py-10">
-        <section className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-7 text-center shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-[#F6F9FC] px-5 py-10">
+        <section className="w-full max-w-md rounded-xl border border-[#E0E7EF] bg-white p-8 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-red-50">
             <CircleAlert className="size-6 text-red-600" />
           </div>
@@ -129,8 +129,8 @@ export default function AcceptEnterpriseInvitationPage() {
 
   if (accepted) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-5 py-10">
-        <section className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-7 text-center shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-[#F6F9FC] px-5 py-10">
+        <section className="w-full max-w-md rounded-xl border border-[#E0E7EF] bg-white p-8 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
             <CheckCircle2 className="size-6 text-primary" />
           </div>
@@ -154,9 +154,9 @@ export default function AcceptEnterpriseInvitationPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-5 py-10">
-      <section className="w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="border-b border-zinc-100 bg-primary/5 px-7 py-8 text-center">
+    <main className="flex min-h-screen items-center justify-center bg-[#F6F9FC] px-5 py-10">
+      <section className="w-full max-w-md overflow-hidden rounded-xl border border-[#E0E7EF] bg-white">
+        <div className="border-b border-[#E0E7EF] bg-[#EAF3FA] px-8 py-9 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
             <Mail className="size-6 text-primary" />
           </div>
@@ -172,8 +172,8 @@ export default function AcceptEnterpriseInvitationPage() {
           </p>
         </div>
 
-        <div className="p-7">
-          <div className="flex gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+        <div className="p-8">
+          <div className="flex gap-3 border-y border-[#E0E7EF] bg-[#F6F9FC] p-4">
             <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
             <div>
               <p className="text-sm font-semibold text-zinc-900">

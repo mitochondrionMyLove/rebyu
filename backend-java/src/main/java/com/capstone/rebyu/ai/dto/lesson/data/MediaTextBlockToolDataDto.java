@@ -21,4 +21,17 @@ public record MediaTextBlockToolDataDto(
                 null, "", "", supportingTitle, supportingDescription, layout
         );
     }
+
+    public static MediaTextBlockToolDataDto draft(
+            String smallHeader, String description,
+            String supportingTitle, String supportingDescription,
+            String mediaType, String layout,
+            String imageKey, String videoKey
+    ) {
+        return new MediaTextBlockToolDataDto(
+                smallHeader, description, mediaType,
+                null, imageKey == null ? "" : imageKey, videoKey == null ? "" : videoKey,
+                supportingTitle, supportingDescription, layout
+        );
+    }
 }

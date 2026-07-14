@@ -149,6 +149,6 @@ export function roleHomePath(role) {
     case "ENTERPRISE":
       return "/enterprise/dashboard"
     default:
-      return "/learner/progress"
+      return "/learner/analytics"
   }
 }

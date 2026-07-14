@@ -81,3 +81,20 @@ class LearnerMasteryListResponse(BaseModel):
     items: list[LearnerLessonMasteryResponse]
     total: int
     average_mastery_probability: float
+
+
+class MasteryHistoryResponse(BaseModel):
+    mastery_history_id: str
+    learner_id: int
+    certification_id: int | None
+    lesson_id: int
+    previous_mastery: float
+    final_mastery: float
+    previous_mastery_level: str | None
+    new_mastery_level: str
+    observed_correct: bool
+    assessment_type: str
+    difficulty_level: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

@@ -59,8 +59,8 @@ function ChartTooltip({ active, payload, label, suffix = "%" }) {
 
     return (
         <div className="rounded-lg border border-[#DCE4EF] bg-white px-3 py-2 shadow-[0_10px_26px_rgba(11,31,58,0.12)]">
-            <p className="text-[11px] font-semibold text-[#6A7A91]">{label}</p>
-            <p className="mt-0.5 text-sm font-bold text-[#0B1F3A]">
+            <p className="text-[11px] font-semibold text-[#66758A]">{label}</p>
+            <p className="mt-0.5 text-sm font-bold text-[#273452]">
                 {payload[0].value}
                 {suffix}
             </p>
@@ -203,13 +203,13 @@ export function ReadinessTrendChart({ className = "h-48" }) {
                 >
                     <defs>
                         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="8%" stopColor="#275DF5" stopOpacity={0.26} />
-                            <stop offset="92%" stopColor="#275DF5" stopOpacity={0.02} />
+                            <stop offset="8%" stopColor="#2F7DD3" stopOpacity={0.26} />
+                            <stop offset="92%" stopColor="#2F7DD3" stopOpacity={0.02} />
                         </linearGradient>
                     </defs>
                     <CartesianGrid
                         vertical={false}
-                        stroke="#E7EDF5"
+                        stroke="#E0E7EF"
                         strokeDasharray="4 5"
                     />
                     <XAxis
@@ -217,7 +217,7 @@ export function ReadinessTrendChart({ className = "h-48" }) {
                         axisLine={false}
                         tickLine={false}
                         interval="preserveStartEnd"
-                        tick={{ fontSize: 10, fill: "#6B7C93" }}
+                        tick={{ fontSize: 10, fill: "#66758A" }}
                         tickMargin={10}
                     />
                     <YAxis hide domain={[0, 100]} />
@@ -228,11 +228,11 @@ export function ReadinessTrendChart({ className = "h-48" }) {
                     <Area
                         type="monotone"
                         dataKey="score"
-                        stroke="#275DF5"
+                        stroke="#2F7DD3"
                         strokeWidth={3}
                         fill={`url(#${gradientId})`}
-                        dot={{ r: 3, fill: "#FFFFFF", stroke: "#275DF5", strokeWidth: 2 }}
-                        activeDot={{ r: 5, fill: "#275DF5", stroke: "#FFFFFF", strokeWidth: 2 }}
+                        dot={{ r: 3, fill: "#FFFFFF", stroke: "#2F7DD3", strokeWidth: 2 }}
+                        activeDot={{ r: 5, fill: "#2F7DD3", stroke: "#FFFFFF", strokeWidth: 2 }}
                         isAnimationActive={false}
                     />
                 </AreaChart>
@@ -254,7 +254,7 @@ export function TopicMasteryChart({ className = "h-52" }) {
                 >
                     <CartesianGrid
                         horizontal={false}
-                        stroke="#E7EDF5"
+                        stroke="#E0E7EF"
                         strokeDasharray="4 5"
                     />
                     <XAxis type="number" hide domain={[0, 100]} />
@@ -279,7 +279,7 @@ export function TopicMasteryChart({ className = "h-52" }) {
                         {topicMasteryData.map((entry) => (
                             <Cell
                                 key={entry.topic}
-                                fill={entry.mastery < 60 ? "#E88962" : "#275DF5"}
+                                fill={entry.mastery < 60 ? "#D4A72C" : "#2F7DD3"}
                             />
                         ))}
                     </Bar>
@@ -303,19 +303,19 @@ export function StudyConsistencyChart({ className = "h-44" }) {
                     <defs>
                         <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
                             <stop offset="0%" stopColor="#7C9BFF" />
-                            <stop offset="100%" stopColor="#275DF5" />
+                            <stop offset="100%" stopColor="#2F7DD3" />
                         </linearGradient>
                     </defs>
                     <CartesianGrid
                         vertical={false}
-                        stroke="#E7EDF5"
+                        stroke="#E0E7EF"
                         strokeDasharray="4 5"
                     />
                     <XAxis
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 10, fill: "#6B7C93" }}
+                        tick={{ fontSize: 10, fill: "#66758A" }}
                         tickMargin={8}
                     />
                     <YAxis hide domain={[0, 70]} />
@@ -328,8 +328,8 @@ export function StudyConsistencyChart({ className = "h-44" }) {
                         dataKey="minutes"
                         stroke={`url(#${gradientId})`}
                         strokeWidth={3}
-                        dot={{ r: 3, fill: "#FFFFFF", stroke: "#275DF5", strokeWidth: 2 }}
-                        activeDot={{ r: 5, fill: "#275DF5", stroke: "#FFFFFF", strokeWidth: 2 }}
+                        dot={{ r: 3, fill: "#FFFFFF", stroke: "#2F7DD3", strokeWidth: 2 }}
+                        activeDot={{ r: 5, fill: "#2F7DD3", stroke: "#FFFFFF", strokeWidth: 2 }}
                         isAnimationActive={false}
                     />
                 </LineChart>
@@ -350,7 +350,7 @@ export function AssessmentPerformanceChart({ className = "h-48" }) {
                 >
                     <CartesianGrid
                         vertical={false}
-                        stroke="#E7EDF5"
+                        stroke="#E0E7EF"
                         strokeDasharray="4 5"
                     />
                     <XAxis
@@ -358,7 +358,7 @@ export function AssessmentPerformanceChart({ className = "h-48" }) {
                         axisLine={false}
                         tickLine={false}
                         interval={0}
-                        tick={{ fontSize: 9, fill: "#6B7C93" }}
+                        tick={{ fontSize: 9, fill: "#66758A" }}
                         tickMargin={9}
                     />
                     <YAxis hide domain={[0, 100]} />
@@ -368,7 +368,7 @@ export function AssessmentPerformanceChart({ className = "h-48" }) {
                     />
                     <Bar
                         dataKey="score"
-                        fill="#275DF5"
+                        fill="#2F7DD3"
                         radius={[5, 5, 0, 0]}
                         barSize={30}
                         isAnimationActive={false}
@@ -382,7 +382,7 @@ export function AssessmentPerformanceChart({ className = "h-48" }) {
 export function ReadinessRadialChart({ value = 84, className = "h-40 w-40" }) {
     const containerRef = useRef(null);
     const valueRef = useRef(null);
-    const data = [{ name: "Readiness", value, fill: "#275DF5" }];
+    const data = [{ name: "Readiness", value, fill: "#2F7DD3" }];
 
     useLayoutEffect(() => {
         const root = containerRef.current;
@@ -485,11 +485,11 @@ export function ReadinessRadialChart({ value = 84, className = "h-40 w-40" }) {
             <div className="relative flex flex-col items-center justify-center">
         <span
             ref={valueRef}
-            className="text-3xl font-bold tracking-tight text-[#0B1F3A]"
+            className="text-3xl font-bold tracking-tight text-[#273452]"
         >
           0%
         </span>
-                <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6B7C93]">
+                <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#66758A]">
           Ready
         </span>
             </div>

@@ -12,4 +12,8 @@ public record ImageFeatureGridToolDataDto(
     public static ImageFeatureGridToolDataDto draft(String smallHeader, String description, List<GridItemDataDto> gridItems) {
         return new ImageFeatureGridToolDataDto(smallHeader, description, null, "", gridItems);
     }
+
+    public static ImageFeatureGridToolDataDto draft(String smallHeader, String description, List<GridItemDataDto> gridItems, String imageKey) {
+        return new ImageFeatureGridToolDataDto(smallHeader, description, null, imageKey == null ? "" : imageKey, gridItems);
+    }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { AlertCircle, Loader2, LogIn } from "lucide-react"
@@ -13,12 +13,18 @@ import AuthShell from "./auth-shell.jsx"
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, user, status } = useAuth()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
+
+  useEffect(() => {
+    if (status === "authenticated" && user?.role) {
+      navigate(roleHomePath(user.role), { replace: true })
+    }
+  }, [navigate, status, user?.role])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -135,6 +141,10 @@ export default function LoginPage() {
     } finally {
       setPending(false)
     }
+  }
+
+  if (status === "loading" || status === "authenticated") {
+    return null
   }
 
   return (

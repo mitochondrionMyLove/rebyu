@@ -1,8 +1,12 @@
 package com.capstone.rebyu.bkt.client;
 
 import com.capstone.rebyu.bkt.dto.BktMasteryEventBatch;
+import com.capstone.rebyu.bkt.dto.ConfidenceView;
 import com.capstone.rebyu.bkt.dto.LearnerMasteryView;
+import com.capstone.rebyu.bkt.dto.LessonPriorityView;
+import com.capstone.rebyu.bkt.dto.MasteryHistoryView;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -87,6 +91,53 @@ public class BktClient {
     public Map<String, Object> getConfidence(Long learnerId, Long certificationId) {
         return getMap("/priorities/learners/" + learnerId + "/certifications/"
                 + certificationId + "/confidence", "load confidence");
+    }
+
+    /** Typed lesson-level priorities for a learner + certification. */
+    public List<LessonPriorityView> getLessonPriorities(Long learnerId, Long certificationId) {
+        try {
+            return webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/priorities/learners/{learnerId}/certifications/{certificationId}/lessons")
+                            .build(learnerId, certificationId))
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<List<LessonPriorityView>>() {
+                    })
+                    .block();
+        } catch (Exception e) {
+            throw new BktServiceException("Could not load lesson priorities for learner " + learnerId, e);
+        }
+    }
+
+    /** Typed certification confidence summary for a learner. */
+    public ConfidenceView getConfidenceView(Long learnerId, Long certificationId) {
+        try {
+            return webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/priorities/learners/{learnerId}/certifications/{certificationId}/confidence")
+                            .build(learnerId, certificationId))
+                    .retrieve()
+                    .bodyToMono(ConfidenceView.class)
+                    .block();
+        } catch (Exception e) {
+            throw new BktServiceException("Could not load confidence view for learner " + learnerId, e);
+        }
+    }
+
+    /** Mastery history events for a learner + certification. */
+    public List<MasteryHistoryView> getMasteryHistory(Long learnerId, Long certificationId) {
+        try {
+            return webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/mastery/learners/{learnerId}/certifications/{certificationId}/history")
+                            .build(learnerId, certificationId))
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<List<MasteryHistoryView>>() {
+                    })
+                    .block();
+        } catch (Exception e) {
+            throw new BktServiceException("Could not load mastery history for learner " + learnerId, e);
+        }
     }
 
     @SuppressWarnings("unchecked")

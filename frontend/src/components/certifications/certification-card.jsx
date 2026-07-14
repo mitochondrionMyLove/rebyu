@@ -18,6 +18,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { getFileViewUrl } from "@/services/fileService.js"
+import { getCertificationFallbackImage, getCuratedCertificationCover } from "@/lib/certification-cover-images.js"
 import {
   deleteCertification,
   publishCertification,
@@ -34,9 +35,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-
-const DEFAULT_IMAGE =
-    "https://www.eclosio.ong/wp-content/uploads/2018/08/default.png"
 
 function getErrorMessage(error, fallback = "Something went wrong.") {
   const responseData = error?.response?.data
@@ -90,7 +88,9 @@ function CertificationCard({ item, certification }) {
       String(certificationStatus ?? "").toUpperCase() === "ACTIVE"
 
   const imageKey = currentCertification?.imageKey ?? item?.imageKey
-  const imageUrl = imageKey ? getFileViewUrl(imageKey) : DEFAULT_IMAGE
+  const fallbackImage = getCertificationFallbackImage(certificationTitle)
+  const curatedCover = getCuratedCertificationCover(certificationTitle)
+  const imageUrl = curatedCover ?? (imageKey ? getFileViewUrl(imageKey) : fallbackImage)
 
   const { mutate: removeCertification, isPending: isDeleting } = useMutation({
     mutationFn: async () => {
@@ -240,7 +240,7 @@ function CertificationCard({ item, certification }) {
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 onError={(event) => {
                   event.currentTarget.onerror = null
-                  event.currentTarget.src = DEFAULT_IMAGE
+                  event.currentTarget.src = fallbackImage
                 }}
                 loading="eager"
             />

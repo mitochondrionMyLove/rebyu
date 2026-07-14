@@ -3,7 +3,10 @@ package com.capstone.rebyu.bkt.service;
 import com.capstone.rebyu.bkt.client.BktClient;
 import com.capstone.rebyu.bkt.client.BktServiceException;
 import com.capstone.rebyu.bkt.config.BktProperties;
+import com.capstone.rebyu.bkt.dto.ConfidenceView;
 import com.capstone.rebyu.bkt.dto.LearnerMasteryView;
+import com.capstone.rebyu.bkt.dto.LessonPriorityView;
+import com.capstone.rebyu.bkt.dto.MasteryHistoryView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Service
 public class LearnerMasteryService {
+
+    public record LessonPrioritiesResult(List<LessonPriorityView> lessons, boolean available) {
+    }
+
+    public record ConfidenceResult(ConfidenceView confidence, boolean available) {
+    }
+
+    public record MasteryHistoryResult(List<MasteryHistoryView> history, boolean available) {
+    }
 
     private final BktClient bktClient;
     private final BktProperties properties;
@@ -78,6 +90,45 @@ public class LearnerMasteryService {
         } catch (BktServiceException e) {
             log.warn("Confidence unavailable for learner {}: {}", learnerId, e.getMessage());
             return Map.of("status", "TEMPORARILY_UNAVAILABLE");
+        }
+    }
+
+    public LessonPrioritiesResult getLessonPrioritiesForAnalytics(Long learnerId, Long certificationId) {
+        if (!properties.isEnabled()) {
+            return new LessonPrioritiesResult(List.of(), false);
+        }
+        try {
+            List<LessonPriorityView> lessons = bktClient.getLessonPriorities(learnerId, certificationId);
+            return new LessonPrioritiesResult(lessons != null ? lessons : List.of(), true);
+        } catch (BktServiceException e) {
+            log.warn("Lesson priorities unavailable for learner {}: {}", learnerId, e.getMessage());
+            return new LessonPrioritiesResult(List.of(), false);
+        }
+    }
+
+    public ConfidenceResult getConfidenceForAnalytics(Long learnerId, Long certificationId) {
+        if (!properties.isEnabled()) {
+            return new ConfidenceResult(null, false);
+        }
+        try {
+            ConfidenceView confidence = bktClient.getConfidenceView(learnerId, certificationId);
+            return new ConfidenceResult(confidence, true);
+        } catch (BktServiceException e) {
+            log.warn("Confidence view unavailable for learner {}: {}", learnerId, e.getMessage());
+            return new ConfidenceResult(null, false);
+        }
+    }
+
+    public MasteryHistoryResult getMasteryHistoryForAnalytics(Long learnerId, Long certificationId) {
+        if (!properties.isEnabled()) {
+            return new MasteryHistoryResult(List.of(), false);
+        }
+        try {
+            List<MasteryHistoryView> history = bktClient.getMasteryHistory(learnerId, certificationId);
+            return new MasteryHistoryResult(history != null ? history : List.of(), true);
+        } catch (BktServiceException e) {
+            log.warn("Mastery history unavailable for learner {}: {}", learnerId, e.getMessage());
+            return new MasteryHistoryResult(List.of(), false);
         }
     }
 

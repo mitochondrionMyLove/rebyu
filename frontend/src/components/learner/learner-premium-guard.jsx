@@ -11,6 +11,7 @@ export default function LearnerPremiumGuard({
   certificationId,
   title,
   description,
+  compact = false,
   children,
 }) {
   const entitlements = useLearnerEntitlements(certificationId)
@@ -25,7 +26,7 @@ export default function LearnerPremiumGuard({
 
   if (!entitlements.hasFeature(feature)) {
     return (
-      <div className="relative isolate min-h-[calc(100vh-8rem)]">
+      <div className={`relative isolate ${compact ? "min-h-72" : "min-h-[calc(100vh-8rem)]"}`}>
         <div
           className="pointer-events-none select-none blur-sm"
           aria-hidden="true"
@@ -40,7 +41,7 @@ export default function LearnerPremiumGuard({
           role="dialog"
           aria-label="Pro Feature"
         >
-          <div className="sticky top-1/2 w-full -translate-y-1/2">
+          <div className={compact ? "w-full" : "sticky top-1/2 w-full -translate-y-1/2"}>
             <FeatureLockState
               title={title}
               description={description}

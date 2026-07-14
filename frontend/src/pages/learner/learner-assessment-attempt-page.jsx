@@ -96,7 +96,7 @@ const QUESTION_TYPE_STYLES = {
   SHORT_ANSWER: {
     label: "Short Answer",
     className:
-        "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+        "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
   },
   DESCRIPTIVE: {
     label: "Descriptive",
@@ -705,6 +705,11 @@ export default function LearnerAssessmentAttemptPage() {
       // Submission may complete the certification's diagnostic gate. Remove
       // the pre-attempt portal snapshot so lessons are unlocked on return.
       await queryClient.invalidateQueries({ queryKey: ["learner-portal-data"] })
+      // Refresh the analytics view so mastery/scores reflect this attempt
+      // without the learner needing to log out or clear cache.
+      await queryClient.invalidateQueries({
+        queryKey: ["learner-progress-analytics", String(result.certificationId)],
+      })
       toast.success("Assessment submitted.")
       navigate(`/learner/results/${result.assessmentAttemptId}`, {
         replace: true,

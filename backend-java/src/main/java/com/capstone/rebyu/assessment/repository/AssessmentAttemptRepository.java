@@ -28,4 +28,7 @@ public interface AssessmentAttemptRepository extends JpaRepository<AssessmentAtt
 
     boolean existsByExam_ExamIdAndLearnerIdAndStatus(
             Long examId, Long learnerId, AssessmentAttempt.Status status);
+
+    List<AssessmentAttempt> findByLearnerIdAndExam_Certification_CertificationIdAndStatus(
+            Long learnerId, Long certificationId, AssessmentAttempt.Status status);
 }

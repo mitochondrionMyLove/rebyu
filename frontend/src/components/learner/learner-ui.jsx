@@ -39,7 +39,7 @@ const mainItems = [
 
 const pageItems = [
   { label: "Account", href: "/learner/account", icon: UserRound },
-  { label: "Files", href: "/learner/files", icon: FolderOpen },
+  { label: "Library", href: "/learner/files", icon: FolderOpen },
 ]
 
 function getInitials(name = "", email = "") {
@@ -137,7 +137,7 @@ function getPageTitle(pathname) {
   if (pathname.includes("/lessons")) return "Lesson"
   if (pathname.includes("/certifications")) return "My Certifications"
   if (pathname.includes("/challenges")) return "Challenges"
-  if (pathname.includes("/files")) return "My Files"
+  if (pathname.includes("/files")) return "Library"
   if (pathname.includes("/account")) return "Account"
   return "Learner"
 }
@@ -274,12 +274,12 @@ export function LearnerPageHeader({ title, subtitle, children }) {
 
 export function LearnerEmptyState({ icon: Icon = BookOpen, title, description, action }) {
   return (
-    <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-500">
+    <div className="flex min-h-64 flex-col items-center justify-center border-y border-border/60 px-6 py-12 text-center">
+      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted text-muted-foreground">
         <Icon className="h-6 w-6" />
       </div>
-      <h2 className="mt-4 text-base font-semibold text-zinc-950">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-zinc-500">
+      <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
+      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
         {description}
       </p>
       {action && <div className="mt-5">{action}</div>}

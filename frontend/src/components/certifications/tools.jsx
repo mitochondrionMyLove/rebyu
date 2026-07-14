@@ -21,6 +21,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const FILE_API_URL = "http://localhost:8080/api/files/download"
 
@@ -1041,29 +1042,27 @@ export function MediaTextBlockTool({ data, onDataChange, onDelete }) {
             />
 
             <div className="grid gap-3 rounded-3xl border border-zinc-200 bg-zinc-50/60 p-4 sm:grid-cols-2">
-                <label className="space-y-1 text-sm font-medium text-zinc-700">
+                <div className="space-y-1.5 text-sm font-medium text-zinc-700">
                     <span>Media type</span>
-                    <select
-                        value={mediaType}
-                        onChange={(event) => updateField("mediaType", event.target.value)}
-                        className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-950 focus:ring-4 focus:ring-zinc-100"
-                    >
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                    </select>
-                </label>
+                    <Select value={mediaType} onValueChange={(value) => updateField("mediaType", value)}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="image">Image</SelectItem>
+                            <SelectItem value="video">Video</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
 
-                <label className="space-y-1 text-sm font-medium text-zinc-700">
+                <div className="space-y-1.5 text-sm font-medium text-zinc-700">
                     <span>Layout</span>
-                    <select
-                        value={toolData.layout === "image-right" ? "image-right" : "image-left"}
-                        onChange={(event) => updateField("layout", event.target.value)}
-                        className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-950 focus:ring-4 focus:ring-zinc-100"
-                    >
-                        <option value="image-left">Media left</option>
-                        <option value="image-right">Media right</option>
-                    </select>
-                </label>
+                    <Select value={toolData.layout === "image-right" ? "image-right" : "image-left"} onValueChange={(value) => updateField("layout", value)}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="image-left">Media left</SelectItem>
+                            <SelectItem value="image-right">Media right</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 md:items-start">

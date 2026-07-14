@@ -9,4 +9,8 @@ public record IntroImageCardToolDataDto(
     public static IntroImageCardToolDataDto draft(String smallHeader, String description) {
         return new IntroImageCardToolDataDto(smallHeader, description, null, "");
     }
+
+    public static IntroImageCardToolDataDto draft(String smallHeader, String description, String imageKey) {
+        return new IntroImageCardToolDataDto(smallHeader, description, null, imageKey == null ? "" : imageKey);
+    }
 }

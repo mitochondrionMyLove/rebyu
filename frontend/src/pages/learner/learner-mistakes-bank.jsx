@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
     BrainCircuit,
     CheckCircle2,
@@ -27,6 +28,7 @@ import {
 } from "@/components/learner/learner-ui.jsx"
 import { getMistakes, setMistakeReviewed } from "@/services/learnerToolsService"
 import { toast } from "sonner"
+import { useLearnerEntitlements } from "@/hooks/use-learner-entitlements.js"
 
 const ALL_VALUE = "all"
 
@@ -55,6 +57,8 @@ function MasteryBadge({ status }) {
 }
 
 export default function MistakesBank() {
+    const entitlements = useLearnerEntitlements()
+    const navigate = useNavigate()
     const [mistakes, setMistakes] = useState([])
     const [searchQuery, setSearchQuery] = useState("")
     const [certificationFilter, setCertificationFilter] = useState(ALL_VALUE)
@@ -63,8 +67,13 @@ export default function MistakesBank() {
     const [expandedIds, setExpandedIds] = useState(new Set())
 
     useEffect(() => {
-        getMistakes().then(setMistakes).catch(() => toast.error("Your mistake bank could not be loaded."))
-    }, [])
+        if (entitlements.isLoading) return
+        if (!entitlements.hasPremium) {
+            navigate("/learner/learning", { replace: true })
+            return
+        }
+        getMistakes().then(setMistakes).catch(() => toast.error("Your mistake notebook could not be loaded."))
+    }, [entitlements.hasPremium, entitlements.isLoading, navigate])
 
     const certifications = useMemo(
         () => [
@@ -162,7 +171,7 @@ export default function MistakesBank() {
     return (
         <div className="space-y-6">
             <LearnerPageHeader
-                title="Mistakes Bank"
+                title="Mistake Notebook"
                 subtitle="Review questions you answered incorrectly and strengthen weak lessons."
             />
 

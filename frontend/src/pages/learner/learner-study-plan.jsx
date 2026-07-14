@@ -227,7 +227,7 @@ function getEventClassName(type) {
     }
 
     if (type === "quiz") {
-        return "bg-violet-100 text-violet-700 ring-violet-200"
+        return "bg-blue-100 text-blue-700 ring-blue-200"
     }
 
     if (type === "mock") {
@@ -589,7 +589,7 @@ function StudyPlanCalendar({
 
                 <Card className="rounded-xl shadow-none">
                     <CardContent className="p-4">
-                        <Brain className="size-5 text-violet-600" />
+                        <Brain className="size-5 text-blue-600" />
                         <p className="mt-3 text-sm font-semibold">Quizzes</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                             Practice checkpoints
@@ -611,7 +611,7 @@ function StudyPlanCalendar({
     )
 }
 
-function StudyPlanContent() {
+export function StudyPlanContent({ onPlanGenerated }) {
     const { data } = useOutletContext()
 
     const certificationOptions = useMemo(
@@ -658,7 +658,7 @@ function StudyPlanContent() {
             priorityTopics,
         })
 
-        setGeneratedPlan({
+        const nextPlan = {
             certification,
             courseGoal,
             targetExamDate,
@@ -671,7 +671,13 @@ function StudyPlanContent() {
             priorityTopics,
             studyPreferences,
             events,
-        })
+        }
+
+        if (onPlanGenerated) {
+            onPlanGenerated(nextPlan)
+        } else {
+            setGeneratedPlan(nextPlan)
+        }
 
         setViewDate(parseDate(calendarStart))
     }
@@ -1065,7 +1071,7 @@ function StudyPlanContent() {
     )
 }
 
-export default function LearningStudyPlan() {
+export function StudyPlanGenerator({ onPlanGenerated }) {
     return (
         <LearnerPremiumGuard
             feature="PERSONALIZED_STUDY_PLAN"
@@ -1077,7 +1083,11 @@ export default function LearningStudyPlan() {
                 "Adapts to your diagnostic and quiz performance",
             ]}
         >
-            <StudyPlanContent />
+            <StudyPlanContent onPlanGenerated={onPlanGenerated} />
         </LearnerPremiumGuard>
     )
+}
+
+export default function LearningStudyPlan() {
+    return <StudyPlanGenerator />
 }

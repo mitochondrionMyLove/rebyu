@@ -35,6 +35,9 @@ public class SecurityConfig {
                         // so a missing/invalid token returns 401.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 "/api/learners/accept-invitation").authenticated()
+                        // Progress analytics resolves the learner strictly from
+                        // the validated token — never from a client-supplied id.
+                        .requestMatchers("/api/learners/me/**").authenticated()
                         // Existing application routes keep their current
                         // public behavior; tokens are validated when present.
                         .anyRequest().permitAll()

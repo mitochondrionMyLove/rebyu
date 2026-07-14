@@ -24,10 +24,10 @@ export function EnterprisePageHeader({ title, subtitle, actions }) {
 
 export function EnterpriseStatCard({ icon: Icon, label, value, hint }) {
   return (
-    <Card className="gap-3 border-border py-4 shadow-sm">
+    <Card className="gap-3 border-0 border-l border-border bg-transparent py-2 shadow-none first:border-l-0">
       <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-4 pb-0">
         <div className="min-w-0">
-          <CardDescription className="truncate text-xs font-medium uppercase tracking-[0.08em]">
+          <CardDescription className="truncate text-sm font-medium">
             {label}
           </CardDescription>
           <CardTitle className="mt-2 text-2xl font-semibold tabular-nums text-foreground">

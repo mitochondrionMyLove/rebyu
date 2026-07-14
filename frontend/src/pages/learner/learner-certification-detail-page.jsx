@@ -42,6 +42,7 @@ import { Separator } from "@/components/ui/separator"
 import { LearnerEmptyState } from "@/components/learner/learner-ui.jsx"
 
 import { getFileViewUrl } from "@/services/fileService.js"
+import { getCertificationFallbackImage, getCuratedCertificationCover } from "@/lib/certification-cover-images.js"
 import { getCertificationModules } from "@/services/learnerService.js"
 
 import {
@@ -52,18 +53,19 @@ import {
   purchaseCertification,
 } from "@/services/assessmentService.js"
 
-const DEFAULT_IMAGE =
-    "https://www.eclosio.ong/wp-content/uploads/2018/08/default.png"
-
 function getCertificationImageUrl(certification) {
+  const curatedCover = getCuratedCertificationCover(certification?.title)
+  if (curatedCover) return curatedCover
+
+  const fallbackImage = getCertificationFallbackImage(certification?.title)
   if (!certification?.imageKey) {
-    return DEFAULT_IMAGE
+    return fallbackImage
   }
 
   try {
-    return getFileViewUrl(certification.imageKey) || DEFAULT_IMAGE
+    return getFileViewUrl(certification.imageKey) || fallbackImage
   } catch {
-    return DEFAULT_IMAGE
+    return fallbackImage
   }
 }
 

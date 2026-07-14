@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate, useOutletContext } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
 import {
   ArcElement,
   BarElement,
@@ -23,9 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { LearnerEmptyState } from "@/components/learner/learner-ui.jsx"
+import {
+  LearnerEmptyState,
+  LearnerErrorState,
+  LearnerLoadingSkeleton,
+} from "@/components/learner/learner-ui.jsx"
 import LearnerPremiumGuard from "@/components/learner/learner-premium-guard.jsx"
 import { FEATURES } from "@/services/subscriptionService.js"
+import { getProgressAnalytics } from "@/services/learnerAnalyticsService.js"
 
 ChartJS.register(
     CategoryScale,
@@ -96,43 +102,26 @@ function getTopicTitle(topic, fallback = "Untitled Topic") {
   )
 }
 
-function getTrendText(value) {
-  if (value === null || value === undefined || value === "") {
-    return null
-  }
-
-  const numericValue = Number(value)
-
-  if (!Number.isFinite(numericValue)) {
-    return null
-  }
-
-  return `${numericValue > 0 ? "+" : ""}${numericValue.toFixed(2)}%`
-}
-
 function ProgressStatCard({
                             label,
                             value,
                             trend,
-                            backgroundClassName,
                           }) {
   return (
-      <article
-          className={`min-h-[92px] rounded-[10px] px-4 py-3 ${backgroundClassName}`}
-      >
+      <article className="min-w-0 py-2 sm:px-5 sm:first:pl-0 sm:[&:not(:first-child)]:border-l sm:[&:not(:first-child)]:border-border/70">
         <div className="flex items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-zinc-700">
+          <p className="text-sm font-medium text-muted-foreground">
             {label}
           </p>
 
           {trend && (
               <span className="text-xs font-medium text-zinc-500">
-            {trend} ↗
+            {trend}
           </span>
           )}
         </div>
 
-        <p className="mt-3 text-2xl font-semibold leading-none tracking-tight text-zinc-900">
+        <p className="mt-3 font-heading text-3xl font-semibold leading-none tracking-tight text-foreground">
           {value}
         </p>
       </article>
@@ -142,9 +131,9 @@ function ProgressStatCard({
 function DashboardPanel({ title, children, className = "" }) {
   return (
       <section
-          className={`rounded-[10px] border border-[#EEF0F3] bg-[#FBFCFD] px-4 py-4 ${className}`}
+          className={`border-t border-border/70 pt-5 ${className}`}
       >
-        <h2 className="text-sm font-semibold text-zinc-800">
+        <h2 className="text-lg font-semibold text-foreground">
           {title}
         </h2>
 
@@ -278,10 +267,6 @@ export default function LearnerProgressPage() {
 
   const publishedCertifications = data.certifications ?? []
   const allLessons = data.lessons ?? []
-  const allWeakAreas = data.weakAreas ?? []
-  const performancePoints = data.performancePoints ?? []
-  const recentExamResults = data.recentExamResults ?? []
-  const stats = data.stats ?? {}
 
   const [selectedCertificationId, setSelectedCertificationId] = useState(
       publishedCertifications[0]?.certificationId
@@ -317,6 +302,14 @@ export default function LearnerProgressPage() {
     )
   }, [publishedCertifications, selectedCertificationId])
 
+  const analyticsQuery = useQuery({
+    queryKey: ["learner-progress-analytics", selectedCertificationId],
+    queryFn: () => getProgressAnalytics(selectedCertificationId),
+    enabled: Boolean(selectedCertificationId),
+    staleTime: 30_000,
+  })
+  const analytics = analyticsQuery.data
+
   const lessons = useMemo(() => {
     if (!selectedCertificationId) {
       return allLessons
@@ -328,66 +321,49 @@ export default function LearnerProgressPage() {
     )
   }, [allLessons, selectedCertificationId])
 
-  const completedLessons = lessons.filter(
-      (lesson) => lesson.completed
-  ).length
-
-  const totalLessons = lessons.length
-
+  const totalLessons = analytics?.totalLessonCount ?? 0
+  const completedLessons = analytics?.completedLessonCount ?? 0
   const overallProgress =
-      totalLessons > 0
-          ? Math.round((completedLessons / totalLessons) * 100)
+      analytics?.completionPercentage != null
+          ? Math.round(analytics.completionPercentage)
           : 0
 
   const certificationWeakAreas = useMemo(() => {
-    return allWeakAreas
-        .filter((area) => {
-          if (!area.lessonId) {
-            return true
-          }
-
-          return lessons.some(
-              (lesson) =>
-                  String(lesson.lessonId) === String(area.lessonId)
-          )
-        })
-        .sort((firstTopic, secondTopic) => {
-          return getTopicScore(firstTopic) - getTopicScore(secondTopic)
-        })
-  }, [allWeakAreas, lessons])
+    return (analytics?.weakestTopics ?? []).map((topic) => ({
+      lessonId: topic.lessonId,
+      title: topic.lessonTitle,
+      masteryPercentage: topic.masteryPercentage,
+    }))
+  }, [analytics])
 
   const nextLesson = useMemo(() => {
     return lessons.find((lesson) => !lesson.completed) ?? null
   }, [lessons])
 
+  const scoreTrend = analytics?.scoreTrend ?? []
+
   const lineChartData = useMemo(() => {
-    const labels = performancePoints.map(
-        (point, index) =>
-            point.label ??
-            point.month ??
-            point.date ??
-            point.name ??
-            `Attempt ${index + 1}`
+    const labels = scoreTrend.map((point, index) =>
+        point.submittedAt
+            ? new Date(point.submittedAt).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            })
+            : point.assessmentTitle ?? `Attempt ${index + 1}`
     )
 
-    const quizScores = performancePoints.map((point) => {
-      return toPercent(
-          point.quiz ??
-          point.quizScore ??
-          point.quizAverage ??
-          point.score ??
-          point.value
-      )
-    })
+    const isQuizType = (type) => {
+      const normalized = (type ?? "").toUpperCase()
+      return normalized.includes("QUIZ") || normalized === "DIAGNOSTIC"
+    }
 
-    const examScores = performancePoints.map((point) => {
-      return toPercent(
-          point.exam ??
-          point.examScore ??
-          point.mockExam ??
-          point.mockExamScore
-      )
-    })
+    const quizScores = scoreTrend.map((point) =>
+        isQuizType(point.assessmentType) ? toPercent(point.percentage) : null
+    )
+
+    const examScores = scoreTrend.map((point) =>
+        isQuizType(point.assessmentType) ? null : toPercent(point.percentage)
+    )
 
     return {
       labels,
@@ -419,7 +395,7 @@ export default function LearnerProgressPage() {
         },
       ],
     }
-  }, [performancePoints])
+  }, [scoreTrend])
 
   const lineChartOptions = useMemo(() => {
     return {
@@ -575,57 +551,17 @@ export default function LearnerProgressPage() {
     }
   }, [])
 
-  const recentExamResult = recentExamResults[0]
-
   const mockExamSegments = useMemo(() => {
-    const breakdown =
-        recentExamResult?.topicBreakdown ??
-        recentExamResult?.categoryBreakdown ??
-        recentExamResult?.breakdown ??
-        recentExamResult?.categories ??
-        recentExamResult?.results
+    const buckets = analytics?.performanceByDifficulty ?? []
 
-    if (Array.isArray(breakdown) && breakdown.length > 0) {
-      return breakdown.slice(0, 4).map((item, index) => ({
-        label:
-            item.name ??
-            item.title ??
-            item.topic ??
-            `Category ${index + 1}`,
-        value:
-            toPercent(
-                item.score ??
-                item.percentage ??
-                item.value ??
-                item.correctRate
-            ) ?? 0,
-        color: BAR_COLORS[index % BAR_COLORS.length],
-      }))
-    }
-
-    const latestMockScore = toPercent(
-        recentExamResult?.score ??
-        recentExamResult?.percentage ??
-        recentExamResult?.resultPercentage
-    )
-
-    if (latestMockScore !== null) {
-      return [
-        {
-          label: "Correct Answers",
-          value: latestMockScore,
-          color: "#A9DEFA",
-        },
-        {
-          label: "Incorrect Answers",
-          value: Math.max(0, 100 - latestMockScore),
-          color: "#242424",
-        },
-      ]
-    }
-
-    return []
-  }, [recentExamResult])
+    return buckets
+        .filter((bucket) => bucket.totalAnswered > 0)
+        .map((bucket, index) => ({
+          label: bucket.bucketKey,
+          value: Math.round(bucket.accuracyPercentage ?? 0),
+          color: BAR_COLORS[index % BAR_COLORS.length],
+        }))
+  }, [analytics])
 
   const doughnutChartData = useMemo(() => {
     return {
@@ -670,30 +606,26 @@ export default function LearnerProgressPage() {
     }
   }, [])
 
-  const topicMastery = toPercent(stats.topicMastery)
-  const confidenceLevel = toPercent(stats.confidenceLevel)
-  const studyStreak = getNumber(stats.studyStreak, 0)
+  const topicMastery = toPercent(analytics?.overallMasteryPercentage)
+  const confidenceLevel = toPercent(analytics?.confidencePercentage)
+  const studyStreak = getNumber(analytics?.studyStreakDays, 0)
+  const readinessLevel = toPercent(analytics?.readinessPercentage)
+  const bktUnavailable = analytics != null && analytics.bktAvailable === false
 
   return (
       <LearnerPremiumGuard
           feature={FEATURES.PROGRESS_ANALYTICS}
-          title="Pro Feature"
-          description="Detailed progress analytics require a Pro subscription. Upgrade to unlock this feature."
-          benefits={[
-            "Certification progress tracking",
-            "Quiz and exam performance trends",
-            "Topic mastery and weak-area insights",
-          ]}
-          returnTo="/learner/learning"
+          title="Advanced progress analytics"
+          description="Unlock mastery, weakness analysis, performance trends, confidence, and recommended next actions with Pro or institution access."
       >
-        <div className="space-y-6 font-sans">
-        <div className="flex items-center">
+        <div className="space-y-8 font-sans">
+        <div className="flex justify-end">
           <Select
               value={selectedCertificationId}
               onValueChange={setSelectedCertificationId}
               disabled={publishedCertifications.length === 0}
           >
-            <SelectTrigger className="h-8 w-auto min-w-[190px] border-0 bg-transparent px-0 pr-2 text-sm font-semibold uppercase text-zinc-700 shadow-none focus:ring-0 focus:ring-offset-0">
+            <SelectTrigger className="w-auto min-w-[210px] bg-background text-sm font-medium">
               <SelectValue placeholder="Select certification" />
             </SelectTrigger>
 
@@ -722,15 +654,26 @@ export default function LearnerProgressPage() {
                   </Button>
                 }
             />
+        ) : analyticsQuery.isLoading ? (
+            <LearnerLoadingSkeleton />
+        ) : analyticsQuery.isError ? (
+            <LearnerErrorState
+                title="Couldn't load your analytics"
+                error={analyticsQuery.error}
+                onRetry={analyticsQuery.refetch}
+            />
         ) : (
             <>
-              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {bktUnavailable && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+                    Mastery analytics are temporarily unavailable. Your assessment scores below are still up to date.
+                  </div>
+              )}
+
+              <section className="grid gap-5 sm:grid-cols-2 sm:gap-0 xl:grid-cols-4" aria-label="Analytics summary">
                 <ProgressStatCard
                     label="Overall Progress"
                     value={`${overallProgress}%`}
-                    trend={getTrendText(
-                        stats.overallProgressChange ?? stats.progressChange
-                    )}
                     backgroundClassName="bg-[#E2F5FF]"
                 />
 
@@ -741,9 +684,6 @@ export default function LearnerProgressPage() {
                           ? "—"
                           : `${topicMastery}%`
                     }
-                    trend={getTrendText(
-                        stats.topicMasteryChange ?? stats.masteryChange
-                    )}
                     backgroundClassName="bg-[#E8EFF9]"
                 />
 
@@ -754,18 +694,17 @@ export default function LearnerProgressPage() {
                           ? "—"
                           : `${confidenceLevel}%`
                     }
-                    trend={getTrendText(
-                        stats.confidenceLevelChange ?? stats.confidenceChange
-                    )}
+                    trend={
+                      readinessLevel === null
+                          ? null
+                          : `Readiness ${readinessLevel}%`
+                    }
                     backgroundClassName="bg-[#E2F5FF]"
                 />
 
                 <ProgressStatCard
                     label="Study Streak"
                     value={`${studyStreak} days`}
-                    trend={getTrendText(
-                        stats.studyStreakChange ?? stats.streakChange
-                    )}
                     backgroundClassName="bg-[#E8EFF9]"
                 />
               </section>
@@ -777,7 +716,7 @@ export default function LearnerProgressPage() {
                   </div>
 
                   <div className="mt-1 h-[215px]">
-                    {performancePoints.length === 0 ? (
+                    {scoreTrend.length === 0 ? (
                         <div className="flex h-full flex-col items-center justify-center">
                           <Target className="h-7 w-7 text-zinc-300" />
 
@@ -852,15 +791,15 @@ export default function LearnerProgressPage() {
                   </div>
                 </DashboardPanel>
 
-                <DashboardPanel title="Recent Mock Exam Results">
+                <DashboardPanel title="Accuracy by Difficulty">
                   {mockExamSegments.length === 0 ? (
                       <div className="flex h-[195px] flex-col items-center justify-center">
                         <p className="text-sm font-medium text-zinc-600">
-                          No mock exam result yet
+                          No graded answers yet
                         </p>
 
                         <p className="mt-1 text-xs text-zinc-400">
-                          Take a mock exam to view your category results.
+                          Complete an assessment to see accuracy by difficulty.
                         </p>
                       </div>
                   ) : (

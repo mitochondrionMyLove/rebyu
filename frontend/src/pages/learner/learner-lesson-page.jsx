@@ -16,7 +16,6 @@ import {
   PlayCircle,
   Plus,
   Layers3,
-  LockKeyhole,
   Search,
   SendHorizontal,
   Sparkles,
@@ -683,10 +682,7 @@ function GeminiStyleTutor({
   }
 
   async function createStudyAid(type) {
-    if (!entitlements.personalProActive) {
-      toast.error("AI Quiz and Flashcard generation requires REBYU Pro.", {
-        action: { label: "View plans", onClick: () => navigate("/learner/subscription") },
-      })
+    if (!entitlements.hasPremium) {
       return
     }
     if (generating) return
@@ -880,15 +876,27 @@ function GeminiStyleTutor({
                     <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Generated items are saved to Library.</span>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => createStudyAid("quiz")} disabled={Boolean(generating)}>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      if (!entitlements.hasPremium) event.preventDefault()
+                      createStudyAid("quiz")
+                    }}
+                    disabled={Boolean(generating)}
+                  >
                     <BookOpenCheck className="mr-2 size-4" />
                     <span className="flex-1">Generate quiz</span>
-                    {!entitlements.personalProActive ? <LockKeyhole className="size-3.5 text-amber-600" /> : <span className="text-[10px] font-semibold text-primary">PRO</span>}
+                    {!entitlements.hasPremium ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary">PRO</span> : null}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => createStudyAid("flashcard")} disabled={Boolean(generating)}>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      if (!entitlements.hasPremium) event.preventDefault()
+                      createStudyAid("flashcard")
+                    }}
+                    disabled={Boolean(generating)}
+                  >
                     <Layers3 className="mr-2 size-4" />
                     <span className="flex-1">Generate flashcards</span>
-                    {!entitlements.personalProActive ? <LockKeyhole className="size-3.5 text-amber-600" /> : <span className="text-[10px] font-semibold text-primary">PRO</span>}
+                    {!entitlements.hasPremium ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary">PRO</span> : null}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1229,6 +1237,7 @@ export default function LearnerLessonPage() {
   const { data } = useOutletContext()
 
   const [navOpen, setNavOpen] = useState(false)
+  const [curriculumOpen, setCurriculumOpen] = useState(true)
   const [coachOpen, setCoachOpen] = useState(false)
   const [locallyCompleted, setLocallyCompleted] = useState(false)
   const completionSentRef = useRef(false)
@@ -1416,13 +1425,17 @@ export default function LearnerLessonPage() {
         <div
             className={cn(
                 "grid min-h-[calc(100dvh-8rem)]",
-                coachOpen && isXl
-                    ? "xl:grid-cols-[320px_minmax(0,1fr)_400px]"
-                    : "xl:grid-cols-[320px_minmax(0,1fr)]"
+                curriculumOpen && coachOpen && isXl
+                    ? "xl:grid-cols-[300px_minmax(0,1fr)_380px]"
+                    : curriculumOpen && isXl
+                      ? "xl:grid-cols-[300px_minmax(0,1fr)]"
+                      : coachOpen && isXl
+                        ? "xl:grid-cols-[minmax(0,1fr)_380px]"
+                        : "grid-cols-1"
             )}
         >
           {/* LEFT: Course Outline */}
-          <aside className="hidden min-h-0 border-r border-neutral-200 xl:block">
+          {curriculumOpen ? <aside className="hidden min-h-0 border-r border-neutral-200 xl:block">
             <div className="sticky top-0 h-[calc(100dvh-8rem)]">
               <CourseOutline
                   modules={modules}
@@ -1431,7 +1444,7 @@ export default function LearnerLessonPage() {
                   onOpenLesson={openLesson}
               />
             </div>
-          </aside>
+          </aside> : null}
 
           {/* CENTER: Lesson Content */}
           <main className="min-w-0 bg-white">
@@ -1453,11 +1466,12 @@ export default function LearnerLessonPage() {
                   <Button
                       variant="outline"
                       size="sm"
-                      className="shrink-0 gap-2 xl:hidden"
-                      onClick={() => setNavOpen(true)}
+                      className="shrink-0 gap-2"
+                      onClick={() => isXl ? setCurriculumOpen((open) => !open) : setNavOpen(true)}
+                      aria-expanded={isXl ? curriculumOpen : navOpen}
                   >
                     <Menu className="size-4" />
-                    Outline
+                    {isXl && curriculumOpen ? "Hide outline" : "Outline"}
                   </Button>
                 </div>
 

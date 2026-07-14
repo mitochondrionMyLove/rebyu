@@ -22,7 +22,7 @@ const TONE_CLASSES = {
   low:
     "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-300",
   reassess:
-    "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300",
+    "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300",
   muted:
     "border-border bg-muted text-muted-foreground",
   ontrack:

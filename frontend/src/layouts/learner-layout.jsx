@@ -3,14 +3,14 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import {
   LogOutIcon,
-  Search,
+  FilesIcon,
+  NotebookPenIcon,
   SettingsIcon,
   UserIcon,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { LearnerAppSidebar } from "@/components/learner/learner-sidebar"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { LearnerMobileNavigation, PortalTopNavigation } from "@/components/navigation/portal-navigation.jsx"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +30,10 @@ import { NotificationBell } from "@/components/notification-bell.jsx"
 import { getLearnerInvitations } from "@/services/enterpriseService.js"
 import { usePortalTheme } from "@/hooks/use-portal-theme.js"
 import { PortalThemeToggle } from "@/components/portal-theme-toggle"
+import { CalendarDays } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useLearnerEntitlements } from "@/hooks/use-learner-entitlements.js"
 
 function getInitials(name = "", email = "") {
   const source = name || email || "Learner"
@@ -48,6 +52,15 @@ export default function LearnerLayout() {
   const isChallengesPage = location.pathname === "/learner/challenges"
   const { logout: authLogout } = useAuth()
   const [searchValue, setSearchValue] = useState("")
+  const entitlements = useLearnerEntitlements()
+
+  const openMistakeNotebook = () => {
+    if (entitlements.isLoading) return
+    if (!entitlements.hasPremium) {
+      return
+    }
+    navigate("/learner/mistakes")
+  }
 
   const query = useQuery({
     queryKey: ["learner-portal-data"],
@@ -122,32 +135,14 @@ export default function LearnerLayout() {
   }
 
   return (
-    <SidebarProvider
-      className="netacad-portal learner-portal"
-      open={false}
-      style={{ "--sidebar-width-icon": "3.25rem" }}
-    >
-      <LearnerAppSidebar collapsible="icon" className="border-r border-sidebar-border" />
-
-      <SidebarInset className={isChallengesPage ? "!bg-[#eef4ff] dark:!bg-[#071126]" : undefined}>
-      <header className="sticky top-0 z-40 h-16 border-b bg-white/95 shadow-sm backdrop-blur">
-        <div className="mx-auto flex h-full w-full max-w-[1280px] items-center justify-between gap-5 px-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <SidebarTrigger className="md:hidden" aria-label="Open learner navigation" />
-
-            <label className="relative hidden w-[320px] max-w-[48vw] sm:block lg:w-[380px]">
-              <span className="sr-only">Search learner portal</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={searchValue}
-                onChange={(event) => setSearchValue(event.target.value)}
-                placeholder="Search lessons, certifications, and files"
-                className="h-9 w-full rounded border border-input bg-white pl-9 pr-3 text-sm outline-none transition focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/15"
-              />
-            </label>
-          </div>
-
-          <div className="flex min-w-0 items-center justify-end gap-2">
+    <div className={`netacad-portal learner-portal flex min-h-screen flex-col ${isChallengesPage ? "!bg-[#f1f7fc] dark:!bg-[#111b26]" : "bg-background"}`}>
+      <PortalTopNavigation role="LEARNER" actions={<>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => navigate("/learner/plan")} aria-label="Open study plan calendar"><CalendarDays /></Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Study plan calendar</TooltipContent>
+            </Tooltip>
             <NotificationBell
               items={notifications}
               loading={query.isLoading || invitationsQuery.isLoading}
@@ -157,19 +152,24 @@ export default function LearnerLayout() {
             <PortalThemeToggle />
 
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label="Open account menu"
-                >
-                  <Avatar>
-                    <AvatarFallback>
-                      {getInitials(displayName, email)}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              </DropdownMenuTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label="Open account menu"
+                    >
+                      <Avatar>
+                        <AvatarFallback>
+                          {getInitials(displayName, email)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Account menu</TooltipContent>
+              </Tooltip>
               <DropdownMenuContent
                 align="end"
                 sideOffset={10}
@@ -186,6 +186,20 @@ export default function LearnerLayout() {
                   <UserIcon />
                   Account settings
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/learner/library")}>
+                  <FilesIcon />
+                  Library
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    if (!entitlements.hasPremium) event.preventDefault()
+                    openMistakeNotebook()
+                  }}
+                >
+                  <NotebookPenIcon />
+                  <span className="flex-1">Mistake Notebook</span>
+                  {!entitlements.hasPremium ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary">PRO</span> : null}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/learner/subscription")}>
                   <SettingsIcon />
                   Plan and billing
@@ -197,12 +211,9 @@ export default function LearnerLayout() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        </div>
+      </>} />
 
-      </header>
-
-        <main className={`mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 ${isChallengesPage ? "!bg-[#eef4ff] dark:!bg-[#071126]" : ""}`}>
+        <main className={`rebyu-page pb-24 lg:pb-8 ${isChallengesPage ? "!bg-[#f1f7fc] dark:!bg-[#111b26]" : ""}`}>
           {query.isLoading ? (
             <LearnerLoadingSkeleton />
           ) : query.isError ? (
@@ -211,7 +222,7 @@ export default function LearnerLayout() {
             <Outlet context={outletContext} />
           )}
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      <LearnerMobileNavigation />
+    </div>
   )
 }

@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
@@ -50,7 +51,7 @@ const libraryTypeMeta = {
     label: "Flashcards",
     icon: Layers3,
     badge:
-        "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
   },
   file: {
     label: "File",
@@ -290,30 +291,23 @@ export default function LearnerFilesPage() {
           <label className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
 
-            <input
+            <Input
                 value={localSearch}
                 onChange={(event) => setLocalSearch(event.target.value)}
                 placeholder="Search quizzes, flashcards, files, or community resources"
-                className="h-10 w-full rounded-lg border border-zinc-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
+                className="pl-10"
             />
           </label>
 
-          <select
-              value={certificationId}
-              onChange={(event) => setCertificationId(event.target.value)}
-              className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
-          >
-            <option value="">All certifications</option>
-
-            {certifications.map((certification) => (
-                <option
-                    key={String(certification.certificationId)}
-                    value={String(certification.certificationId)}
-                >
-                  {certification.title}
-                </option>
-            ))}
-          </select>
+          <Select value={certificationId || ALL_VALUE} onValueChange={(value) => setCertificationId(value === ALL_VALUE ? "" : value)}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="All certifications" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VALUE}>All certifications</SelectItem>
+              {certifications.map((certification) => (
+                <SelectItem key={String(certification.certificationId)} value={String(certification.certificationId)}>{certification.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (
@@ -474,15 +468,14 @@ export default function LearnerFilesPage() {
           <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle>Add to library</DialogTitle><DialogDescription>Save a useful link, a real file, or a personal note.</DialogDescription></DialogHeader>
             <div className="grid gap-4">
-              <select
-                  value={newType}
-                  onChange={(event) => { setNewType(event.target.value); setUploadedFile(null) }}
-                  className="h-10 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="link">Link</option>
-                <option value="file">File upload</option>
-                <option value="note">Note</option>
-              </select>
+              <Select value={newType} onValueChange={(value) => { setNewType(value); setUploadedFile(null) }}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Resource type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="link">Link</SelectItem>
+                  <SelectItem value="file">File upload</SelectItem>
+                  <SelectItem value="note">Note</SelectItem>
+                </SelectContent>
+              </Select>
               <Input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder="Resource title" />
 
               {newType === "link" ? (

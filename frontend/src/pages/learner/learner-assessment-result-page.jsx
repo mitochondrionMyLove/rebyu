@@ -28,6 +28,8 @@ import {
   getAttemptResult,
 } from "@/services/assessmentService.js"
 import { base } from "@/services/base"
+import LearnerPremiumGuard from "@/components/learner/learner-premium-guard.jsx"
+import { FEATURES } from "@/services/subscriptionService.js"
 
 function formatDuration(totalSeconds) {
   if (totalSeconds == null) return "—"
@@ -212,17 +214,27 @@ export default function LearnerAssessmentResultPage() {
           </Button>
         </div>
 
-        {result.certificationId != null && learnerId != null ? (
-          <CertificationAnalyticsPanel
-            learnerId={learnerId}
-            certificationId={result.certificationId}
-          />
-        ) : null}
+        <LearnerPremiumGuard
+          feature={FEATURES.READINESS_ANALYSIS}
+          certificationId={result.certificationId}
+          compact
+          title="Advanced result insights"
+          description="Unlock weakness analysis, detailed performance breakdowns, readiness insights, and deeper attempt comparisons with Pro or institution access."
+        >
+          <div className="space-y-6">
+            {result.certificationId != null && learnerId != null ? (
+              <CertificationAnalyticsPanel
+                learnerId={learnerId}
+                certificationId={result.certificationId}
+              />
+            ) : null}
 
-        <PerformanceBreakdown
-          lessonBreakdown={result.lessonBreakdown}
-          assessmentType={result.assessmentType}
-        />
+            <PerformanceBreakdown
+              lessonBreakdown={result.lessonBreakdown}
+              assessmentType={result.assessmentType}
+            />
+          </div>
+        </LearnerPremiumGuard>
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Answer review</h2>

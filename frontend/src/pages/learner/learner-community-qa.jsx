@@ -5,8 +5,9 @@ import {
     Download,
     FileArchive,
     FileText,
-    Heart,
     Home,
+    Heart,
+    ImageIcon,
     Loader2,
     MessageCircle,
     MoreHorizontal,
@@ -47,7 +48,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { getFileDownloadUrl, getFileViewUrl } from "@/services/fileService"
+import { getFileDownloadUrl } from "@/services/fileService"
 import { getAllCertifications } from "@/services/certificationService"
 import {
     addCommunityComment,
@@ -73,7 +74,8 @@ const FEED_TABS = [
 ]
 
 const POST_TYPE_STYLES = {
-    discussion: "border-violet-200 bg-violet-50 text-violet-700",
+    discussion: "border-blue-200 bg-blue-50 text-blue-700",
+    image: "border-sky-200 bg-sky-50 text-sky-700",
     quizzes: "border-blue-200 bg-blue-50 text-blue-700",
     notes: "border-amber-200 bg-amber-50 text-amber-700",
     docx: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -82,6 +84,7 @@ const POST_TYPE_STYLES = {
 
 const POST_TYPE_LABELS = {
     discussion: "Discussion",
+    image: "Photo",
     quizzes: "Quiz",
     notes: "PDF / Notes",
     docx: "DOCX",
@@ -89,7 +92,7 @@ const POST_TYPE_LABELS = {
 }
 
 /** Post types where the composer offers an optional real file attachment. */
-const ATTACHABLE_TYPES = new Set(["notes", "docx"])
+const ATTACHABLE_TYPES = new Set(["image", "notes", "docx"])
 
 function CommunityAvatar({ initials, className = "" }) {
     return (
@@ -217,7 +220,13 @@ function CommunityPost({
                     </p>
                 </div>
 
-                {post.attachment ? (
+                {post.attachment?.type === "IMAGE" && post.attachment.key ? (
+                    <figure className="mt-4 overflow-hidden rounded-md border bg-muted/30">
+                        <img src={getFileDownloadUrl(post.attachment.key)} alt={post.attachment.name || "Community post attachment"} className="max-h-[560px] w-full object-contain" loading="lazy" />
+                    </figure>
+                ) : null}
+
+                {post.attachment && post.attachment.type !== "IMAGE" ? (
                     <div className="mt-4 flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background">
                             <AttachmentIcon type={post.attachment.type} />
@@ -291,28 +300,13 @@ function CommunityPost({
             </div>
 
             <div className="grid grid-cols-3 border-t">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-11 rounded-none"
-                    onClick={() => onToggleLike(post.postId)}
-                >
-                    <Heart
-                        className={`mr-2 h-4 w-4 ${post.liked ? "fill-primary text-primary" : ""}`}
-                    />
+                <Button type="button" variant="ghost" className="h-11 rounded-none" onClick={() => onToggleLike(post.postId)}>
+                    <Heart className={`mr-2 h-4 w-4 ${post.liked ? "fill-primary text-primary" : ""}`} />
                     Like
                 </Button>
-
-                <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-11 rounded-none border-x"
-                    onClick={() => onOpenComments(post.postId)}
-                >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Comment
+                <Button type="button" variant="ghost" className="h-11 rounded-none border-x" onClick={() => onOpenComments(post.postId)}>
+                    <MessageCircle className="mr-2 h-4 w-4" />Comment
                 </Button>
-
                 <Button
                     type="button"
                     variant="ghost"
@@ -380,9 +374,8 @@ export default function Community() {
     const visiblePosts = useMemo(() => {
         const query = searchValue.trim().toLowerCase()
 
-        return posts.filter((post) => {
+        const filtered = posts.filter((post) => {
             if (showSavedOnly && !post.saved) return false
-
             const matchesTab =
                 showSavedOnly || activeTab === "for-you" || post.postType === activeTab
 
@@ -395,6 +388,8 @@ export default function Community() {
 
             return matchesTab && matchesSearch
         })
+
+        return filtered
     }, [activeTab, posts, searchValue, showSavedOnly])
 
     function openComposer(type) {
@@ -484,7 +479,7 @@ export default function Community() {
                 postType: shareType,
                 circleId: shareCommunity ? Number(shareCommunity) : null,
                 attachmentName: attachedFile?.name ?? null,
-                attachmentType: shareType === "notes" ? "PDF" : shareType === "docx" ? "DOCX" : null,
+                attachmentType: shareType === "image" ? "IMAGE" : shareType === "notes" ? "PDF" : shareType === "docx" ? "DOCX" : null,
                 attachmentKey: attachedFile?.key ?? null,
             })
 
@@ -569,18 +564,10 @@ export default function Community() {
 
     return (
         <div className="space-y-6">
-            <div className="grid items-start justify-center gap-5 lg:grid-cols-[minmax(0,680px)_280px] xl:grid-cols-[220px_minmax(0,680px)_280px]">
-                <aside className="sticky top-24 hidden space-y-4 xl:block">
-                    <nav className="overflow-hidden rounded-md border bg-background shadow-sm">
-                        <div className="border-b bg-muted/40 px-4 py-3">
-                            <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                                Community feed
-                            </p>
-                        </div>
-
-                        <div className="p-2">
+            <div className="sticky top-16 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+                <div className="mx-auto flex w-full max-w-[1200px] items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             {FEED_TABS.map((tab, index) => {
-                                const Icon = index === 0
+                                    const Icon = index === 0
                                     ? Home
                                     : tab.value === "circle"
                                         ? UsersRound
@@ -595,7 +582,7 @@ export default function Community() {
                                         key={tab.value}
                                         type="button"
                                         onClick={() => selectFeedTab(tab.value)}
-                                        className={`flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-medium transition ${
+                                        className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition ${
                                             !showSavedOnly && activeTab === tab.value
                                                 ? "bg-primary text-primary-foreground"
                                                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -606,97 +593,97 @@ export default function Community() {
                                     </button>
                                 )
                             })}
-                        </div>
-                    </nav>
-
-                    <section className="rounded-md border bg-background p-3 shadow-sm">
-                        <p className="px-1 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                            Your shortcuts
-                        </p>
                         <button
                             type="button"
-                            className={`mt-2 flex w-full items-center gap-3 rounded px-2 py-2 text-left text-sm hover:bg-accent ${
+                            className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent ${
                                 showSavedOnly ? "bg-accent" : ""
                             }`}
-                            onClick={() => setShowSavedOnly((current) => !current)}
+                            onClick={() => {
+                                setShowSavedOnly((current) => !current)
+                            }}
                         >
                             <Bookmark className="size-4 text-primary" />
                             Saved posts ({savedCount})
                         </button>
-                        <button
-                            type="button"
-                            className="flex w-full items-center gap-3 rounded px-2 py-2 text-left text-sm hover:bg-accent"
-                            onClick={() => selectFeedTab("circle")}
-                        >
-                            <Users className="size-4 text-primary" />
-                            My study circles
-                        </button>
-                    </section>
-
-                    <section className="rounded-md border bg-white p-4 text-foreground shadow-sm">
-                        <UsersRound className="size-5 text-primary" />
-                        <p className="mt-3 text-sm font-semibold">Study together</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            Join focused communities, compare notes, and help other learners.
-                        </p>
                         <Button
                             type="button"
                             size="sm"
-                            className="mt-3 w-full"
+                            className="ml-auto shrink-0"
                             onClick={() => setCreateCircleOpen(true)}
                         >
                             Create a circle
                         </Button>
-                    </section>
-                </aside>
+                </div>
+            </div>
+
+            <div className="mx-auto grid w-full max-w-[1200px] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
 
                 <main className="min-w-0 space-y-4">
                     <section className="rounded-md border bg-background p-4 shadow-sm">
-                        <button
-                            type="button"
-                            className="flex w-full items-center gap-3"
-                            onClick={() => openComposer("discussion")}
-                        >
+                        <button type="button" className="flex w-full items-center gap-3" onClick={() => openComposer("discussion")}>
                             <CommunityAvatar initials="GG" />
-
                             <div className="flex h-10 min-w-0 flex-1 items-center rounded-full border bg-muted/40 px-4 text-left text-sm text-muted-foreground transition hover:bg-muted">
                                 Start a discussion or share a review resource...
                             </div>
                         </button>
-
-                        <div className="mt-4 grid gap-2 border-t pt-3 sm:grid-cols-4">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("discussion")}>
-                                <MessageCircle className="mr-2 h-4 w-4 text-violet-600" />
-                                Discussion
-                            </Button>
-
-                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("quizzes")}>
-                                <BookOpen className="mr-2 h-4 w-4 text-blue-600" />
-                                Share quiz
-                            </Button>
-
-                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("notes")}>
-                                <FileText className="mr-2 h-4 w-4 text-orange-600" />
-                                PDF / notes
-                            </Button>
-
-                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("docx")}>
-                                <FileArchive className="mr-2 h-4 w-4 text-emerald-600" />
-                                DOCX
-                            </Button>
+                        <div className="mt-4 grid gap-1 border-t pt-3 sm:grid-cols-5">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("discussion")}><MessageCircle className="mr-2 size-4 text-blue-600" />Discussion</Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("image")}><ImageIcon className="mr-2 size-4 text-sky-600" />Photo</Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("quizzes")}><BookOpen className="mr-2 size-4 text-blue-600" />Share quiz</Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("notes")}><FileText className="mr-2 size-4 text-orange-600" />PDF / notes</Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openComposer("docx")}><FileArchive className="mr-2 size-4 text-emerald-600" />DOCX</Button>
                         </div>
                     </section>
 
-                    <section className="grid gap-3 rounded-md border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm sm:grid-cols-2">
-                        <p>
-                            <span className="font-semibold text-primary">
-                                Start discussions and ask questions
-                            </span>{" "}
-                            about lessons, quizzes, exam strategies, and study topics.
-                        </p>
+                    {composerOpen ? (
+                        <section className="rounded-lg border border-primary/30 bg-card p-4 sm:p-5">
+                            <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-4">
+                                <div>
+                                    <h2 className="text-sm font-semibold">Create a post</h2>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">Share a question, resource, quiz, photo, or screenshot.</p>
+                                </div>
+                                <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setComposerOpen(false); setAttachedFile(null) }} aria-label="Close post editor"><X /></Button>
+                            </div>
 
-                        <p>Share only files you created or have permission to distribute.</p>
-                    </section>
+                            <div className="mt-4 flex gap-1 overflow-x-auto pb-1">
+                                {[
+                                    { value: "discussion", label: "Discussion", icon: MessageCircle },
+                                    { value: "image", label: "Photo", icon: ImageIcon },
+                                    { value: "quizzes", label: "Quiz", icon: BookOpen },
+                                    { value: "notes", label: "PDF / Notes", icon: FileText },
+                                    { value: "docx", label: "DOCX", icon: FileArchive },
+                                ].map((type) => {
+                                    const Icon = type.icon
+                                    return <Button key={type.value} type="button" variant={shareType === type.value ? "secondary" : "ghost"} size="sm" className="shrink-0" onClick={() => { setShareType(type.value); setAttachedFile(null) }}><Icon className="mr-1.5 size-4" />{type.label}</Button>
+                                })}
+                            </div>
+
+                            <div className="mt-4 grid gap-3">
+                                <Select value={shareCommunity} onValueChange={setShareCommunity}>
+                                    <SelectTrigger><SelectValue placeholder="Choose a study circle (optional)" /></SelectTrigger>
+                                    <SelectContent>{circles.filter((circle) => circle.joined || circle.owner).map((circle) => <SelectItem key={circle.circleId} value={String(circle.circleId)}>{circle.name}</SelectItem>)}</SelectContent>
+                                </Select>
+                                <Input value={shareTitle} onChange={(event) => setShareTitle(event.target.value)} placeholder={shareType === "discussion" ? "An interesting title" : "Post title"} />
+                                <Textarea value={shareDescription} onChange={(event) => setShareDescription(event.target.value)} placeholder="What do you want to discuss or share?" className="min-h-32 resize-y" />
+
+                                {ATTACHABLE_TYPES.has(shareType) ? (
+                                    <div>
+                                        <input ref={fileInputRef} type="file" accept={shareType === "image" ? "image/png,image/jpeg,image/webp,image/gif" : shareType === "docx" ? ".docx" : ".pdf"} className="hidden" onChange={handleAttachmentSelected} />
+                                        <button type="button" disabled={isUploadingAttachment} onClick={() => fileInputRef.current?.click()} className="flex w-full items-center gap-3 border border-dashed border-border px-4 py-3 text-left hover:border-primary/50 disabled:opacity-60">
+                                            {isUploadingAttachment ? <Loader2 className="size-5 animate-spin text-muted-foreground" /> : shareType === "image" ? <ImageIcon className="size-5 text-primary" /> : <FileText className="size-5 text-primary" />}
+                                            <span className="min-w-0 flex-1 truncate text-sm">{attachedFile?.name ?? `Add ${shareType === "image" ? "a photo or screenshot" : shareType === "docx" ? "a DOCX file" : "a PDF file"}`}</span>
+                                            {attachedFile ? <span className="text-xs font-medium text-primary">Change</span> : null}
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            <div className="mt-4 flex justify-end gap-2 border-t border-border/70 pt-4">
+                                <Button type="button" variant="ghost" onClick={() => { setComposerOpen(false); setAttachedFile(null) }}>Cancel</Button>
+                                <Button type="button" onClick={publishPost} disabled={isUploadingAttachment || !shareTitle.trim() || !shareDescription.trim()}><Send className="mr-2 size-4" />Post</Button>
+                            </div>
+                        </section>
+                    ) : null}
 
                     <div className="flex flex-col gap-3 border-b pb-3 xl:hidden sm:flex-row sm:items-center sm:justify-between">
                         <h2 className="text-sm font-semibold">
@@ -730,7 +717,7 @@ export default function Community() {
                     ) : null}
 
                     {visiblePosts.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {visiblePosts.map((post) => (
                                 <CommunityPost
                                     key={post.postId}
@@ -835,7 +822,7 @@ export default function Community() {
             </div>
 
             <Dialog
-                open={composerOpen}
+                open={false}
                 onOpenChange={(open) => {
                     setComposerOpen(open)
                     if (!open) setAttachedFile(null)
@@ -914,14 +901,14 @@ export default function Community() {
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept={shareType === "docx" ? ".docx" : ".pdf"}
+                                    accept={shareType === "image" ? "image/png,image/jpeg,image/webp,image/gif" : shareType === "docx" ? ".docx" : ".pdf"}
                                     className="hidden"
                                     onChange={handleAttachmentSelected}
                                 />
 
                                 {attachedFile ? (
                                     <div className="flex items-center gap-3 rounded-xl border px-4 py-3">
-                                        <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                        {shareType === "image" ? <ImageIcon className="h-5 w-5 shrink-0 text-primary" /> : <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />}
                                         <span className="min-w-0 flex-1 truncate text-sm font-medium">
                                             {attachedFile.name}
                                         </span>
@@ -946,12 +933,14 @@ export default function Community() {
                                         {isUploadingAttachment ? (
                                             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                                         ) : (
-                                            <FileText className="h-5 w-5 text-muted-foreground" />
+                                            shareType === "image"
+                                                ? <ImageIcon className="h-5 w-5 text-primary" />
+                                                : <FileText className="h-5 w-5 text-muted-foreground" />
                                         )}
                                         <span className="mt-2 text-sm font-medium">
                                             {isUploadingAttachment
                                                 ? "Uploading..."
-                                                : `Choose a ${shareType === "docx" ? "DOCX" : "PDF"} file (optional)`}
+                                                : `Choose a ${shareType === "image" ? "photo or screenshot" : shareType === "docx" ? "DOCX" : "PDF"} file (optional)`}
                                         </span>
                                         <span className="mt-1 text-xs text-muted-foreground">
                                             Select a file you created or have permission to share.

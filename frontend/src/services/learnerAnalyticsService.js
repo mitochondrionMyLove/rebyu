@@ -3,6 +3,15 @@ import { base } from "./base"
 // Kept for existing importers.
 export { getLearnerPortalData } from "./learnerService.js"
 
+/**
+ * Certification-scoped progress analytics for the authenticated learner.
+ * The learner is always resolved server-side from the JWT -- no learnerId
+ * is ever sent from the browser.
+ */
+export async function getProgressAnalytics(certificationId) {
+  return base(`learners/me/certifications/${certificationId}/progress-analytics`)
+}
+
 // ---------------------------------------------------------------------------
 // BKT analytics. The browser only ever calls Spring Boot; Spring Boot proxies
 // the internal FastAPI BKT service.

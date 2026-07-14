@@ -4021,7 +4021,7 @@ OUTPUT RULES:
                                             </p>
                                     </div>
 
-                                    <div className="grid min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[minmax(0,1fr)_300px] xl:grid-rows-[minmax(0,1fr)]">
+                                    <div className="grid min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[minmax(0,1fr)_260px] xl:grid-rows-[minmax(0,1fr)]">
                                         <main className="min-h-0 min-w-0 overflow-y-auto">
                                             <div className="mx-auto w-full max-w-4xl space-y-4 p-5 sm:p-6">
                                         {Object.keys(validationErrors).length > 0 && (
@@ -4100,7 +4100,7 @@ OUTPUT RULES:
                                     </div>
                                 </div>
                             ) : (
-                            <div className="grid min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[360px_minmax(0,1fr)_300px] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
+                            <div className="grid min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
                         <aside className="min-h-0 border-b border-border bg-background xl:overflow-y-auto xl:border-b-0 xl:border-r">
                             <div className="space-y-4 p-4">
                                 <div>

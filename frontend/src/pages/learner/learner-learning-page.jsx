@@ -14,10 +14,13 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   LearnerEmptyState,
   ProgressBar,
 } from "@/components/learner/learner-ui.jsx"
+import { getCertificationFallbackImage, getCuratedCertificationCover } from "@/lib/certification-cover-images.js"
 
 function getCertificationTitle(certification) {
   return certification?.title ?? "Untitled Certification"
@@ -32,10 +35,11 @@ function getCertificationDescription(certification) {
 
 function getCertificationImage(certification) {
   return (
+      getCuratedCertificationCover(getCertificationTitle(certification)) ??
       certification?.imageUrl ??
       certification?.thumbnailUrl ??
       certification?.coverUrl ??
-      null
+      getCertificationFallbackImage(getCertificationTitle(certification))
   )
 }
 
@@ -509,40 +513,33 @@ export default function LearnerLearningPage() {
                   <div className="relative w-full lg:max-w-sm">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
-                    <input
+                    <Input
                         value={localSearch}
                         onChange={(event) => setLocalSearch(event.target.value)}
                         placeholder="Search courses, training"
-                        className="h-10 w-full border border-input bg-background pl-10 pr-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
+                        className="pl-10"
                     />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <select
-                        value={selectedIndustry}
-                        onChange={(event) => setSelectedIndustry(event.target.value)}
-                        className="h-10 min-w-[130px] border border-input bg-background px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                    >
-                      <option value="ALL">All Industries</option>
+                    <Select value={selectedIndustry} onValueChange={setSelectedIndustry}>
+                      <SelectTrigger className="min-w-[170px]"><SelectValue placeholder="All industries" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Industries</SelectItem>
+                        {industries.map((industry) => <SelectItem key={industry} value={industry}>{industry}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
 
-                      {industries.map((industry) => (
-                          <option key={industry} value={industry}>
-                            {industry}
-                          </option>
-                      ))}
-                    </select>
-
-                    <select
-                        value={selectedStatus}
-                        onChange={(event) => setSelectedStatus(event.target.value)}
-                        className="h-10 min-w-[130px] border border-input bg-background px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                    >
-                      <option value="ALL">All Types</option>
-                      <option value="DIAGNOSTIC REQUIRED">Diagnostic Required</option>
-                      <option value="IN PROGRESS">In Progress</option>
-                      <option value="READY TO START">Ready to Start</option>
-                      <option value="COMPLETED">Completed</option>
-                    </select>
+                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                      <SelectTrigger className="min-w-[185px]"><SelectValue placeholder="All types" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Types</SelectItem>
+                        <SelectItem value="DIAGNOSTIC REQUIRED">Diagnostic Required</SelectItem>
+                        <SelectItem value="IN PROGRESS">In Progress</SelectItem>
+                        <SelectItem value="READY TO START">Ready to Start</SelectItem>
+                        <SelectItem value="COMPLETED">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
 
                     <div className="flex overflow-hidden border border-input">
                       <button

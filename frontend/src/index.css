@@ -1,5 +1,5 @@
 
-@import url("https://fonts.googleapis.com/css2?family=Elms+Sans:ital,wght@0,100..900;1,100..900&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..700&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 @import "flowbite-react/plugin/tailwindcss";
 @source "../.flowbite-react/class-list.json";
@@ -11,8 +11,8 @@
 
 :root {
 
-    --background: oklch(0.99 0.002 255);
-    --foreground: oklch(0.18 0.03 265);
+    --background: #f6f9fc;
+    --foreground: #273452;
 
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.18 0.03 265);
@@ -21,51 +21,51 @@
     --popover-foreground: oklch(0.18 0.03 265);
 
 
-    --primary: oklch(0.53 0.19 260);
-    --primary-foreground: oklch(0.985 0.003 255);
+    --primary: #2f7dd3;
+    --primary-foreground: #ffffff;
 
 
-    --secondary: oklch(0.97 0.003 255);
-    --secondary-foreground: oklch(0.22 0.03 265);
+    --secondary: #f6f9fc;
+    --secondary-foreground: #303b59;
 
-    --muted: oklch(0.965 0.004 255);
-    --muted-foreground: oklch(0.5 0.02 265);
+    --muted: #eef3f8;
+    --muted-foreground: #66708a;
 
 
-    --accent: oklch(0.95 0.025 255);
-    --accent-foreground: oklch(0.22 0.05 265);
+    --accent: #e8f3fc;
+    --accent-foreground: #1f5f99;
 
     --destructive: oklch(0.59 0.22 27);
     --destructive-foreground: oklch(0.985 0 0);
 
-    --border: oklch(0.9 0.008 255);
-    --input: oklch(0.9 0.008 255);
-    --ring: oklch(0.53 0.19 260);
+    --border: #e0e7ef;
+    --input: #cbd8e5;
+    --ring: #5a9ddd;
 
-    --chart-1: oklch(0.53 0.19 260);
-    --chart-2: oklch(0.65 0.13 235);
-    --chart-3: oklch(0.83 0.15 94);
-    --chart-4: oklch(0.62 0.13 290);
-    --chart-5: oklch(0.37 0.05 265);
+    --chart-1: #2f7dd3;
+    --chart-2: #5aa4e6;
+    --chart-3: #d4a72c;
+    --chart-4: #8dc7ef;
+    --chart-5: #1f4f7a;
 
-    --radius: 0.8rem;
+    --radius: 0.625rem;
 
 
-    --brand-navy: oklch(0.18 0.03 265);
-    --brand-navy-soft: oklch(0.29 0.05 265);
+    --brand-navy: #102a43;
+    --brand-navy-soft: #273452;
 
-    --brand-blue: oklch(0.53 0.19 260);
-    --brand-blue-dark: oklch(0.4 0.15 263);
-    --brand-blue-soft: oklch(0.95 0.025 255);
+    --brand-blue: #2f7dd3;
+    --brand-blue-dark: #1f5f99;
+    --brand-blue-soft: #e8f3fc;
 
 
     --brand-sky: oklch(0.72 0.1 235);
     --brand-sky-soft: oklch(0.96 0.02 235);
 
 
-    --brand-yellow: oklch(0.87 0.16 94);
-    --brand-yellow-foreground: oklch(0.2 0.03 265);
-    --brand-yellow-soft: oklch(0.975 0.055 95);
+    --brand-yellow: #d4a72c;
+    --brand-yellow-foreground: #2c260f;
+    --brand-yellow-soft: #fff7d6;
 
     --brand-lilac: oklch(0.95 0.018 290);
     --brand-lilac-foreground: oklch(0.28 0.05 285);
@@ -85,70 +85,211 @@
     --sidebar-ring: oklch(0.53 0.19 260);
 }
 
+/* REBYU editorial application foundation. These rules intentionally replace
+   the older boxed portal treatment without changing component behavior. */
+@layer components {
+    .rebyu-page {
+        @apply mx-auto flex min-h-[calc(100dvh-4rem)] min-w-0 w-full max-w-[1440px] flex-1 flex-col items-stretch gap-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8;
+    }
+
+    .rebyu-page > * {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .rebyu-page-header {
+        @apply flex flex-col gap-4 border-b border-border/60 pb-6 sm:flex-row sm:items-end sm:justify-between;
+    }
+
+    .rebyu-section {
+        @apply space-y-6;
+    }
+
+    .rebyu-reading-width {
+        max-width: 72ch;
+    }
+}
+
+.public-auth-shell :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]) {
+    min-height: 2.75rem;
+    border-color: #cbd8e5;
+    border-radius: 0.625rem;
+    background: #ffffff;
+}
+
+.public-auth-shell :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):focus-visible {
+    border-color: #5a9ddd;
+    box-shadow: 0 0 0 3px rgb(90 157 221 / 0.16);
+}
+
+.public-auth-shell [data-slot="button"] {
+    min-height: 2.75rem;
+    border-radius: 0.625rem;
+    font-weight: 600;
+}
+
+.netacad-portal,
+body.netacad-overlay-theme {
+    --background: #fbfcfe;
+    --foreground: #182033;
+    --card: #ffffff;
+    --card-foreground: #182033;
+    --primary: #2f7dd3;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #27344a;
+    --muted: #f4f6f8;
+    --muted-foreground: #667085;
+    --accent: #eff6ff;
+    --accent-foreground: #1d4ed8;
+    --border: #e4e7ec;
+    --input: #d0d5dd;
+    --ring: #5a9ddd;
+    --radius: 0.625rem;
+}
+
+.netacad-portal [data-slot="card"] {
+    border-color: color-mix(in srgb, var(--border) 78%, transparent);
+    border-radius: 0.625rem;
+    box-shadow: none;
+}
+
+.netacad-portal [data-slot="table-container"] {
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.netacad-portal [data-slot="table-header"] {
+    background: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+.netacad-portal [data-slot="table-head"] {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+:is(.admin-portal, .enterprise-portal) :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border:is(.bg-card, .bg-background, .bg-white),
+:is(.admin-portal, .enterprise-portal) :is(section, article).rounded-xl.border {
+    border-color: color-mix(in srgb, var(--border) 78%, transparent);
+    border-radius: 0.625rem;
+    box-shadow: none;
+}
+
+.netacad-portal > header {
+    box-shadow: none;
+}
+
+.netacad-portal :is(p, li) {
+    line-height: 1.65;
+}
+
+.netacad-portal code,
+.netacad-portal pre,
+.netacad-portal kbd {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Keep page-local native tables visually aligned with the shared Table
+   primitive while retaining their responsive wrappers and event handlers. */
+.netacad-portal table:not([data-slot="table"]) thead {
+    background: color-mix(in srgb, var(--muted) 70%, transparent);
+    color: var(--muted-foreground);
+}
+
+.netacad-portal table:not([data-slot="table"]) th {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.netacad-portal table:not([data-slot="table"]) :is(th, td) {
+    padding-block: 0.75rem;
+}
+
+.netacad-portal table:not([data-slot="table"]) tr {
+    border-color: color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
 /* Portal system: white surfaces with a clear blue interaction language. */
 .netacad-portal,
 body.netacad-overlay-theme {
-    --background: #ffffff;
-    --foreground: #202124;
+    --background: #f6f9fc;
+    --foreground: #273452;
     --card: #ffffff;
-    --card-foreground: #202124;
+    --card-foreground: #273452;
     --popover: #ffffff;
-    --popover-foreground: #202124;
-    --primary: #1769aa;
+    --popover-foreground: #273452;
+    --primary: #2f7dd3;
     --primary-foreground: #ffffff;
-    --secondary: #edf5fb;
-    --secondary-foreground: #174d78;
-    --muted: #f5f5f5;
-    --muted-foreground: #6b7280;
-    --accent: #eaf3fa;
-    --accent-foreground: #12588d;
-    --border: #e1e4e8;
-    --input: #c9cdd2;
-    --ring: #2b7fbd;
-    --radius: 0.35rem;
-    --chart-1: #1769aa;
-    --chart-2: #35a4d4;
-    --chart-3: #6abf4b;
-    --chart-4: #f5a623;
-    --chart-5: #6f5bd3;
+    --secondary: #f6f9fc;
+    --secondary-foreground: #303b59;
+    --muted: #eef3f8;
+    --muted-foreground: #66708a;
+    --accent: #e8f3fc;
+    --accent-foreground: #1f5f99;
+    --border: #e0e7ef;
+    --input: #cbd8e5;
+    --ring: #5a9ddd;
+    --radius: 0.625rem;
+    --chart-1: #2f7dd3;
+    --chart-2: #5aa4e6;
+    --chart-3: #d4a72c;
+    --chart-4: #8dc7ef;
+    --chart-5: #1f4f7a;
     --sidebar: #ffffff;
     --sidebar-foreground: #292929;
-    --sidebar-primary: #1769aa;
+    --sidebar-primary: #2f7dd3;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #eaf3fa;
-    --sidebar-accent-foreground: #12588d;
-    --sidebar-border: #e1e4e8;
-    --sidebar-ring: #2b7fbd;
+    --sidebar-accent: #e8f3fc;
+    --sidebar-accent-foreground: #1f5f99;
+    --sidebar-border: #e0e2ea;
+    --sidebar-ring: #5a9ddd;
     background: var(--background);
 }
 
 .dark .netacad-portal,
 .dark body.netacad-overlay-theme {
-    --background: #111827;
-    --foreground: #f3f4f6;
-    --card: #182233;
-    --card-foreground: #f3f4f6;
-    --popover: #182233;
-    --popover-foreground: #f3f4f6;
-    --primary: #62aee2;
-    --primary-foreground: #08131f;
-    --secondary: #223249;
-    --secondary-foreground: #e5eef6;
-    --muted: #202b3b;
-    --muted-foreground: #aeb9c7;
-    --accent: #253a52;
-    --accent-foreground: #eaf4fb;
-    --border: #334155;
-    --input: #475569;
-    --ring: #62aee2;
-    --sidebar: #131d2b;
-    --sidebar-foreground: #e5e7eb;
-    --sidebar-primary: #62aee2;
-    --sidebar-primary-foreground: #08131f;
-    --sidebar-accent: #253a52;
-    --sidebar-accent-foreground: #f3f4f6;
-    --sidebar-border: #334155;
-    --sidebar-ring: #62aee2;
+    --background: #111b26;
+    --foreground: #f1f2f8;
+    --card: #182635;
+    --card-foreground: #f1f2f8;
+    --popover: #182635;
+    --popover-foreground: #f1f2f8;
+    --primary: #78b7e8;
+    --primary-foreground: #0c2030;
+    --secondary: #223347;
+    --secondary-foreground: #e8eaf4;
+    --muted: #1e2d3d;
+    --muted-foreground: #adb3c8;
+    --accent: #203b52;
+    --accent-foreground: #eaf6ff;
+    --border: #334b60;
+    --input: #45627a;
+    --ring: #78b7e8;
+    --sidebar: #152331;
+    --sidebar-foreground: #e8eaf4;
+    --sidebar-primary: #78b7e8;
+    --sidebar-primary-foreground: #0c2030;
+    --sidebar-accent: #203b52;
+    --sidebar-accent-foreground: #f1f2f8;
+    --sidebar-border: #334b60;
+    --sidebar-ring: #78b7e8;
     color-scheme: dark;
 }
 
@@ -211,18 +352,19 @@ body.netacad-overlay-theme {
 
 .netacad-portal [data-slot="card"] {
     border-color: var(--border);
-    border-radius: 0.35rem;
+    border-radius: 0.625rem;
     background: #ffffff;
-    box-shadow: 0 1px 3px rgb(23 43 77 / 0.08);
+    box-shadow: none;
     transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .netacad-portal [data-slot="table-container"] {
     overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 0.35rem;
+    border-block: 1px solid var(--border);
+    border-inline: 0;
+    border-radius: 0;
     background: #ffffff;
-    box-shadow: 0 1px 3px rgb(23 43 77 / 0.06);
+    box-shadow: none;
 }
 
 /* Normalize older page-local panels to the same card treatment used by the
@@ -230,9 +372,9 @@ body.netacad-overlay-theme {
 :is(.admin-portal, .enterprise-portal) :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border:is(.bg-card, .bg-background, .bg-white),
 :is(.admin-portal, .enterprise-portal) :is(section, article).rounded-xl.border {
     border-color: var(--border);
-    border-radius: 0.35rem;
+    border-radius: 0.625rem;
     background-color: #ffffff;
-    box-shadow: 0 1px 3px rgb(23 43 77 / 0.07);
+    box-shadow: none;
 }
 
 .netacad-portal h1,
@@ -244,32 +386,32 @@ body.netacad-overlay-theme {
 /* Component language shared by inline portal UI and Radix content portaled to
    document.body. Explicit data slots keep this independent from page markup. */
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"] {
-    border-radius: 0.25rem;
-    font-weight: 650;
-    letter-spacing: 0.005em;
+    border-radius: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0;
     box-shadow: none;
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="default"] {
-    background: #1769aa;
-    border: 1px solid #1769aa;
+    background: var(--primary);
+    border: 1px solid var(--primary);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="default"]:hover {
-    background: #12588d;
-    border-color: #12588d;
+    background: color-mix(in srgb, var(--primary) 88%, #273452);
+    border-color: color-mix(in srgb, var(--primary) 88%, #273452);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="outline"] {
-    border-color: #8798a8;
-    background: #ffffff;
-    color: #292929;
+    border-color: var(--border);
+    background: var(--background);
+    color: var(--foreground);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="button"][data-variant="outline"]:hover {
-    border-color: #1769aa;
-    background: #edf5fb;
-    color: #12588d;
+    border-color: var(--primary);
+    background: var(--accent);
+    color: var(--accent-foreground);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) :is(
@@ -277,9 +419,9 @@ body.netacad-overlay-theme {
     [data-slot="textarea"],
     [data-slot="select-trigger"]
 ) {
-    border-radius: 0.25rem;
-    border-color: #b9c5d0;
-    background: #ffffff;
+    border-radius: 0.625rem;
+    border-color: var(--input);
+    background: var(--background);
     box-shadow: inset 0 1px 1px rgb(23 43 77 / 0.04);
 }
 
@@ -288,18 +430,17 @@ body.netacad-overlay-theme {
     [data-slot="textarea"],
     [data-slot="select-trigger"]
 ):focus-visible {
-    border-color: #2b7fbd;
-    box-shadow: 0 0 0 3px rgb(0 169 224 / 0.18);
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) :is(
     [data-slot="dialog-content"],
     [data-slot="alert-dialog-content"]
 ) {
-    border: 1px solid #c6d0d9;
-    border-top: 4px solid #173b63;
-    border-radius: 0.3rem;
-    box-shadow: 0 20px 55px rgb(15 42 67 / 0.24);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    box-shadow: 0 24px 64px rgb(15 23 42 / 0.16);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) :is(
@@ -308,18 +449,18 @@ body.netacad-overlay-theme {
     [data-slot="sheet-title"],
     [data-slot="drawer-title"]
 ) {
-    color: #172b4d;
-    font-size: 1.125rem;
-    font-weight: 700;
+    color: var(--foreground);
+    font-size: 1.25rem;
+    font-weight: 600;
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) :is(
     [data-slot="sheet-content"],
     [data-slot="drawer-content"]
 ) {
-    border-color: #c6d0d9;
+    border-color: var(--border);
     background: #ffffff;
-    box-shadow: 0 10px 40px rgb(15 42 67 / 0.2);
+    box-shadow: 0 24px 64px rgb(15 23 42 / 0.16);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) :is(
@@ -328,14 +469,14 @@ body.netacad-overlay-theme {
     [data-slot="select-content"],
     [data-slot="popover-content"]
 ) {
-    border: 1px solid #c6d0d9;
-    border-radius: 0.25rem;
-    box-shadow: 0 10px 25px rgb(15 42 67 / 0.16);
+    border: 1px solid var(--border);
+    border-radius: 0.625rem;
+    box-shadow: 0 12px 32px rgb(15 23 42 / 0.12);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="tabs-list"] {
     gap: 0;
-    border-bottom: 1px solid #b9c5d0;
+    border-bottom: 1px solid var(--border);
     border-radius: 0;
     background: transparent;
     padding: 0;
@@ -349,9 +490,9 @@ body.netacad-overlay-theme {
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="tabs-trigger"][data-state="active"] {
-    border-bottom-color: #1769aa;
-    background: #edf5fb;
-    color: #12588d;
+    border-bottom-color: var(--primary);
+    background: var(--accent);
+    color: var(--accent-foreground);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="tabs-content"] {
@@ -359,15 +500,15 @@ body.netacad-overlay-theme {
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="table-header"] {
-    background: #f3f6f8;
-    color: #292929;
+    background: var(--muted);
+    color: var(--foreground);
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="table-head"] {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.045em;
-    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
 }
 
 :is(.netacad-portal, .netacad-overlay-theme) [data-slot="table-row"] {
@@ -426,13 +567,12 @@ body.netacad-overlay-theme [data-sonner-toast].netacad-toast {
     align-items: center;
     gap: 10px;
     overflow: hidden;
-    border: 1px solid #c6d0d9;
-    border-left: 5px solid #1769aa;
-    border-radius: 0.3rem;
-    background: #ffffff;
-    color: #172b4d;
-    padding: 13px 48px 13px 14px;
-    box-shadow: 0 12px 32px rgb(15 42 67 / 0.18);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--popover);
+    color: var(--foreground);
+    padding: 14px 46px 14px 14px;
+    box-shadow: 0 12px 32px rgb(15 23 42 / 0.12);
 }
 
 body.netacad-overlay-theme .netacad-toast-content {
@@ -441,33 +581,17 @@ body.netacad-overlay-theme .netacad-toast-content {
     padding-top: 0;
 }
 
-body.netacad-overlay-theme [data-sonner-toast][data-type="success"] {
-    border-left-color: #3f9c35;
-}
-
-body.netacad-overlay-theme [data-sonner-toast][data-type="error"] {
-    border-left-color: #c4314b;
-}
-
-body.netacad-overlay-theme [data-sonner-toast][data-type="warning"] {
-    border-left-color: #e79b19;
-}
-
-body.netacad-overlay-theme [data-sonner-toast][data-type="info"] {
-    border-left-color: #35a4d4;
-}
-
 body.netacad-overlay-theme .netacad-toast-title {
-    color: #172b4d;
-    font-size: 0.925rem;
-    font-weight: 700;
+    color: var(--foreground);
+    font-size: 1rem;
+    font-weight: 600;
     line-height: 1.3;
 }
 
 body.netacad-overlay-theme .netacad-toast-description {
     margin-top: 3px;
-    color: #5d6b7a;
-    font-size: 0.825rem;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
@@ -487,21 +611,21 @@ body.netacad-overlay-theme .netacad-toast-cancel {
     align-self: center;
     flex-shrink: 0;
     height: 30px;
-    border-radius: 0.2rem;
+    border-radius: 0.375rem;
     padding-inline: 10px;
     font-size: 0.75rem;
     font-weight: 700;
 }
 
 body.netacad-overlay-theme .netacad-toast-action {
-    background: #1769aa;
-    color: #ffffff;
+    background: var(--primary);
+    color: var(--primary-foreground);
 }
 
 body.netacad-overlay-theme .netacad-toast-cancel {
-    border: 1px solid #8798a8;
-    background: #ffffff;
-    color: #292929;
+    border: 1px solid var(--border);
+    background: var(--secondary);
+    color: var(--secondary-foreground);
 }
 
 body.netacad-overlay-theme .netacad-toast-close {
@@ -519,46 +643,46 @@ body.netacad-overlay-theme .netacad-toast-close {
 }
 
 .dark {
-    --background: oklch(0.17 0.025 265);
-    --foreground: oklch(0.975 0.004 255);
+    --background: #111b26;
+    --foreground: #f1f2f8;
 
-    --card: oklch(0.22 0.03 265);
-    --card-foreground: oklch(0.975 0.004 255);
+    --card: #182635;
+    --card-foreground: #f1f2f8;
 
-    --popover: oklch(0.22 0.03 265);
-    --popover-foreground: oklch(0.975 0.004 255);
+    --popover: #182635;
+    --popover-foreground: #f1f2f8;
 
-    --primary: oklch(0.68 0.16 255);
-    --primary-foreground: oklch(0.16 0.025 265);
+    --primary: #78b7e8;
+    --primary-foreground: #0c2030;
 
-    --secondary: oklch(0.27 0.03 265);
-    --secondary-foreground: oklch(0.975 0.004 255);
+    --secondary: #223347;
+    --secondary-foreground: #e8eaf4;
 
-    --muted: oklch(0.27 0.03 265);
-    --muted-foreground: oklch(0.73 0.025 255);
+    --muted: #1e2d3d;
+    --muted-foreground: #adb3c8;
 
-    --accent: oklch(0.31 0.06 260);
-    --accent-foreground: oklch(0.975 0.004 255);
+    --accent: #203b52;
+    --accent-foreground: #eaf6ff;
 
     --destructive: oklch(0.7 0.19 25);
     --destructive-foreground: oklch(0.985 0 0);
 
-    --border: oklch(1 0 0 / 12%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.68 0.16 255);
+    --border: #334b60;
+    --input: #45627a;
+    --ring: #78b7e8;
 
-    --chart-1: oklch(0.68 0.16 255);
-    --chart-2: oklch(0.74 0.1 235);
-    --chart-3: oklch(0.84 0.15 94);
-    --chart-4: oklch(0.7 0.1 290);
-    --chart-5: oklch(0.75 0.02 255);
+    --chart-1: #78b7e8;
+    --chart-2: #5aa4e6;
+    --chart-3: #e4bd54;
+    --chart-4: #a7d6f4;
+    --chart-5: #4f87b5;
 
     --brand-navy: oklch(0.975 0.004 255);
     --brand-navy-soft: oklch(0.8 0.025 255);
 
-    --brand-blue: oklch(0.68 0.16 255);
-    --brand-blue-dark: oklch(0.55 0.14 258);
-    --brand-blue-soft: oklch(0.3 0.06 260);
+    --brand-blue: #78b7e8;
+    --brand-blue-dark: #559bd1;
+    --brand-blue-soft: #203b52;
 
     --brand-sky: oklch(0.74 0.1 235);
     --brand-sky-soft: oklch(0.28 0.04 235);
@@ -570,22 +694,23 @@ body.netacad-overlay-theme .netacad-toast-close {
     --brand-lilac: oklch(0.31 0.045 290);
     --brand-lilac-foreground: oklch(0.9 0.03 290);
 
-    --sidebar: oklch(0.19 0.025 265);
-    --sidebar-foreground: oklch(0.975 0.004 255);
+    --sidebar: #152331;
+    --sidebar-foreground: #e8eaf4;
 
-    --sidebar-primary: oklch(0.68 0.16 255);
-    --sidebar-primary-foreground: oklch(0.16 0.025 265);
+    --sidebar-primary: #78b7e8;
+    --sidebar-primary-foreground: #0c2030;
 
-    --sidebar-accent: oklch(0.3 0.06 260);
-    --sidebar-accent-foreground: oklch(0.975 0.004 255);
+    --sidebar-accent: #203b52;
+    --sidebar-accent-foreground: #f1f2f8;
 
-    --sidebar-border: oklch(1 0 0 / 12%);
-    --sidebar-ring: oklch(0.68 0.16 255);
+    --sidebar-border: #334b60;
+    --sidebar-ring: #78b7e8;
 }
 
 @theme inline {
-    --font-sans: "Google Sans Flex", sans-serif;
-    --font-heading: "Elms Sans", sans-serif;
+    --font-sans: "Google Sans Flex", "Google Sans", Arial, ui-sans-serif, system-ui, sans-serif;
+    --font-heading: "Google Sans Flex", "Google Sans", Arial, ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -662,12 +787,12 @@ body.netacad-overlay-theme .netacad-toast-close {
     }
 
     html {
-        font-size: 17px;
+        font-size: 16px;
         @apply font-sans;
     }
 
     body {
-        @apply min-h-screen bg-background font-sans text-[1rem] text-foreground antialiased;
+        @apply min-h-screen bg-background font-sans text-base leading-relaxed text-foreground antialiased;
     }
 
     h1,
@@ -676,19 +801,19 @@ body.netacad-overlay-theme .netacad-toast-close {
     h4,
     h5,
     h6 {
-        @apply font-heading tracking-tight text-foreground;
+        @apply font-heading tracking-[-0.025em] text-foreground;
     }
 
     h1 {
-        @apply text-3xl font-bold;
+        @apply text-3xl font-bold leading-tight sm:text-4xl;
     }
 
     h2 {
-        @apply text-2xl font-bold;
+        @apply text-2xl font-semibold leading-tight;
     }
 
     h3 {
-        @apply text-xl font-semibold;
+        @apply text-xl font-semibold leading-snug;
     }
 
     h4 {
@@ -700,7 +825,40 @@ body.netacad-overlay-theme .netacad-toast-close {
     textarea,
     select {
         font: inherit;
-        font-family: "Google Sans Flex", sans-serif;
+        font-family: "Google Sans Flex", "Google Sans", Arial, ui-sans-serif, system-ui, sans-serif;
     }
+}
+
+/* Shared component scale: readable, study-friendly, and consistent across
+   learner, institution, and administrator surfaces. */
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="dropdown-menu-content"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"]
+) {
+    border-color: var(--border);
+    border-radius: 0.75rem;
+    box-shadow: 0 12px 32px rgb(39 52 82 / 0.12);
+    font-size: 0.9375rem;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="select-item"]
+) {
+    min-height: 2.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) :is(
+    [data-slot="table-cell"],
+    [data-slot="table-head"]
+) {
+    font-size: 0.9375rem;
+}
+
+:is(.netacad-portal, .netacad-overlay-theme) [data-slot="tooltip-content"] {
+    font-size: 0.8125rem;
 }
 

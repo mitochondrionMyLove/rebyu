@@ -9,4 +9,8 @@ public record ImageRightTextToolDataDto(
     public static ImageRightTextToolDataDto draft(String title, String description) {
         return new ImageRightTextToolDataDto(null, "", title, description);
     }
+
+    public static ImageRightTextToolDataDto draft(String title, String description, String imageKey) {
+        return new ImageRightTextToolDataDto(null, imageKey == null ? "" : imageKey, title, description);
+    }
 }

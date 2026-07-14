@@ -13,4 +13,7 @@ public interface AssessmentAttemptAnswerRepository
 
     Optional<AssessmentAttemptAnswer> findByAttempt_AssessmentAttemptIdAndAttemptQuestion_AttemptQuestionId(
             Long assessmentAttemptId, Long attemptQuestionId);
+
+    List<AssessmentAttemptAnswer> findByAttempt_AssessmentAttemptIdIn(
+            List<Long> assessmentAttemptIds);
 }

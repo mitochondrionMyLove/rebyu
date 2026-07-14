@@ -62,7 +62,7 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      split
+      compact
       title="Create your account"
       description="Create a learner account and begin preparing with REBYU."
       footer={
@@ -74,8 +74,8 @@ export default function RegisterPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <FieldGroup>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <FieldGroup className="gap-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="register-first">First name</FieldLabel>

@@ -448,32 +448,34 @@ public class LessonToolDraftValidator {
         }
     }
 
+    // A trusted imageKey/videoKey (resolved server-side from certification
+    // knowledge, never AI-invented — see LessonGenerationService) is allowed
+    // through; only a raw uploaded file object is rejected, since drafts are
+    // never allowed to arrive with actual file blobs.
     private void validateImageData(ImageToolDataDto data, String toolLabel) {
-        if (data == null || data.file() != null || !"".equals(data.imageKey())) {
-            throw new InvalidAiResponseException(toolLabel + ": image drafts must not include media.");
+        if (data == null || data.file() != null) {
+            throw new InvalidAiResponseException(toolLabel + ": image drafts must not include an uploaded file.");
         }
     }
 
     private void validateVideoData(VideoToolDataDto data, String toolLabel) {
-        if (data == null || data.file() != null || !"".equals(data.videoKey())) {
-            throw new InvalidAiResponseException(toolLabel + ": video drafts must not include media.");
+        if (data == null || data.file() != null) {
+            throw new InvalidAiResponseException(toolLabel + ": video drafts must not include an uploaded file.");
         }
     }
 
     private void validateImageLeftTextData(ImageLeftTextToolDataDto data, String toolLabel) {
-        if (data == null || data.file() != null || !"".equals(data.imageKey())
-                || isBlank(data.title()) || isBlank(data.description())) {
+        if (data == null || data.file() != null || isBlank(data.title()) || isBlank(data.description())) {
             throw new InvalidAiResponseException(
-                    toolLabel + ": image-left-text drafts require empty media, title, and description."
+                    toolLabel + ": image-left-text drafts require no uploaded file, a title, and a description."
             );
         }
     }
 
     private void validateImageRightTextData(ImageRightTextToolDataDto data, String toolLabel) {
-        if (data == null || data.file() != null || !"".equals(data.imageKey())
-                || isBlank(data.title()) || isBlank(data.description())) {
+        if (data == null || data.file() != null || isBlank(data.title()) || isBlank(data.description())) {
             throw new InvalidAiResponseException(
-                    toolLabel + ": image-right-text drafts require empty media, title, and description."
+                    toolLabel + ": image-right-text drafts require no uploaded file, a title, and a description."
             );
         }
     }

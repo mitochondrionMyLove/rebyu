@@ -2,6 +2,7 @@ import { Bell, CheckCircle2, GraduationCap, Mail, XCircle } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,21 +34,26 @@ export function NotificationBell({ items = [], loading = false, emptyMessage }) 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Open notifications${items.length ? `, ${items.length} available` : ""}`}
-          className="relative"
-        >
-          <Bell />
-          {items.length > 0 ? (
-            <span className="absolute right-1 top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground ring-2 ring-background">
-              {items.length > 9 ? "9+" : items.length}
-            </span>
-          ) : null}
-        </Button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Open notifications${items.length ? `, ${items.length} available` : ""}`}
+              className="relative"
+            >
+              <Bell />
+              {items.length > 0 ? (
+                <span className="absolute right-1 top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground ring-2 ring-background">
+                  {items.length > 9 ? "9+" : items.length}
+                </span>
+              ) : null}
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Notifications</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-0">
         <DropdownMenuLabel className="px-4 py-3">Notifications</DropdownMenuLabel>
         <DropdownMenuSeparator className="m-0" />

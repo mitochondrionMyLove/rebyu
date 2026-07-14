@@ -150,9 +150,9 @@ export default function EnterpriseRequestAccessPage() {
   // --- Confirmation screen ---------------------------------------------------
   if (confirmation) {
     return (
-      <div className="min-h-dvh bg-muted/40 px-4 py-12">
-        <div className="mx-auto max-w-lg">
-          <Card>
+      <div className="min-h-dvh bg-[#F6F9FC] px-5 py-12 text-[#273452]">
+        <div className="mx-auto max-w-xl pt-10">
+          <Card className="border-[#E0E7EF] shadow-none">
             <CardHeader className="items-center text-center">
               <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <CheckCircle2 className="size-6" aria-hidden="true" />
@@ -168,7 +168,7 @@ export default function EnterpriseRequestAccessPage() {
                 certification access. You will receive an email after the
                 request is approved or rejected.
               </p>
-              <div className="rounded-xl border bg-muted/40 p-4">
+              <div className="border-y border-[#E0E7EF] bg-[#F6F9FC] p-5">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   Your reference number
                 </p>
@@ -191,18 +191,28 @@ export default function EnterpriseRequestAccessPage() {
 
   // --- Request form ----------------------------------------------------------
   return (
-    <div className="min-h-dvh bg-muted/40 px-4 py-10">
-      <div className="mx-auto max-w-3xl">
-        <Button asChild variant="ghost" size="sm" className="mb-4">
-          <Link to="/">
-            <ArrowLeft aria-hidden="true" />
-            Back to home
+    <div className="min-h-dvh bg-[#F6F9FC] text-[#273452]">
+      <header className="border-b border-[#E0E7EF] bg-white">
+        <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-5 sm:px-8">
+          <Link to="/" className="flex items-center gap-2.5 font-heading text-lg font-bold tracking-tight">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-[#2F7DD3] text-white">
+              <GraduationCap className="size-5" aria-hidden="true" />
+            </span>
+            REBYU
           </Link>
-        </Button>
+          <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-[#66758A] hover:text-[#2F7DD3]">
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Home
+          </Link>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1000px] px-5 py-10 sm:px-8 sm:py-14">
 
         <div className="mb-6">
-          <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-            Request Enterprise Access
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2F7DD3]">Institution partnerships</p>
+          <h1 className="mt-3 font-heading text-3xl font-bold tracking-[-0.035em] sm:text-4xl">
+            Request institution access
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Tell us about your organization and the certifications your learners
@@ -211,10 +221,10 @@ export default function EnterpriseRequestAccessPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="mt-10 space-y-10">
           {/* Organization details */}
-          <Card>
-            <CardHeader>
+          <Card className="border-0 bg-transparent shadow-none">
+            <CardHeader className="border-b border-[#E0E7EF] px-0 pb-5">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Building2 className="size-5 text-primary" aria-hidden="true" />
                 Organization details
@@ -223,7 +233,7 @@ export default function EnterpriseRequestAccessPage() {
                 We use these to verify your organization.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
+            <CardContent className="grid gap-5 px-0 pt-6 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="org-name">Organization name</Label>
                 <Input
@@ -286,8 +296,8 @@ export default function EnterpriseRequestAccessPage() {
           </Card>
 
           {/* Certification selection */}
-          <Card>
-            <CardHeader>
+          <Card className="border-0 bg-transparent shadow-none">
+            <CardHeader className="border-b border-[#E0E7EF] px-0 pb-5">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <GraduationCap
                   className="size-5 text-primary"
@@ -300,7 +310,7 @@ export default function EnterpriseRequestAccessPage() {
                 for each.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 px-0 pt-6">
               {certificationsQuery.isLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 3 }).map((_, index) => (
@@ -318,7 +328,7 @@ export default function EnterpriseRequestAccessPage() {
                   return (
                     <div
                       key={id}
-                      className="flex flex-wrap items-center gap-3 rounded-xl border p-3"
+                      className={`flex flex-wrap items-center gap-3 border-b border-[#E0E7EF] px-1 py-4 transition-colors ${isSelected ? "bg-[#E8F3FC]/65" : "bg-transparent"}`}
                     >
                       <label className="flex flex-1 cursor-pointer items-center gap-3">
                         <Checkbox
@@ -364,8 +374,8 @@ export default function EnterpriseRequestAccessPage() {
 
           {/* Summary */}
           {selectedItems.length > 0 ? (
-            <Card>
-              <CardHeader>
+            <Card className="border-[#D8E7F2] bg-[#EAF3FA] shadow-none">
+              <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Request summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -402,7 +412,7 @@ export default function EnterpriseRequestAccessPage() {
 
           <Button
             type="submit"
-            className="w-full"
+            className="h-11 w-full sm:ml-auto sm:flex sm:w-auto sm:min-w-64"
             disabled={submitMutation.isPending}
           >
             {submitMutation.isPending ? (

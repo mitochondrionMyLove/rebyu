@@ -1,9 +1,9 @@
 import { useMemo } from "react"
 import { Outlet, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { Building2Icon, LogOutIcon, SettingsIcon, UserIcon } from "lucide-react"
+import { LogOutIcon, SettingsIcon, UserIcon } from "lucide-react"
 
-import { EnterpriseAppSidebar } from "@/components/enterprise/enterprise-sidebar.jsx"
+import { PortalTopNavigation } from "@/components/navigation/portal-navigation.jsx"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -13,12 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
 import { getEnterpriseById } from "@/services/enterpriseService.js"
 import { useAuth } from "@/context/auth-context.jsx"
 import { getEnterpriseInvitations } from "@/services/partnershipService.js"
@@ -107,29 +101,8 @@ export default function EnterpriseLayout() {
   }
 
   return (
-    <SidebarProvider
-      className="netacad-portal enterprise-portal"
-      open={false}
-      style={{ "--sidebar-width-icon": "3.25rem" }}
-    >
-      <EnterpriseAppSidebar collapsible="icon" className="border-r border-sidebar-border" />
-
-      <SidebarInset>
-        <header className="sticky top-0 z-40 h-16 shrink-0 border-b bg-white/95 shadow-sm backdrop-blur">
-          <div className="mx-auto flex h-full w-full max-w-[1280px] items-center justify-between gap-5 px-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <SidebarTrigger className="-ml-1 md:hidden" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 hidden data-[orientation=vertical]:h-4 md:block"
-            />
-            <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-              <Building2Icon className="size-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{orgName}</span>
-            </div>
-          </div>
-
-          <div className="flex min-w-0 items-center justify-end gap-2">
+    <div className="netacad-portal enterprise-portal flex min-h-screen flex-col bg-background">
+      <PortalTopNavigation role="ENTERPRISE" organizationName={orgName} actions={<>
             <NotificationBell
               items={notifications}
               loading={invitationsQuery.isLoading}
@@ -177,14 +150,11 @@ export default function EnterpriseLayout() {
                </DropdownMenuItem>
              </DropdownMenuContent>
            </DropdownMenu>
-          </div>
-          </div>
-        </header>
+      </>} />
 
-        <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="rebyu-page">
           <Outlet context={outletContext} />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </main>
+    </div>
   )
 }
