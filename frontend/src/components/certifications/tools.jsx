@@ -22,8 +22,9 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { API } from "@/services/base"
 
-const FILE_API_URL = "http://localhost:8080/api/files/download"
+const FILE_API_URL = `${API}/files/download`
 
 function createId(prefix) {
     return `${prefix}-${crypto.randomUUID()}`

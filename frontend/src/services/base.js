@@ -1,9 +1,13 @@
 import axios from "axios"
 import { fetchAuthSession } from "aws-amplify/auth"
 
-// In dev the Vite proxy forwards /api to the backend (see vite.config.ts),
-// which keeps requests same-origin regardless of the dev server port.
-export const API = import.meta.env.DEV ? "/api" : "http://localhost:8080/api"
+// In development, Vite forwards /api to the local backend. In deployed builds,
+// use the public API URL supplied by the host (for example, Railway).
+const deployedApiOrigin = import.meta.env.VITE_API_URL?.replace(/\/+$/, "")
+
+export const API = import.meta.env.DEV
+  ? "/api"
+  : `${deployedApiOrigin || "http://localhost:8080"}/api`
 
 // Attaches the Cognito access token when a session exists.
 async function currentAccessToken() {
