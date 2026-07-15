@@ -3351,17 +3351,17 @@ OUTPUT RULES:
     }
 
     return (
-        <section className="flex h-full min-h-0 flex-col overflow-hidden py-0">
+        <section className="flex min-h-0 flex-col bg-muted/20 py-0 md:h-[calc(100dvh-8rem)] md:overflow-hidden">
             <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
-                className="flex h-full min-h-0 flex-1 flex-col"
+                className="flex min-h-0 flex-1 flex-col"
             >
-                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-background">
-                    <TabsList className="h-11 w-fit rounded-none bg-transparent p-0">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/80 bg-background/95 px-3 py-2 backdrop-blur sm:px-5">
+                    <TabsList className="h-10 w-fit gap-1 rounded-lg bg-muted/70 p-1">
                         <TabsTrigger
                             value="all-questions"
-                            className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                            className="h-8 rounded-md px-3 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
                         >
                             <ListChecks className="mr-2 h-4 w-4" />
                             All Questions
@@ -3369,7 +3369,7 @@ OUTPUT RULES:
 
                         <TabsTrigger
                             value="question-builder"
-                            className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                            className="h-8 rounded-md px-3 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
                         >
                             <BookOpen className="mr-2 h-4 w-4" />
                             Question Builder
@@ -3412,23 +3412,13 @@ OUTPUT RULES:
                     value="all-questions"
                     className="m-0 min-h-0 flex-1 overflow-y-auto py-5"
                 >
-                    <div className="w-full">
-                        <div>
-                            <h2 className="font-heading text-xl font-bold tracking-tight text-foreground">
-                                Questions
-                            </h2>
-
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Select a certification to view and manage its questions.
-                            </p>
-                        </div>
-
-                        <Card className="mt-5 border-border/80 shadow-sm">
+                    <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6">
+                        <Card className="rounded-2xl border-border/80 bg-background shadow-sm">
                             <CardContent className="p-4 sm:p-5">
-                                <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                                     <div>
-                                        <h3 className="text-sm font-semibold text-foreground">
-                                            Find questions
+                                        <h3 className="text-base font-semibold text-foreground">
+                                            Refine your library
                                         </h3>
 
                                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -3447,7 +3437,7 @@ OUTPUT RULES:
                                     )}
                                 </div>
 
-                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(250px,1.35fr)_minmax(230px,1.2fr)_minmax(185px,0.9fr)_minmax(165px,0.8fr)]">
+                                <div className="grid gap-3 rounded-xl border border-border/70 bg-muted/30 p-3 md:grid-cols-2 xl:grid-cols-[minmax(250px,1.35fr)_minmax(230px,1.2fr)_minmax(185px,0.9fr)_minmax(165px,0.8fr)]">
                                     <div className="space-y-1.5">
                                         <Label
                                             htmlFor="question-filter-certification"
@@ -3679,9 +3669,22 @@ OUTPUT RULES:
                             </CardContent>
                         </Card>
 
-                        <Card className="mt-4 overflow-hidden">
+                        <Card className="mt-5 overflow-hidden rounded-2xl border-border/80 bg-background shadow-sm">
+                            <div className="flex flex-col gap-2 border-b border-border/70 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-foreground">Question library</h3>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        Review saved questions or open one to make changes.
+                                    </p>
+                                </div>
+                                <Badge variant="secondary" className="w-fit rounded-md px-2.5 py-1">
+                                    {selectedFilterCertification
+                                        ? `${filteredQuestions.length} total`
+                                        : "Choose a certification"}
+                                </Badge>
+                            </div>
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[880px]">
+                                <Table className="min-w-[880px] [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-muted/35">
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead className="min-w-72">Question</TableHead>
@@ -3824,7 +3827,7 @@ OUTPUT RULES:
 
                             <Separator />
 
-                            <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col gap-3 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                                 <p className="min-w-0 truncate text-sm text-muted-foreground">
                                     {selectedFilterCertification
                                         ? `${filteredQuestions.length} question${
@@ -3899,11 +3902,11 @@ OUTPUT RULES:
 
                 <TabsContent
                     value="question-builder"
-                    className="m-0 min-h-0 flex-1 overflow-hidden py-5 data-[state=active]:flex data-[state=active]:flex-col"
+                    className="m-0 min-h-0 flex-1 overflow-visible py-5 md:overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
                 >
                     {builderMode === "" ? (
                         <div className="flex flex-1 items-center justify-center p-6">
-                            <div className="w-full max-w-2xl rounded-xl border border-border bg-background p-8 text-center shadow-sm">
+                            <div className="w-full max-w-2xl rounded-2xl border border-border/80 bg-gradient-to-br from-background via-background to-primary/5 p-8 text-center shadow-lg shadow-primary/5">
                                 <h2 className="font-heading text-xl font-bold tracking-tight text-foreground">
                                     Question Builder
                                 </h2>
@@ -3916,7 +3919,7 @@ OUTPUT RULES:
                                     <button
                                         type="button"
                                         onClick={() => setBuilderMode("manual")}
-                                        className="group flex flex-col items-center gap-3 rounded-xl border border-border bg-background p-6 text-center transition hover:border-primary hover:bg-primary/5"
+                                        className="group flex flex-col items-center gap-3 rounded-xl border border-border/80 bg-background/90 p-6 text-center shadow-sm transition duration-200 hover:-translate-y-1 hover:border-primary/60 hover:bg-primary/5 hover:shadow-md"
                                     >
                                         <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                                             <FileQuestion className="h-6 w-6" />
@@ -3932,7 +3935,7 @@ OUTPUT RULES:
                                     <button
                                         type="button"
                                         onClick={() => setBuilderMode("generate")}
-                                        className="group flex flex-col items-center gap-3 rounded-xl border border-border bg-background p-6 text-center transition hover:border-primary hover:bg-primary/5"
+                                        className="group flex flex-col items-center gap-3 rounded-xl border border-border/80 bg-background/90 p-6 text-center shadow-sm transition duration-200 hover:-translate-y-1 hover:border-primary/60 hover:bg-primary/5 hover:shadow-md"
                                     >
                                         <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                                             <UploadIcon className="h-6 w-6" />
@@ -3951,7 +3954,7 @@ OUTPUT RULES:
                     ) : (
                         <div className="flex min-h-0 flex-1 flex-col gap-3">
                             <div className="flex shrink-0 justify-center">
-                                <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1">
+                                <div className="inline-flex rounded-xl border border-border/80 bg-background p-1 shadow-sm">
                                     <button
                                         type="button"
                                         onClick={() => setBuilderMode("manual")}
@@ -4021,8 +4024,8 @@ OUTPUT RULES:
                                             </p>
                                     </div>
 
-                                    <div className="grid min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[minmax(0,1fr)_260px] xl:grid-rows-[minmax(0,1fr)]">
-                                        <main className="min-h-0 min-w-0 overflow-y-auto">
+                                    <div className="grid min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border/80 bg-background shadow-sm md:grid-cols-[minmax(0,1fr)_240px] md:overflow-hidden">
+                                        <main className="min-h-0 min-w-0 bg-muted/20 md:overflow-y-auto">
                                             <div className="mx-auto w-full max-w-4xl space-y-4 p-5 sm:p-6">
                                         {Object.keys(validationErrors).length > 0 && (
                                             <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -4073,7 +4076,7 @@ OUTPUT RULES:
                                         )}
                                             </div>
                                         </main>
-                                        <aside className="min-h-0 border-t border-border bg-background xl:overflow-y-auto xl:border-l xl:border-t-0">
+                                        <aside className="min-h-0 border-t border-border bg-background/95 md:overflow-y-auto md:border-l md:border-t-0">
                                             <div className="space-y-4 p-4">
                                                 <div>
                                                     <p className="text-sm font-medium text-foreground">
@@ -4100,8 +4103,8 @@ OUTPUT RULES:
                                     </div>
                                 </div>
                             ) : (
-                            <div className="grid min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-sm xl:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
-                        <aside className="min-h-0 border-b border-border bg-background xl:overflow-y-auto xl:border-b-0 xl:border-r">
+                            <div className="grid min-h-0 w-full flex-1 overflow-y-auto rounded-2xl border border-border/80 bg-background shadow-sm md:grid-cols-[220px_minmax(0,1fr)_240px] md:overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)_260px]">
+                        <aside className="min-h-0 border-b border-border bg-background/95 md:overflow-y-auto md:border-b-0 md:border-r">
                             <div className="space-y-4 p-4">
                                 <div>
                                     <p className="text-sm font-medium text-foreground">
@@ -4283,7 +4286,7 @@ OUTPUT RULES:
                             </div>
                         </aside>
 
-                        <main className="min-h-0 min-w-0 bg-muted/20 xl:overflow-y-auto">
+                        <main className="min-h-0 min-w-0 bg-muted/30 md:overflow-y-auto">
                             <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 p-5 sm:p-6">
                                 {!selectedLesson ? (
                                     <EmptyState
@@ -4359,7 +4362,7 @@ OUTPUT RULES:
                             </div>
                         </main>
 
-                        <aside className="min-h-0 border-t border-border bg-background xl:overflow-y-auto xl:border-l xl:border-t-0">
+                        <aside className="min-h-0 border-t border-border bg-background/95 md:overflow-y-auto md:border-l md:border-t-0">
                             <div className="space-y-4 p-4">
                                 <div>
                                     <p className="text-sm font-medium text-foreground">

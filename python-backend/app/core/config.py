@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -24,7 +25,12 @@ class Settings(BaseSettings):
     debug: bool = False
     api_prefix: str = "/api/v1/bkt"
     service_api_key: str = ""
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # Keep this as a CSV environment variable (rather than Pydantic's default
+    # JSON array) so `CORS_ORIGINS=http://localhost:5173,http://localhost:3000`
+    # works in .env files.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
 
     database_url: str = "postgresql+psycopg://rebyu:rebyu@postgres:5432/rebyu"
     sql_echo: bool = False

@@ -79,9 +79,26 @@ function getNumber(value, fallback = 0) {
   return Number.isFinite(parsedValue) ? parsedValue : fallback
 }
 
+// For values the backend already reports on a 0-100 scale. Unlike toPercent,
+// this never re-scales -- a real value of 0.5 (half a percent) must stay 0.5,
+// not become 50, which toPercent's 0-1-means-a-fraction heuristic would do.
+function clampPercent(value) {
+  if (value === null || value === undefined || value === "") {
+    return null
+  }
+
+  const numericValue = Number(value)
+
+  if (!Number.isFinite(numericValue)) {
+    return null
+  }
+
+  return Math.max(0, Math.min(100, Math.round(numericValue)))
+}
+
 function getTopicScore(topic) {
   return (
-      toPercent(
+      clampPercent(
           topic.mastery ??
           topic.masteryPercentage ??
           topic.score ??
@@ -182,6 +199,123 @@ function ChartLegend() {
           <span className="h-1.5 w-1.5 rounded-full bg-[#202020]" />
           <span className="text-xs text-zinc-500">Exam</span>
         </div>
+      </div>
+  )
+}
+
+function StrongestTopicRow({ topic }) {
+  const mastery = clampPercent(topic.masteryPercentage) ?? 0
+
+  return (
+      <div className="flex items-center justify-between gap-3">
+        <p className="truncate text-sm font-medium text-zinc-600">
+          {topic.lessonTitle ?? "Untitled Topic"}
+        </p>
+
+        <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+          {mastery}%
+        </span>
+      </div>
+  )
+}
+
+function RecommendationCard({ recommendation }) {
+  return (
+      <div className="rounded-lg border border-border/60 px-3.5 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm font-medium text-foreground">
+            {recommendation.lessonTitle ?? "Untitled Topic"}
+          </p>
+
+          {recommendation.priorityTag && (
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {recommendation.priorityTag.replaceAll("_", " ")}
+              </span>
+          )}
+        </div>
+
+        {recommendation.reason && (
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+              {recommendation.reason}
+            </p>
+        )}
+      </div>
+  )
+}
+
+function CategoryMasteryNode({ category, depth = 0 }) {
+  const mastery = clampPercent(category.masteryPercentage)
+
+  return (
+      <div>
+        <div
+            className="flex items-center justify-between gap-3 py-1.5"
+            style={{ paddingLeft: `${depth * 16}px` }}
+        >
+          <p className={`truncate ${depth === 0 ? "text-sm font-semibold text-foreground" : "text-sm text-muted-foreground"}`}>
+            {category.title ?? "Untitled Category"}
+          </p>
+
+          <span className="shrink-0 text-xs font-medium text-muted-foreground">
+            {mastery === null ? "Unassessed" : `${mastery}%`}
+            {" · "}
+            {category.completedLessonCount}/{category.totalLessonCount} lessons
+          </span>
+        </div>
+
+        {(category.children ?? []).map((child) => (
+            <CategoryMasteryNode key={`${child.categoryLevel}-${child.categoryId}`} category={child} depth={depth + 1} />
+        ))}
+      </div>
+  )
+}
+
+function RecentActivityRow({ activity }) {
+  const occurredAt = activity.occurredAt ? new Date(activity.occurredAt) : null
+
+  return (
+      <div className="flex items-center justify-between gap-3 py-1.5">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-zinc-700">
+            {activity.title ?? (activity.activityType === "CHALLENGE" ? "Challenge" : "Assessment")}
+          </p>
+
+          <p className="text-xs text-zinc-400">
+            {activity.activityType === "CHALLENGE" ? "Challenge" : "Assessment"}
+            {occurredAt ? ` · ${occurredAt.toLocaleDateString()}` : ""}
+          </p>
+        </div>
+
+        {activity.scorePercentage != null && (
+            <span className="shrink-0 text-xs font-semibold text-zinc-700">
+              {clampPercent(activity.scorePercentage)}%
+            </span>
+        )}
+      </div>
+  )
+}
+
+function PerformanceBreakdownList({ buckets }) {
+  const visible = (buckets ?? []).filter((bucket) => bucket.totalAnswered > 0)
+
+  if (visible.length === 0) {
+    return <p className="mt-3 text-sm text-muted-foreground">No graded answers yet.</p>
+  }
+
+  return (
+      <div className="mt-3 space-y-2.5">
+        {visible.map((bucket) => (
+            <div key={bucket.bucketKey} className="flex items-center justify-between gap-3">
+              <span className="truncate text-sm text-zinc-600">
+                {bucket.bucketKey?.replaceAll("_", " ") ?? "Unknown"}
+              </span>
+
+              <span className="shrink-0 text-xs font-medium text-zinc-500">
+                {bucket.correctAnswers}/{bucket.totalAnswered} correct
+                {bucket.accuracyPercentage != null ? ` (${Math.round(bucket.accuracyPercentage)}%)` : ""}
+              </span>
+            </div>
+        ))}
       </div>
   )
 }
@@ -358,11 +492,11 @@ export default function LearnerProgressPage() {
     }
 
     const quizScores = scoreTrend.map((point) =>
-        isQuizType(point.assessmentType) ? toPercent(point.percentage) : null
+        isQuizType(point.assessmentType) ? clampPercent(point.percentage) : null
     )
 
     const examScores = scoreTrend.map((point) =>
-        isQuizType(point.assessmentType) ? null : toPercent(point.percentage)
+        isQuizType(point.assessmentType) ? null : clampPercent(point.percentage)
     )
 
     return {
@@ -606,10 +740,10 @@ export default function LearnerProgressPage() {
     }
   }, [])
 
-  const topicMastery = toPercent(analytics?.overallMasteryPercentage)
-  const confidenceLevel = toPercent(analytics?.confidencePercentage)
+  const topicMastery = clampPercent(analytics?.overallMasteryPercentage)
+  const confidenceLevel = clampPercent(analytics?.confidencePercentage)
   const studyStreak = getNumber(analytics?.studyStreakDays, 0)
-  const readinessLevel = toPercent(analytics?.readinessPercentage)
+  const readinessLevel = clampPercent(analytics?.readinessPercentage)
   const bktUnavailable = analytics != null && analytics.bktAvailable === false
 
   return (
@@ -838,6 +972,85 @@ export default function LearnerProgressPage() {
                         </div>
                       </div>
                   )}
+                </DashboardPanel>
+              </section>
+
+              <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(310px,0.78fr)]">
+                <DashboardPanel title="Recommended Topics">
+                  {(analytics?.recommendedTopics ?? []).length === 0 ? (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        No recommendations yet -- complete an assessment to get personalized suggestions.
+                      </p>
+                  ) : (
+                      <div className="mt-4 space-y-2.5">
+                        {analytics.recommendedTopics.map((recommendation) => (
+                            <RecommendationCard
+                                key={recommendation.lessonId}
+                                recommendation={recommendation}
+                            />
+                        ))}
+                      </div>
+                  )}
+                </DashboardPanel>
+
+                <DashboardPanel title="Strongest Topics">
+                  {(analytics?.strongestTopics ?? []).length === 0 ? (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        No strong topics identified yet.
+                      </p>
+                  ) : (
+                      <div className="mt-4 space-y-3">
+                        {analytics.strongestTopics.map((topic) => (
+                            <StrongestTopicRow key={topic.lessonId} topic={topic} />
+                        ))}
+                      </div>
+                  )}
+                </DashboardPanel>
+              </section>
+
+              <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(310px,0.78fr)]">
+                <DashboardPanel title="Category Mastery">
+                  {(analytics?.categoryMastery ?? []).length === 0 ? (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        No category mastery data yet.
+                      </p>
+                  ) : (
+                      <div className="mt-3 divide-y divide-border/60">
+                        {analytics.categoryMastery.map((category) => (
+                            <CategoryMasteryNode
+                                key={`${category.categoryLevel}-${category.categoryId}`}
+                                category={category}
+                            />
+                        ))}
+                      </div>
+                  )}
+                </DashboardPanel>
+
+                <DashboardPanel title="Recent Activity">
+                  {(analytics?.recentActivity ?? []).length === 0 ? (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        No recent assessment or challenge activity yet.
+                      </p>
+                  ) : (
+                      <div className="mt-3 divide-y divide-border/60">
+                        {analytics.recentActivity.map((activity, index) => (
+                            <RecentActivityRow
+                                key={`${activity.activityType}-${activity.occurredAt}-${index}`}
+                                activity={activity}
+                            />
+                        ))}
+                      </div>
+                  )}
+                </DashboardPanel>
+              </section>
+
+              <section className="grid gap-4 sm:grid-cols-2">
+                <DashboardPanel title="Performance by Question Type">
+                  <PerformanceBreakdownList buckets={analytics?.performanceByQuestionType} />
+                </DashboardPanel>
+
+                <DashboardPanel title="Performance by Assessment Type">
+                  <PerformanceBreakdownList buckets={analytics?.performanceByAssessmentType} />
                 </DashboardPanel>
               </section>
 
