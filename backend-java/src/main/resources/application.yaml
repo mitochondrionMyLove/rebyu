@@ -80,7 +80,7 @@ app:
     from: nezer.resora@gmail.com
 
 server:
-  port: 8080
+  port: ${PORT:8080}
   error:
     include-message: always
     include-binding-errors: always
@@ -148,9 +148,9 @@ langchain4j:
       log-responses: false
 
 db:
-  host: ${HOST}
-  port: ${PORT}
-  database: ${DATABASE}
+  host: ${DB_HOST}
+  port: ${DB_PORT:5432}
+  database: ${DB_DATABASE}
 
 # Internal FastAPI Bayesian Knowledge Tracing (BKT) service integration.
 # The browser never calls FastAPI; only Spring Boot does, over the internal
