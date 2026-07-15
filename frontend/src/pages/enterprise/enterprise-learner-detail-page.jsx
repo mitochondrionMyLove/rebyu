@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { Link, useOutletContext, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, TargetIcon } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -27,18 +27,6 @@ import {
 import { base } from "@/services/base"
 
 function useLearnerInsights(learnerId, enabled) {
-  const weakAreasQuery = useQuery({
-    queryKey: ["weak-areas"],
-    queryFn: () => base("weak-areas"),
-    enabled,
-    retry: 1,
-  })
-  const masteryQuery = useQuery({
-    queryKey: ["learner-lesson-mastery"],
-    queryFn: () => base("learner-lesson-mastery"),
-    enabled,
-    retry: 1,
-  })
   const resultsQuery = useQuery({
     queryKey: ["exam-results"],
     queryFn: () => base("exam-results"),
@@ -53,15 +41,10 @@ function useLearnerInsights(learnerId, enabled) {
         (item) => Number(item.learnerId) === idNum
       )
     return {
-      weakAreas: filterByLearner(weakAreasQuery.data),
-      mastery: filterByLearner(masteryQuery.data),
       results: filterByLearner(resultsQuery.data),
-      isLoading:
-        weakAreasQuery.isLoading ||
-        masteryQuery.isLoading ||
-        resultsQuery.isLoading,
+      isLoading: resultsQuery.isLoading,
     }
-  }, [learnerId, weakAreasQuery, masteryQuery, resultsQuery])
+  }, [learnerId, resultsQuery])
 }
 
 export default function EnterpriseLearnerDetailPage() {
@@ -201,46 +184,6 @@ export default function EnterpriseLearnerDetailPage() {
               <p className="py-4 text-center text-muted-foreground">
                 Learner profile details are unavailable.
               </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Weak areas</CardTitle>
-            <CardDescription>
-              Topics where this learner shows the lowest accuracy.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {insights.weakAreas.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                <TargetIcon
-                  className="mx-auto mb-2 size-5"
-                  aria-hidden="true"
-                />
-                No weak-area data recorded yet.
-              </div>
-            ) : (
-              <ul className="space-y-3">
-                {insights.weakAreas.slice(0, 6).map((area) => (
-                  <li
-                    key={`${area.learnerId}-${area.lessonId}`}
-                    className="space-y-1"
-                  >
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Lesson #{area.lessonId}</span>
-                      <span className="text-muted-foreground">
-                        {Math.round((area.accuracyRate ?? 0) * 100)}% accuracy
-                      </span>
-                    </div>
-                    <Progress
-                      value={(area.accuracyRate ?? 0) * 100}
-                      aria-label="Accuracy"
-                    />
-                  </li>
-                ))}
-              </ul>
             )}
           </CardContent>
         </Card>

@@ -65,14 +65,6 @@ export function markLessonComplete(data) {
   })
 }
 
-export function getAllLessonMastery() {
-  return base("learner-lesson-mastery")
-}
-
-export function getAllWeakAreas() {
-  return base("weak-areas")
-}
-
 export function getAllActivityLogs() {
   return base("activity-logs")
 }
@@ -139,17 +131,6 @@ function isSameId(a, b) {
   return String(a ?? "") === String(b ?? "")
 }
 
-function uniqueBy(items, keyFn) {
-  const map = new Map()
-  for (const item of items) {
-    const key = keyFn(item)
-    if (key !== null && key !== undefined && !map.has(key)) {
-      map.set(key, item)
-    }
-  }
-  return [...map.values()]
-}
-
 function completionKey(item) {
   return `${item.learnerId}:${item.lessonId}`
 }
@@ -192,8 +173,6 @@ export async function getLearnerPortalData() {
     certifications,
     learnerCertifications,
     completedLessons,
-    mastery,
-    weakAreas,
     activityLogs,
     exams,
     examResults,
@@ -207,8 +186,6 @@ export async function getLearnerPortalData() {
       ? base(`learner/enrollments?learnerId=${identity.learnerId}`)
       : getAllLearnerCertifications(),
     getAllCompletedLessons(),
-    getAllLessonMastery(),
-    getAllWeakAreas(),
     getAllActivityLogs(),
     getAllExams(),
     getAllExamResults(),
@@ -280,14 +257,6 @@ export async function getLearnerPortalData() {
   )
   const completedSet = new Set(completedForLearner.map(completionKey))
 
-  const masteryForLearner = asArray(mastery).filter((item) =>
-    isSameId(item.learnerId, learnerId)
-  )
-
-  const weakAreasForLearner = asArray(weakAreas).filter((item) =>
-    isSameId(item.learnerId, learnerId)
-  )
-
   const activityLogsForUser = asArray(activityLogs).filter((item) =>
     isSameId(item.userId, userId)
   )
@@ -307,20 +276,13 @@ export async function getLearnerPortalData() {
       }
     })
 
-  const lessonById = new Map(allLessons.map((lesson) => [String(lesson.lessonId), lesson]))
-
   const lessonsWithProgress = lessonList.map((lesson) => {
     const complete = completedSet.has(`${learnerId}:${lesson.lessonId}`)
-    const masteryItem = masteryForLearner.find((item) =>
-      isSameId(item.lessonId, lesson.lessonId)
-    )
 
     return {
       ...lesson,
       completed: complete,
       status: complete ? "Completed" : "Not Started",
-      masteryProbability: masteryItem?.masteryProbability ?? null,
-      masteryLevel: masteryItem?.masteryLevel ?? null,
     }
   })
 
@@ -328,19 +290,6 @@ export async function getLearnerPortalData() {
   const totalLessons = lessonsWithProgress.length
   const overallProgress =
     totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : null
-
-  const masteryValues = masteryForLearner
-    .map((item) => getScoreNumber(item.masteryProbability))
-    .filter((value) => value !== null)
-
-  const topicMastery =
-    masteryValues.length > 0
-      ? Math.round(
-          (masteryValues.reduce((sum, value) => sum + value, 0) /
-            masteryValues.length) *
-            100
-        )
-      : null
 
   const performancePoints = examResultsForLearner
     .map((result) => {
@@ -358,29 +307,6 @@ export async function getLearnerPortalData() {
     })
     .filter((point) => point.score !== null)
     .sort((a, b) => new Date(a.takenAt ?? 0) - new Date(b.takenAt ?? 0))
-
-  const weakTopics = uniqueBy(
-    weakAreasForLearner
-      .map((area) => {
-        const lesson = lessonById.get(String(area.lessonId))
-        const accuracy = getScoreNumber(area.accuracyRate)
-        const masteryValue = getScoreNumber(area.masteryProbability)
-        return {
-          ...area,
-          title: lesson?.name ?? `Lesson ${area.lessonId}`,
-          category: lesson?.middleCategoryTitle ?? lesson?.majorCategoryTitle ?? "Topic",
-          percent:
-            masteryValue !== null
-              ? Math.round(masteryValue * 100)
-              : accuracy !== null
-                ? Math.round(accuracy * 100)
-                : 0,
-          recommendation: area.weaknessLevel ?? "Review recommended",
-        }
-      })
-      .sort((a, b) => a.percent - b.percent),
-    (item) => item.lessonId
-  )
 
   const recentExamResults = performancePoints.slice(-5).reverse()
 
@@ -435,8 +361,6 @@ export async function getLearnerPortalData() {
     enrolledCertifications,
     lessons: lessonsWithProgress,
     completedLessons: completedForLearner,
-    mastery: masteryForLearner,
-    weakAreas: weakTopics,
     activityLogs: activityLogsForUser,
     exams: asArray(exams),
     examResults: examResultsForLearner,
@@ -447,7 +371,6 @@ export async function getLearnerPortalData() {
       totalLessons,
       completedCount,
       overallProgress,
-      topicMastery,
       confidenceLevel: learner?.confidenceLevel ?? null,
       readinessScore: learner?.readinessScore ?? null,
       studyStreak: computeStudyStreak(activityLogsForUser),
